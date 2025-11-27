@@ -1,0 +1,40 @@
+/* App.css (Global Styles) */
+
+@import 'tailwindcss';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS VARIABLES (The :root block) */
+:root {
+    /* Define your custom colors here - These will be used by var() */
+    --color-primary-bg: #0B1221;
+    --color-secondary-bg: #151D2C;
+    --color-text-light: #E5E7EB;
+    --color-accent: #00FFFF;
+    --color-accent-dark: #00AABB; 
+}
+
+/* BASE GLOBAL STYLES */
+
+body {
+    /* Apply the variable for the background color */
+    background-color: var(--color-secondary-bg);
+    color: var(--color-text-light);
+    @apply antialiased; 
+}
+
+/* CUSTOM COMPONENT CLASSES (The @apply statements remain the same!) */
+
+.btn-cta {
+    /* NOTE: We MUST use background-color: var(...) instead of @apply bg-accent here, 
+       because @apply doesn't read CSS variables directly for color utilities. */
+    background-color: var(--color-accent);
+    color: var(--color-primary-bg);
+    @apply font-bold py-3 px-6 rounded-lg shadow-xl tracking-wider uppercase transition duration-300;
+}
+
+.btn-cta:hover {
+    background-color: var(--color-accent-dark);
+}
