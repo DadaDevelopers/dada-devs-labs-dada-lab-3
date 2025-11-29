@@ -15,7 +15,7 @@ const Footer: React.FC = () => {
         
         {/* Copyright & Bitcoin mention */}
         <p className="text-xs text-gray-500 mt-4">
-          &copy; {new Date().getFullYear()} RAHAFUND by DirectAid. Built with Bitcoin and Lightning ⚡.
+          &copy; {new Date().getFullYear()} DirectAid by DadaDevs Cohort 3, Team 3. Built with Bitcoin and Lightning ⚡.
         </p>
       </div>
     </footer>

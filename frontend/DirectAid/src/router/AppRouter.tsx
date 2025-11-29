@@ -13,12 +13,11 @@ export default function AppRouter() {
         <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Signup />} />
-            <Route path="/" element={<AdminDashboard />} />
-            <Route path="/" element={<BeneficiaryDashboard />} />
-            <Route path="/" element={<ProviderDashboard />} />
-            <Route path="/" element={<CampaignPage />} />
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/admindashboard" element={<AdminDashboard />} />
+            <Route path="/userdashboard" element={<BeneficiaryDashboard />} />
+            <Route path="/providerdashboard" element={<ProviderDashboard />} />
+            <Route path="/campaigns" element={<CampaignPage />} />
         </Routes>
     );
 }
