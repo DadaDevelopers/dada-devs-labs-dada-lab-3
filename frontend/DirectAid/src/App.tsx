@@ -1,18 +1,9 @@
-// import React from 'react'
-import LandingPage from './pages/LandingPage';
-import './styles/App.css';
+import AppRouter from "./router/AppRouter.tsx";
+import "./styles/App.css";
 
 
 function App() {
-  
-
-  return (
-    <>
-      <div>
-        <LandingPage />
-      </div>
-    </>
-  )
+  return <AppRouter />;
 }
 
-export default App
+export default App;

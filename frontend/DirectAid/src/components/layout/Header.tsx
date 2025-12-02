@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from "react-router-dom";
 
 
 const Header: React.FC = () => {
@@ -17,7 +18,7 @@ const Header: React.FC = () => {
         <div className="flex space-x-4 text-[var(--color-text-light)]">
           <a href="#how" className="text-sm hover:text-[var(--color-accent)] transition duration-200">How it works</a>
           <a href="#campaigns" className="text-sm hover:text-[var(--color-accent)] transition duration-200">Campaigns</a>
-          <a href="#providers" className="text-sm hover:text-[var(--color-accent)] transition duration-200">Providers</a>
+          <Link to="/ProviderDashboard" className="text-sm hover:text-[var(--color-accent)] transition duration-200">Providers</Link>
         </div>
         <div>
           <a href="/login" className="text-sm hover:text-[var(--color-accent)] transition duration-200">Login</a>
