@@ -1,6 +1,4 @@
 import { Card } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
-import { Progress } from "../../components/ui/progress";
 import { Users, Target } from "lucide-react";
 
 interface CampaignSummaryCardProps {
@@ -22,10 +20,10 @@ export const CampaignSummaryCard = ({
   donorCount,
   imageUrl,
 }: CampaignSummaryCardProps) => {
-  const progressPercentage = (amountRaised / targetAmount) * 100;
+  const progressPercentage = Math.min((amountRaised / targetAmount) * 100, 100);
 
   return (
-    <Card className="overflow-hidden card-elevated hover:scale-[1.02] transition-all duration-300">
+    <Card className="overflow-hidden rounded-lg shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300 bg-card text-card-foreground ">
       {imageUrl && (
         <div className="h-48 overflow-hidden">
           <img 
@@ -44,6 +42,7 @@ export const CampaignSummaryCard = ({
         </div>
 
         <div className="space-y-4">
+          {/* Progress Section */}
           <div>
             <div className="flex justify-between text-sm mb-2">
               <span className="font-semibold">
@@ -53,9 +52,15 @@ export const CampaignSummaryCard = ({
                 of ${targetAmount.toLocaleString()}
               </span>
             </div>
-            <Progress value={progressPercentage} className="h-2" />
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[var(--color-accent)] transition-all duration-300"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
           </div>
 
+          {/* Donors & Action */}
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
@@ -68,9 +73,9 @@ export const CampaignSummaryCard = ({
               </div>
             </div>
             
-            <Button size="sm" className="rounded-full">
+            <button className="bg-[var(--color-accent)] text-black font-medium text-sm px-2 py-2 rounded-full shadow-md hover:bg-primary/90 transition-colors duration-300 ">
               View Campaign
-            </Button>
+            </button>
           </div>
         </div>
       </div>

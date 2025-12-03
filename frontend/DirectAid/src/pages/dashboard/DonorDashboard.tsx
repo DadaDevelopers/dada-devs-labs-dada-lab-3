@@ -37,7 +37,7 @@ import {
 
 const DonorDashboard = () => {
   const navItems = [
-    { label: "Discover", href: "/DonorDashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Discover", href: "/donor", icon: <LayoutDashboard className="w-5 h-5" /> },
     { label: "My Donations", href: "/", icon: <Heart className="w-5 h-5" /> },
     { label: "Receipts", href: "/", icon: <Receipt className="w-5 h-5" /> },
     { label: "Settings", href: "/", icon: <Settings className="w-5 h-5" /> },
@@ -119,7 +119,7 @@ const DonorDashboard = () => {
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2">Discover Campaigns</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Support causes that matter and track your impact</p>
           </div>
-          <Button size="lg" className="gap-2 rounded-full w-full sm:w-auto">
+          <Button size="lg" className="gap-2 rounded-full w-full sm:w-auto btn-cta">
             <Zap className="w-5 h-5" />
             Quick Donate
           </Button>
@@ -153,7 +153,7 @@ const DonorDashboard = () => {
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
             <h2 className="text-xl sm:text-2xl font-bold">Recommended for You</h2>
-            <Button variant="ghost" className="gap-2 w-full sm:w-auto justify-center">
+            <Button variant="ghost" className="gap-2 w-full sm:w-auto justify-center btn-cta">
               Browse All
               <ExternalLink className="w-4 h-4" />
             </Button>
@@ -170,7 +170,7 @@ const DonorDashboard = () => {
         <Card className="p-4 sm:p-6 card-elevated">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
             <h2 className="text-xl sm:text-2xl font-bold">Recent Donations</h2>
-            <Button variant="outline" size="sm" className="rounded-full w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="rounded-full w-full sm:w-auto btn-cta">
               View All
             </Button>
           </div>
@@ -193,7 +193,7 @@ const DonorDashboard = () => {
                   </div>
                   
                   {donation.receipt && (
-                    <Button variant="ghost" size="icon" className="rounded-full flex-shrink-0">
+                    <Button variant="ghost" size="icon" className="rounded-full flex-shrink-0 btn-cta">
                       <Download className="w-4 h-4" />
                     </Button>
                   )}
@@ -362,7 +362,7 @@ const DonorDashboard = () => {
                 <p className="font-semibold text-sm sm:text-base">USD ($)</p>
               </div>
 
-              <Button variant="outline" className="w-full rounded-full">
+              <Button variant="outline" className="w-full rounded-full  btn-cta gap-2">
                 <Settings className="w-4 h-4 mr-2" />
                 Update Settings
               </Button>
@@ -381,7 +381,7 @@ const DonorDashboard = () => {
               <p className="text-xs sm:text-sm text-green-600">Total tax-deductible donations (21,250,000 sats)</p>
             </div>
 
-            <Button className="w-full rounded-full gap-2">
+            <Button className="w-full rounded-full gap-2 btn-cta">
               <Download className="w-4 h-4" />
               Download Annual Summary
             </Button>

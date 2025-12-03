@@ -33,7 +33,7 @@ import {
 
 const BeneficiaryDashboard = () => {
   const navItems = [
-    { label: "Dashboard", href: "/BeneficiaryDashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
     { label: "Funds Received", href: "/", icon: <DollarSign className="w-5 h-5" /> },
     { label: "Reporting", href: "/", icon: <FileText className="w-5 h-5" /> },
     { label: "Audit Status", href: "/", icon: <ShieldCheck className="w-5 h-5" /> },
@@ -120,7 +120,7 @@ const BeneficiaryDashboard = () => {
         </div>
 
         {/* Aid Delivery Progress */}
-        <Card className="p-4 sm:p-6 card-elevated">
+        <Card className="p-4 sm:p-6 card-elevated bg-card">
           <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Aid Delivery Progress</h2>
           
           <div className="space-y-4 sm:space-y-6">
@@ -220,18 +220,7 @@ const BeneficiaryDashboard = () => {
             </ResponsiveContainer>
           </Card>
 
-          {/* Impact Metrics */}
-          <Card className="p-4 sm:p-6 card-elevated lg:col-span-2">
-            <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Community Impact Metrics</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {impactMetrics.map((item, index) => (
-                <div key={index} className="p-3 sm:p-4 rounded-2xl bg-primary/5 border border-primary/20 text-center">
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-2">{item.metric}</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-primary">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+          
         </div>
 
         {/* Active Campaigns */}
@@ -263,7 +252,7 @@ const BeneficiaryDashboard = () => {
                       <Copy className="w-4 h-4" />
                       Copy Link
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1 rounded-full gap-2">
+                    <Button size="sm" variant="outline" className="flex-1 rounded-full gap-2 ">
                       <Share2 className="w-4 h-4" />
                       Share
                     </Button>
@@ -272,8 +261,8 @@ const BeneficiaryDashboard = () => {
               </div>
             ))}
             
-            <Button variant="outline" className="w-full rounded-full gap-2">
-              <Upload className="w-4 h-4" />
+            <Button variant="outline" className="w-full rounded-full gap-2 btn-cta">
+              <Upload className="w-4 h-4 " />
               Upload More Documents
             </Button>
           </div>
@@ -313,7 +302,7 @@ const BeneficiaryDashboard = () => {
                     <p className="text-xs sm:text-sm text-green-700 mb-3">
                       Global Relief Foundation has confirmed service delivery. Please confirm receipt to unlock next disbursement.
                     </p>
-                    <Button size="sm" className="gap-2 rounded-full bg-green-600 hover:bg-green-700 w-full sm:w-auto">
+                    <Button size="sm" className="gap-2 rounded-full bg-green-600 hover:bg-green-700 w-full sm:w-auto ">
                       <CheckCircle2 className="w-4 h-4" />
                       Confirm Service Access
                     </Button>
@@ -342,7 +331,7 @@ const BeneficiaryDashboard = () => {
                   <div className="min-w-0">
                     <h3 className="font-semibold text-yellow-900 text-sm sm:text-base mb-1">Mid-Term Report Due</h3>
                     <p className="text-xs sm:text-sm text-yellow-700 mb-3">Submit your progress report by November 29, 2024</p>
-                    <Button size="sm" className="gap-2 rounded-full w-full sm:w-auto">
+                    <Button size="sm" className="gap-2 rounded-full w-full sm:w-auto btn-cta">
                       <Upload className="w-4 h-4" />
                       Upload Report
                     </Button>
@@ -394,7 +383,7 @@ const BeneficiaryDashboard = () => {
                 </p>
               </div>
 
-              <Button variant="outline" className="w-full rounded-full">
+              <Button variant="outline" className="w-full rounded-full btn-cta">
                 View Audit History
               </Button>
             </div>

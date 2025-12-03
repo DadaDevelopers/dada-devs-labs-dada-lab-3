@@ -34,7 +34,7 @@ import {
 
 const ProviderDashboard = () => {
   const navItems = [
-    { label: "Dashboard", href: "/Provider/Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Dashboard", href: "/provider", icon: <LayoutDashboard className="w-5 h-5" /> },
     { label: "Campaigns", href: "/", icon: <FolderKanban className="w-5 h-5" /> },
     { label: "Create Campaign", href: "/", icon: <PlusCircle className="w-5 h-5" /> },
     { label: "Withdrawals", href: "/", icon: <Wallet className="w-5 h-5" /> },
@@ -116,7 +116,7 @@ const ProviderDashboard = () => {
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2">Provider Dashboard</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your campaigns and track their impact</p>
           </div>
-          <Button size="lg" className="gap-2 rounded-full w-full sm:w-auto">
+          <Button size="lg" className="gap-2 rounded-full w-full sm:w-auto btn-cta">
             <PlusCircle className="w-5 h-5" />
             Create New Campaign
           </Button>
@@ -193,7 +193,7 @@ const ProviderDashboard = () => {
                       <CheckCircle className="w-4 h-4 mr-1" />
                       Approve
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1 rounded-full">
+                    <Button size="sm" variant="outline" className="flex-1 rounded-full btn-cta">
                       Review
                     </Button>
                   </div>
@@ -230,7 +230,7 @@ const ProviderDashboard = () => {
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
             <h2 className="text-xl sm:text-2xl font-bold">Active Campaigns</h2>
-            <Button variant="ghost" className="gap-2 w-full sm:w-auto justify-center">
+            <Button variant="ghost" className="gap-2 w-full sm:w-auto justify-center btn-cta">
               View All
               <ArrowUpRight className="w-4 h-4" />
             </Button>
@@ -330,7 +330,7 @@ const ProviderDashboard = () => {
                     </p>
                   </div>
                 </div>
-                <Button size="sm" className="w-full rounded-full gap-2">
+                <Button size="sm" className="w-full rounded-full gap-2 btn-cta">
                   <Upload className="w-4 h-4" />
                   Upload Receipts
                 </Button>
@@ -381,7 +381,7 @@ const ProviderDashboard = () => {
                 <p className="font-semibold text-sm sm:text-base">NGO-2019-45678</p>
               </div>
 
-              <Button variant="outline" className="w-full rounded-full">
+              <Button variant="outline" className="w-full rounded-full btn-cta gap-2">
                 <Settings className="w-4 h-4 mr-2" />
                 Update Profile
               </Button>
