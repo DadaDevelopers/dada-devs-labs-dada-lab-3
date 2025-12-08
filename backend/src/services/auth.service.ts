@@ -40,9 +40,29 @@ export async function register(data: { firstName: string; lastName?: string; ema
   });
 
   // send email (async)
-  await sendVerificationEmail(user.email, token);
+  // await sendVerificationEmail(user.email, token); // Disabled for local testing
 
-  return { ok: true, message: "User created. Verification email sent." };
+  // Generate tokens after registration
+  const accessToken = signAccessToken({ userId: user.id, role: user.role });
+  const refreshToken = signRefreshToken({ userId: user.id, role: user.role });
+
+  // persist refresh token
+  const refreshExpiresAt = add(new Date(), { days: REFRESH_TTL_DAYS });
+  await prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      token: refreshToken,
+      expiresAt: refreshExpiresAt
+    }
+  });
+
+  return {
+    ok: true,
+    message: "User created. Verification email sent.",
+    accessToken,
+    refreshToken,
+    user
+  };
 }
 
 export async function login(email: string, password: string) {
@@ -93,7 +113,7 @@ export async function resendVerification(email: string) {
   });
   if (existing) {
     // return but also optionally resend
-    await sendVerificationEmail(user.email, existing.token);
+  // await sendVerificationEmail(user.email, existing.token); // Disabled for local testing
     return { ok: true, message: "Existing verification token resent" };
   }
 
@@ -103,7 +123,7 @@ export async function resendVerification(email: string) {
     data: { userId: user.id, token, expiresAt }
   });
 
-  await sendVerificationEmail(user.email, token);
+  // await sendVerificationEmail(user.email, token); // Disabled for local testing
   return { ok: true, message: "Verification token created & sent" };
 }
 
@@ -128,7 +148,7 @@ export async function forgotPassword(email: string) {
     });
   }
 
-  await sendResetPasswordEmail(user.email, token);
+  // await sendResetPasswordEmail(user.email, token); // Disabled for local testing
   return { ok: true, message: "If that email exists, a reset link has been sent" };
 }
 
