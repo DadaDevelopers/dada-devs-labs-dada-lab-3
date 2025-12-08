@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import FormInput from '../ui/FormInput';
-import Button from '../ui/Button';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import FormInput from "../ui/FormInput";
+import Button from "../ui/Button";
+import { useAuth } from "../../hooks/useAuth";
 
 interface LoginFormData {
   email: string;
@@ -17,11 +18,12 @@ interface FormErrors {
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<LoginFormData>({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login } = useAuth();
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -32,15 +34,15 @@ const LoginPage: React.FC = () => {
     const newErrors: FormErrors = {};
 
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = "Email is required";
     } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!formData.password) {
-      newErrors.password = 'Password is required';
+      newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      newErrors.password = "Password must be at least 6 characters";
     }
 
     setErrors(newErrors);
@@ -64,7 +66,7 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -73,21 +75,17 @@ const LoginPage: React.FC = () => {
     setErrors({});
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await loginUser(formData);
-      // For now, simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      // TODO: Handle successful login
-      // navigate('/dashboard');
-      console.log('Login attempt:', formData);
-      
-      // Placeholder: Navigate to appropriate dashboard based on user role
-      // This will be implemented when auth is integrated
-      navigate('/');
+      // Use auth context to login
+      const res = await login(formData.email, formData.password);
+      // prefer server returned user role, fallback to donor
+      const role = res?.user?.role || "donor";
+      // navigate based on role
+      if (role === "provider") navigate("/providerdashboard");
+      else if (role === "beneficiary") navigate("/userdashboard");
+      else navigate("/donordashboard");
     } catch (error) {
       setErrors({
-        general: 'Invalid email or password. Please try again.',
+        general: "Invalid email or password. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -101,9 +99,7 @@ const LoginPage: React.FC = () => {
           <h1 className="text-3xl font-bold text-[var(--color-text-light)] mb-2">
             Welcome Back
           </h1>
-          <p className="text-white/60">
-            Sign in to your DirectAid account
-          </p>
+          <p className="text-white/60">Sign in to your DirectAid account</p>
         </div>
 
         <div className="bg-[var(--color-secondary-bg)] rounded-lg shadow-xl p-8 border border-white/10">
@@ -161,13 +157,13 @@ const LoginPage: React.FC = () => {
               disabled={isSubmitting}
               className="w-full"
             >
-              {isSubmitting ? 'Signing in...' : 'Sign In'}
+              {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-white/60 text-sm">
-              Don't have an account?{' '}
+              Don't have an account?{" "}
               <Link
                 to="/signup"
                 className="text-[var(--color-accent)] hover:underline font-medium"
@@ -183,4 +179,3 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
-
