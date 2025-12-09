@@ -7,11 +7,15 @@ const api = axios.create({
   },
 });
 
-// optional: global response interceptor
+// Global response interceptor (very useful)
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    // handle 401 refresh flow or global errors here
+    // Optional: auto logout or toast on 401
+    if (err.response?.status === 401) {
+      console.warn("Unauthorized – redirecting to login");
+      // You can trigger logout here later
+    }
     return Promise.reject(err);
   }
 );
