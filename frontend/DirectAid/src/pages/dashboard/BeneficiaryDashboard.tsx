@@ -3,7 +3,7 @@ import { useApp } from "../../contexts/AppContext";
 import { mockDataService } from "../../services/mockData";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
-import { Button } from "../../components/ui/button";
+import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
 import {

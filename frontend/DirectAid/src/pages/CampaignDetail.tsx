@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { mockDataService } from "../services/mockData";
-import { Button } from "../components/ui/button";
+import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import {
   ArrowLeft,

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { mockDataService } from "../services/mockData";
 import type { Campaign } from "../types";
-import { Button } from "../components/ui/button";
+import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import {

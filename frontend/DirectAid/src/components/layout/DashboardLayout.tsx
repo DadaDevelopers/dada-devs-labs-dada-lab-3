@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "../../lib/utils";
-import { Button } from "../../components/ui/button";
+import { Button } from "../../components/ui/Button";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Input } from "../../components/ui/input";
 import { Sheet, SheetContent } from "../../components/ui/sheet";

@@ -4,7 +4,7 @@ import { mockDataService } from "../../services/mockData";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
 import { CampaignSummaryCard } from "../../components/feature/CampaignSummaryCard";
-import { Button } from "../../components/ui/button";
+import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
 import {
   LayoutDashboard,
