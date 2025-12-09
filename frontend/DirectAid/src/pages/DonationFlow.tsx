@@ -169,7 +169,7 @@ const DonationFlow = () => {
               (step, idx) => (
                 <div key={step} className="flex items-center">
                   <div
-                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm transition"
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm transition border"
                     style={{
                       backgroundColor:
                         [
@@ -193,7 +193,7 @@ const DonationFlow = () => {
                           : "var(--color-text-light)",
                       borderColor: "var(--color-accent)",
                     }}
-                    className="border"
+                    
                   >
                     {idx + 1}
                   </div>
@@ -478,11 +478,7 @@ const DonationFlow = () => {
                                 : "var(--color-accent)",
                             borderColor: "var(--color-accent)",
                           }}
-                          className={
-                            formData.amount === amount.toString()
-                              ? "border"
-                              : "border"
-                          }
+                          
                         >
                           ${amount}
                         </button>
@@ -879,12 +875,12 @@ const DonationFlow = () => {
 
             <div className="space-y-6">
               <div
-                className="p-4 rounded-lg"
+                className="p-4 rounded-lg border"
                 style={{
                   backgroundColor: "rgba(0, 255, 255, 0.1)",
                   borderColor: "var(--color-accent)",
                 }}
-                className="border"
+                
               >
                 <p className="text-sm" style={{ color: "var(--color-accent)" }}>
                   <strong>Purpose-Locked Funds:</strong> Your donation will be
@@ -1024,12 +1020,12 @@ const DonationFlow = () => {
 
             {/* Receipt Details */}
             <div
-              className="p-4 rounded-lg mb-6 text-left space-y-2"
+              className="p-4 rounded-lg mb-6 text-left space-y-2 border"
               style={{
                 backgroundColor: "var(--color-primary-bg)",
                 borderColor: "var(--color-accent)",
               }}
-              className="border"
+              
             >
               <div>
                 <p

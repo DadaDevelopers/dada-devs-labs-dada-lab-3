@@ -111,12 +111,12 @@ export default function CampaignDetail() {
               className="mb-6 overflow-hidden rounded-lg border card-elevated"
             >
               <div
-                className="h-80 flex items-center justify-center"
+                className="h-80 flex items-center justify-center border-b"
                 style={{
                   backgroundColor: "var(--color-primary-bg)",
                   borderBottomColor: "var(--color-accent)",
                 }}
-                className="border-b"
+               
               >
                 <Heart
                   className="w-24 h-24"
@@ -157,9 +157,9 @@ export default function CampaignDetail() {
                 </h1>
 
                 <div
-                  className="flex flex-wrap gap-6"
+                  className="flex flex-wrap gap-6 mb-6"
                   style={{ color: "var(--color-text-light)", opacity: 0.8 }}
-                  className="mb-6"
+                  
                 >
                   <div className="flex items-center gap-2">
                     <MapPin className="w-5 h-5" />
@@ -176,12 +176,12 @@ export default function CampaignDetail() {
                 </div>
 
                 <div
-                  className="rounded-lg p-4"
+                  className="rounded-lg p-4 border"
                   style={{
                     backgroundColor: "var(--color-primary-bg)",
                     borderColor: "var(--color-accent)",
                   }}
-                  className="border"
+                  
                 >
                   <p
                     style={{ color: "var(--color-text-light)" }}
@@ -208,12 +208,12 @@ export default function CampaignDetail() {
                 Campaign Details
               </h2>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6 mb-1">
                 <div>
                   <p
                     className="text-sm"
                     style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                    className="mb-1"
+                    
                   >
                     Beneficiary
                   </p>
@@ -226,9 +226,9 @@ export default function CampaignDetail() {
                 </div>
                 <div>
                   <p
-                    className="text-sm"
+                    className="text-sm mb-1"
                     style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                    className="mb-1"
+                   
                   >
                     Provider
                   </p>
@@ -241,9 +241,9 @@ export default function CampaignDetail() {
                 </div>
                 <div>
                   <p
-                    className="text-sm"
+                    className="text-sm mb-1"
                     style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                    className="mb-1"
+                    
                   >
                     Created
                   </p>
@@ -256,9 +256,9 @@ export default function CampaignDetail() {
                 </div>
                 <div>
                   <p
-                    className="text-sm"
+                    className="text-sm mb-1"
                     style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                    className="mb-1"
+                    
                   >
                     Category
                   </p>
@@ -290,9 +290,9 @@ export default function CampaignDetail() {
               <div className="flex items-end gap-4 mb-6">
                 <div>
                   <p
-                    className="text-sm"
+                    className="text-sm mb-1"
                     style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                    className="mb-1"
+                    
                   >
                     Raised
                   </p>
@@ -305,9 +305,9 @@ export default function CampaignDetail() {
                 </div>
                 <div>
                   <p
-                    className="text-sm"
+                    className="text-sm mb-1"
                     style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                    className="mb-1"
+                    
                   >
                     Goal
                   </p>
@@ -367,9 +367,9 @@ export default function CampaignDetail() {
               <div className="space-y-4">
                 <div>
                   <p
-                    className="text-xs uppercase tracking-wide"
+                    className="text-xs uppercase tracking-wide mb-1"
                     style={{ color: "var(--color-accent)" }}
-                    className="mb-1"
+                    
                   >
                     Status
                   </p>
@@ -385,9 +385,9 @@ export default function CampaignDetail() {
                   className="border-t pt-4"
                 >
                   <p
-                    className="text-xs uppercase tracking-wide"
+                    className="text-xs uppercase tracking-wide mb-1"
                     style={{ color: "var(--color-accent)" }}
-                    className="mb-1"
+                    
                   >
                     Deadline
                   </p>
@@ -403,9 +403,9 @@ export default function CampaignDetail() {
                   className="border-t pt-4"
                 >
                   <p
-                    className="text-xs uppercase tracking-wide"
+                    className="text-xs uppercase tracking-wide mb-1"
                     style={{ color: "var(--color-accent)" }}
-                    className="mb-1"
+                    
                   >
                     Donors
                   </p>

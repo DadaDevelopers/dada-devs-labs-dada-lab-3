@@ -29,8 +29,8 @@ const ProviderConfirmation = () => {
   const campaignsNeedingConfirmation = campaigns.filter(
     (c) =>
       c.providerId === provider.id &&
-      (c.confirmationStatus === "not_started" ||
-        c.confirmationStatus === "beneficiary_confirmed")
+      (c.confirmationStatus === "pending" ||
+        c.confirmationStatus === "provider_confirmed")
   );
 
   const handleConfirmService = async (campaignId: string) => {
@@ -43,7 +43,7 @@ const ProviderConfirmation = () => {
     const campaign = campaigns.find((c) => c.id === campaignId);
     if (campaign) {
       const newConfirmationStatus =
-        campaign.confirmationStatus === "beneficiary_confirmed"
+        campaign.confirmationStatus === "provider_confirmed"
           ? "both_confirmed"
           : "provider_confirmed";
 
@@ -276,39 +276,32 @@ const ProviderConfirmation = () => {
                         </div>
 
                         {/* Invoices */}
-                        {campaign.invoices && campaign.invoices.length > 0 && (
+                        {campaign.invoice && (
                           <div className="mb-6">
                             <h4 className="font-semibold text-gray-900 mb-3">
-                              Submitted Invoices
+                              Submitted Invoice
                             </h4>
-                            <div className="space-y-2">
-                              {campaign.invoices.map((invoice: any) => (
-                                <div
-                                  key={invoice.id}
-                                  className="p-3 bg-white rounded border border-gray-200 flex items-center justify-between"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <FileText className="w-4 h-4 text-gray-400" />
-                                    <div>
-                                      <p className="text-sm font-semibold text-gray-900">
-                                        {invoice.number}
-                                      </p>
-                                      <p className="text-xs text-gray-600">
-                                        ${invoice.amount.toLocaleString()}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <span
-                                    className={`text-xs font-semibold px-2 py-1 rounded ${
-                                      invoice.status === "approved"
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-yellow-100 text-yellow-800"
-                                    }`}
-                                  >
-                                    {invoice.status}
-                                  </span>
+                            <div className="p-3 bg-white rounded border border-gray-200 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <FileText className="w-4 h-4 text-gray-400" />
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {campaign.invoice.invoiceNumber}
+                                  </p>
+                                  <p className="text-xs text-gray-600">
+                                    ${campaign.invoice.amount.toLocaleString()}
+                                  </p>
                                 </div>
-                              ))}
+                              </div>
+                              <span
+                                className={`text-xs font-semibold px-2 py-1 rounded ${
+                                  campaign.invoice.status === "approved"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-yellow-100 text-yellow-800"
+                                }`}
+                              >
+                                {campaign.invoice.status}
+                              </span>
                             </div>
                           </div>
                         )}

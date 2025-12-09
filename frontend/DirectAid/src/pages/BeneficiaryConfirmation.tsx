@@ -250,47 +250,40 @@ const BeneficiaryConfirmation = () => {
                         </div>
 
                         {/* Invoices */}
-                        {campaign.invoices && campaign.invoices.length > 0 && (
+                        {campaign.invoice && (
                           <div className="mb-6">
                             <h4 className="font-semibold text-gray-900 mb-3">
-                              Provider Invoices
+                              Provider Invoice
                             </h4>
-                            <div className="space-y-2">
-                              {campaign.invoices.map((invoice: any) => (
-                                <div
-                                  key={invoice.id}
-                                  className="p-3 bg-white rounded border border-gray-200 flex items-center justify-between"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <FileText className="w-4 h-4 text-gray-400" />
-                                    <div>
-                                      <p className="text-sm font-semibold text-gray-900">
-                                        {invoice.number}
-                                      </p>
-                                      <p className="text-xs text-gray-600 mt-0.5">
-                                        {new Date(
-                                          invoice.date
-                                        ).toLocaleDateString()}{" "}
-                                        • {invoice.description}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="font-semibold text-gray-900">
-                                      ${invoice.amount.toLocaleString()}
-                                    </p>
-                                    <span
-                                      className={`text-xs font-semibold px-2 py-1 rounded inline-block mt-1 ${
-                                        invoice.status === "approved"
-                                          ? "bg-green-100 text-green-800"
-                                          : "bg-yellow-100 text-yellow-800"
-                                      }`}
-                                    >
-                                      {invoice.status}
-                                    </span>
-                                  </div>
+                            <div className="p-3 bg-white rounded border border-gray-200 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <FileText className="w-4 h-4 text-gray-400" />
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {campaign.invoice.invoiceNumber}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-0.5">
+                                    {new Date(
+                                      campaign.invoice.invoiceDate
+                                    ).toLocaleDateString()}{" "}
+                                    • {campaign.invoice.description}
+                                  </p>
                                 </div>
-                              ))}
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-gray-900">
+                                  ${campaign.invoice.amount.toLocaleString()}
+                                </p>
+                                <span
+                                  className={`text-xs font-semibold px-2 py-1 rounded inline-block mt-1 ${
+                                    campaign.invoice.status === "approved"
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-yellow-100 text-yellow-800"
+                                  }`}
+                                >
+                                  {campaign.invoice.status}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         )}

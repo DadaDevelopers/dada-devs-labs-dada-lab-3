@@ -414,12 +414,12 @@ const CampaignCreationWizard = () => {
 
             <div className="space-y-5">
               <div
-                className="p-4 rounded-lg"
+                className="p-4 rounded-lg border"
                 style={{
                   backgroundColor: "rgba(0, 255, 255, 0.1)",
                   borderColor: "var(--color-accent)",
                 }}
-                className="border"
+                
               >
                 <p className="text-sm" style={{ color: "var(--color-accent)" }}>
                   Upload the invoice or receipt that validates this campaign.
@@ -594,12 +594,12 @@ const CampaignCreationWizard = () => {
 
             <div className="space-y-5">
               <div
-                className="p-4 rounded-lg"
+                className="p-4 rounded-lg border"
                 style={{
                   backgroundColor: "rgba(0, 255, 255, 0.1)",
                   borderColor: "var(--color-accent)",
                 }}
-                className="border"
+                
               >
                 <p className="text-sm" style={{ color: "var(--color-accent)" }}>
                   Please review your campaign details. Once submitted, the
@@ -792,12 +792,12 @@ const CampaignCreationWizard = () => {
             </p>
 
             <div
-              className="p-4 rounded-lg mb-6 text-left"
+              className="p-4 rounded-lg mb-6 text-left border"
               style={{
                 backgroundColor: "var(--color-primary-bg)",
                 borderColor: "var(--color-accent)",
               }}
-              className="border"
+              
             >
               <p
                 className="text-sm"

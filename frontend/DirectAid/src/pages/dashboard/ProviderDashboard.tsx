@@ -80,7 +80,7 @@ const ProviderDashboard = () => {
     },
     {
       label: "Campaigns",
-      href: "/provider/campaigns",
+      href: "/campaigns",
       icon: <FolderKanban className="w-5 h-5" />,
     },
     {

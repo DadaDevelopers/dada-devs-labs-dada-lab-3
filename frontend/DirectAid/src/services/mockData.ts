@@ -183,6 +183,7 @@ export const mockCampaigns: Campaign[] = [
     createdAt: "2024-11-01",
     updatedAt: "2024-11-21",
     launchedAt: "2024-11-01",
+    fundraisingDeadline: "2025-01-29",
     progressPercentage: 45,
     donationTimeline: [
       {
@@ -251,9 +252,10 @@ export const mockCampaigns: Campaign[] = [
       },
     ],
     createdAt: "2024-11-10",
-    updatedAt: "2024-11-22",
+    updatedAt: "2024-11-10",
     launchedAt: "2024-11-10",
-    progressPercentage: 65,
+    fundraisingDeadline: "2025-02-08",
+    progressPercentage: 32,
     donationTimeline: [
       {
         date: "2024-11-10",
@@ -320,9 +322,10 @@ export const mockCampaigns: Campaign[] = [
       },
     ],
     createdAt: "2024-11-15",
-    updatedAt: "2024-11-18",
+    updatedAt: "2024-11-15",
     launchedAt: "2024-11-15",
-    progressPercentage: 46,
+    fundraisingDeadline: "2025-02-13",
+    progressPercentage: 28,
     donationTimeline: [
       {
         date: "2024-11-15",

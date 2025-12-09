@@ -148,6 +148,7 @@ export interface Campaign {
   updatedAt: string;
   launchedAt?: string;
   completedAt?: string;
+  fundraisingDeadline: string;
 
   // Progress tracking
   progressPercentage: number;
