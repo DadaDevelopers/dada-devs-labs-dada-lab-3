@@ -34,12 +34,12 @@ const UserRolesPieChart = () => {
             // This is the magic line that kills the error forever
             formatter={(value: any) => <span className="text-gray-300">{value}</span>}
           />
-          <text x="50%" y="45%" textAnchor="middle" className="text-3xl font-bold fill-white">
+          {/* <text x="50%" y="45%" textAnchor="middle" className="text-3xl font-bold fill-white">
             24k
           </text>
           <text x="50%" y="55%" textAnchor="middle" className="text-sm fill-gray-400">
             Total
-          </text>
+          </text> */}
         </PieChart>
       </ResponsiveContainer>
 
