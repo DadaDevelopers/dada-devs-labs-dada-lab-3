@@ -1,18 +1,14 @@
 // import React from 'react'
 import AppRouter from './router/AppRouter';
 import './styles/App.css';
-
+import { AppProvider } from "./contexts/AppContext";
 
 function App() {
-  
-
   return (
-    <>
-      <div>
-        <AppRouter />
-      </div>
-    </>
-  )
+    <AppProvider>
+      <AppRouter />
+    </AppProvider>
+  );
 }
 
-export default App
+export default App;

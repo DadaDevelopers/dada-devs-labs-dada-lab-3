@@ -2,9 +2,6 @@
 
 @import 'tailwindcss';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* CSS VARIABLES (The :root block) */
 :root {
@@ -24,7 +21,83 @@ body {
     color: var(--color-text-light);
     @apply antialiased; 
 }
+@layer base {
+  :root {
+    --background: 210 45% 7%;  /* #0B1221 */
+    --foreground: 220 13% 91%; /* #E5E7EB */
 
+    --card: 210 35% 12%;       /* #151D2C */
+    --card-foreground: 220 13% 91%;
+
+    --popover: 210 35% 12%;
+    --popover-foreground: 220 13% 91%;
+
+    --primary: 180 100% 50%;   /* #00FFFF */
+    --primary-foreground: 210 45% 7%;
+
+    --secondary: 210 35% 15%;
+    --secondary-foreground: 220 13% 91%;
+
+    --muted: 210 35% 15%;
+    --muted-foreground: 220 13% 70%;
+
+    --accent: 180 100% 50%;    /* #00FFFF */
+    --accent-foreground: 210 45% 7%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 220 13% 91%;
+
+    --border: 210 30% 20%;
+    --input: 210 30% 20%;
+    --ring: 180 100% 50%;
+
+    --radius: 1.5rem;
+
+    --sidebar-background: 210 35% 12%;
+    --sidebar-foreground: 220 13% 91%;
+    --sidebar-primary: 180 100% 50%;
+    --sidebar-primary-foreground: 210 45% 7%;
+    --sidebar-accent: 210 35% 15%;
+    --sidebar-accent-foreground: 220 13% 91%;
+    --sidebar-border: 210 30% 20%;
+    --sidebar-ring: 180 100% 50%;
+
+    --chart-1: 180 100% 50%;   /* Cyan */
+    --chart-2: 160 60% 50%;    /* Teal */
+    --chart-3: 200 70% 55%;    /* Light Blue */
+    --chart-4: 140 55% 45%;    /* Green */
+    --chart-5: 220 65% 50%;    /* Blue */
+
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --shadow-neu: 8px 8px 16px rgba(0, 0, 0, 0.4), -8px -8px 16px rgba(0, 255, 255, 0.05);
+  }
+
+   
+}
+
+/* Base styles */
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom utilities */
+.shadow-neu {
+  box-shadow: var(--shadow-neu);
+}
+
+.card-elevated {
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.3s ease;
+}
+.card-elevated:hover {
+  box-shadow: var(--shadow-lg);
+}
 /* CUSTOM COMPONENT CLASSES (The @apply statements remain the same!) */
 
 .btn-cta {
@@ -32,9 +105,10 @@ body {
        because @apply doesn't read CSS variables directly for color utilities. */
     background-color: var(--color-accent);
     color: var(--color-primary-bg);
-    @apply font-bold py-3 px-6 rounded-lg shadow-xl tracking-wider uppercase transition duration-300;
+    @apply font-bold py-3 px-6 rounded-2xl shadow-xl tracking-wider uppercase transition duration-300;
 }
 
 .btn-cta:hover {
     background-color: var(--color-accent-dark);
 }
+
