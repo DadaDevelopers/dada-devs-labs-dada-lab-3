@@ -1,3 +1,4 @@
+// src/contexts/AppContext.tsx
 import React, {
   createContext,
   useContext,
@@ -35,6 +36,9 @@ interface AppContextType {
   selectCampaign: (campaignId: string) => void;
   createCampaign: (campaign: Campaign) => void;
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
+
+  // ADD THIS: Admin can approve/reject/flag
+  updateCampaignStatus: (campaignId: string, status: "approved" | "rejected" | "flagged") => void;
 
   donations: Donation[];
   createDonation: (donation: Donation) => void;
@@ -76,9 +80,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>(
     mockDataService.getNotifications()
   );
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(
-    null
-  );
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,65 +141,47 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const createCampaign = (campaign: Campaign) => {
-    setCampaigns([campaign, ...campaigns]);
+    // New campaigns start as "pending" for admin approval
+    const newCampaign = { ...campaign, adminStatus: "pending" } as Campaign;
+    setCampaigns([newCampaign, ...campaigns]);
   };
 
   const updateCampaign = (id: string, updates: Partial<Campaign>) => {
     setCampaigns(
-      campaigns.map((campaign) => {
-        if (campaign.id !== id) return campaign;
-
-        let updatedCampaign = { ...campaign, ...updates, updatedAt: new Date().toISOString() };
-
-        // Automatically set confirmation timestamps
-        if (updates.confirmationStatus) {
-          if (
-            updates.confirmationStatus === "provider_confirmed" &&
-            !campaign.providerConfirmedAt
-          ) {
-            updatedCampaign.providerConfirmedAt = new Date().toISOString();
-          } else if (updates.confirmationStatus === "both_confirmed") {
-            if (!campaign.providerConfirmedAt) {
-              updatedCampaign.providerConfirmedAt = new Date().toISOString();
-            }
-            if (!campaign.beneficiaryConfirmedAt) {
-              updatedCampaign.beneficiaryConfirmedAt = new Date().toISOString();
-            }
-          }
-        }
-
-        return updatedCampaign;
-      })
+      campaigns.map((campaign) =>
+        campaign.id === id
+          ? { ...campaign, ...updates, updatedAt: new Date().toISOString() }
+          : campaign
+      )
     );
 
     if (selectedCampaign?.id === id) {
-      setSelectedCampaign((prev) => {
-        if (!prev) return null;
-        let updatedSelected = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+      setSelectedCampaign((prev) =>
+        prev ? { ...prev, ...updates, updatedAt: new Date().toISOString() } : null
+      );
+    }
+  };
 
-        if (updates.confirmationStatus) {
-          if (
-            updates.confirmationStatus === "provider_confirmed" &&
-            !prev.providerConfirmedAt
-          ) {
-            updatedSelected.providerConfirmedAt = new Date().toISOString();
-          } else if (updates.confirmationStatus === "both_confirmed") {
-            if (!prev.providerConfirmedAt) {
-              updatedSelected.providerConfirmedAt = new Date().toISOString();
-            }
-            if (!prev.beneficiaryConfirmedAt) {
-              updatedSelected.beneficiaryConfirmedAt = new Date().toISOString();
-            }
-          }
-        }
+  // NEW FUNCTION: Admin approve/reject/flag
+  const updateCampaignStatus = (campaignId: string, status: "approved" | "rejected" | "flagged") => {
+    setCampaigns(prev =>
+      prev.map(campaign =>
+        campaign.id === campaignId
+          ? { ...campaign, adminStatus: status, updatedAt: new Date().toISOString() }
+          : campaign
+      )
+    );
 
-        return updatedSelected;
-      });
+    // Also update if it's currently selected
+    if (selectedCampaign?.id === campaignId) {
+      setSelectedCampaign(prev =>
+        prev ? { ...prev, adminStatus: status, updatedAt: new Date().toISOString() } : null
+      );
     }
   };
 
   // ========================================================================
-  // DONATION FUNCTIONS
+  // DONATION & NOTIFICATION FUNCTIONS (unchanged)
   // ========================================================================
 
   const createDonation = (donation: Donation) => {
@@ -210,21 +194,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const updateDonation = (id: string, updates: Partial<Donation>) => {
-    setDonations(
-      donations.map((donation) => (donation.id === id ? { ...donation, ...updates } : donation))
-    );
+    setDonations(donations.map((d) => (d.id === id ? { ...d, ...updates } : d)));
   };
 
-  // ========================================================================
-  // NOTIFICATION FUNCTIONS
-  // ========================================================================
-
   const markNotificationAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((notif) =>
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    );
+    setNotifications(notifications.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -243,6 +217,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     selectCampaign,
     createCampaign,
     updateCampaign,
+    updateCampaignStatus,   // ← THIS IS NOW AVAILABLE EVERYWHERE
     donations,
     createDonation,
     updateDonation,

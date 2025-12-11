@@ -50,7 +50,7 @@ export default function AppRouter() {
       <Route path="/donor/settings" element={<DonorSettings />} />
 
       {/* Dashboards */}
-      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/*" element={<AdminDashboard />} />
       <Route path="/beneficiary" element={<BeneficiaryDashboard />} />
       <Route path="/provider" element={<ProviderDashboard />} />
       <Route path="/donor" element={<DonorDashboard />} />
