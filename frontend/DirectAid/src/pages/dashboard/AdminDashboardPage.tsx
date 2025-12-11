@@ -6,7 +6,7 @@ import Topbar from "../../components/admin/Topbar";
 
 import OverviewPage from "../../components/admin/overview/OverviewPage";
 import AdminCampaignPage from "../../components/admin/campaignManagement/AdminCampaignPage";
-import AdminUserManagement from "../../components/admin/userManagement/AdminUserManagement";
+import AdminUserManagementPage from "../../components/admin/userManagement/AdminUserManagementPage";
 
 const AdminDashboardPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -29,7 +29,7 @@ const AdminDashboardPage = () => {
 
             <Route path="overview" element={<OverviewPage />} />
             <Route path="campaigns" element={<AdminCampaignPage />} />
-            <Route path="users" element={<AdminUserManagement />} />
+            <Route path="users" element={<AdminUserManagementPage />} />
           </Routes>
         </main>
       </div>
