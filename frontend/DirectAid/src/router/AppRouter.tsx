@@ -1,8 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import LandingPage from "../pages/LandingPage";
-import LoginPage from "../components/pages/LoginPage";
-import SignUpPage from "../components/pages/SignUpPage";
-import ForgotPasswordPage from "../components/pages/ForgotPasswordPage";
+import Login from "../pages/auth/Login";
+import Signup from "../pages/auth/Signup";
 import AdminDashboard from "../pages/dashboard/AdminDashboard";
 import BeneficiaryDashboard from "../pages/dashboard/BeneficiaryDashboard";
 import ProviderDashboard from "../pages/dashboard/ProviderDashboard";
@@ -25,9 +24,11 @@ export default function AppRouter() {
     <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
+
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
       {/* Campaign */}
       <Route path="/campaigns" element={<CampaignPage />} />
       <Route path="/campaigns/:id" element={<CampaignDetail />} />

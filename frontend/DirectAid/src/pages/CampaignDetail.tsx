@@ -194,83 +194,83 @@ export default function CampaignDetail() {
             </div>
 
             {/* Campaign Details */}
-<div
-  style={{
-    backgroundColor: "var(--color-secondary-bg)",
-    borderColor: "var(--color-accent)",
-  }}
-  className="mb-6 rounded-lg border p-6 card-elevated"
->
-  <h2
-    className="text-xl font-bold mb-4"
-    style={{ color: "var(--color-text-light)" }}
-  >
-    Campaign Details
-  </h2>
+            <div
+              style={{
+                backgroundColor: "var(--color-secondary-bg)",
+                borderColor: "var(--color-accent)",
+              }}
+              className="mb-6 rounded-lg border p-6 card-elevated"
+            >
+              <h2
+                className="text-xl font-bold mb-4"
+                style={{ color: "var(--color-text-light)" }}
+              >
+                Campaign Details
+              </h2>
 
-  <div className="grid grid-cols-2 gap-6 mb-1">
-    <div>
-      <p
-        className="text-sm"
-        style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-      >
-        Beneficiary
-      </p>
-      <p
-        className="font-semibold"
-        style={{ color: "var(--color-text-light)" }}
-      >
-        {campaign.beneficiaryId
-          ? mockDataService.getBeneficiaryById(campaign.beneficiaryId)?.name ||
-            "Pending Assignment"
-          : "Pending Assignment"}
-      </p>
-    </div>
-    <div>
-      <p
-        className="text-sm mb-1"
-        style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-      >
-        Provider
-      </p>
-      <p
-        className="font-semibold"
-        style={{ color: "var(--color-text-light)" }}
-      >
-        DirectAid Provider Network
-      </p>
-    </div>
-    <div>
-      <p
-        className="text-sm mb-1"
-        style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-      >
-        Created
-      </p>
-      <p
-        className="font-semibold"
-        style={{ color: "var(--color-text-light)" }}
-      >
-        {new Date(campaign.createdAt).toLocaleDateString()}
-      </p>
-    </div>
-    <div>
-      <p
-        className="text-sm mb-1"
-        style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-      >
-        Category
-      </p>
-      <p
-        className="font-semibold capitalize"
-        style={{ color: "var(--color-text-light)" }}
-      >
-        {campaign.category}
-      </p>
-    </div>
-  </div>
-</div>
-
+              <div className="grid grid-cols-2 gap-6 mb-1">
+                <div>
+                  <p
+                    className="text-sm"
+                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
+                    
+                  >
+                    Beneficiary
+                  </p>
+                  <p
+                    className="font-semibold"
+                    style={{ color: "var(--color-text-light)" }}
+                  >
+                    {campaign.beneficiaryName || "Pending Assignment"}
+                  </p>
+                </div>
+                <div>
+                  <p
+                    className="text-sm mb-1"
+                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
+                   
+                  >
+                    Provider
+                  </p>
+                  <p
+                    className="font-semibold"
+                    style={{ color: "var(--color-text-light)" }}
+                  >
+                    DirectAid Provider Network
+                  </p>
+                </div>
+                <div>
+                  <p
+                    className="text-sm mb-1"
+                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
+                    
+                  >
+                    Created
+                  </p>
+                  <p
+                    className="font-semibold"
+                    style={{ color: "var(--color-text-light)" }}
+                  >
+                    {new Date(campaign.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <p
+                    className="text-sm mb-1"
+                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
+                    
+                  >
+                    Category
+                  </p>
+                  <p
+                    className="font-semibold capitalize"
+                    style={{ color: "var(--color-text-light)" }}
+                  >
+                    {campaign.category}
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Funding Progress */}
             <div
