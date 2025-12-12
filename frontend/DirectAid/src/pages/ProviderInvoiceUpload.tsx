@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { mockDataService } from "../services/mockData";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+
 import {
   ArrowLeft,
   Upload,
@@ -12,62 +13,92 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
-  Eye,
-  MapPin,
-  DollarSign,
-  Calendar,
 } from "lucide-react";
 
-type Step = "select-campaign" | "upload-invoice" | "review" | "success";
+// -------------------------------------------------------
+// Types
+// -------------------------------------------------------
+
+type Step = "upload-invoice" | "review" | "success";
+
+interface InvoiceFormState {
+  invoiceNumber: string;
+  invoiceDate: string;
+  invoiceAmount: string;
+  description: string;
+  invoiceFile: File | null;
+}
+
+interface Campaign {
+  id: string;
+  title: string;
+  description: string;
+  invoices?: any[];
+  providerConfirmed?: boolean;
+}
+
+// -------------------------------------------------------
+// Component
+// -------------------------------------------------------
 
 const ProviderInvoiceUpload = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { campaigns, updateCampaign } = useApp();
+
   const provider = mockDataService.getProviderUser();
+  const campaignId = searchParams.get("campaignId");
 
-  const [currentStep, setCurrentStep] = useState<Step>("select-campaign");
-  const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [currentStep, setCurrentStep] = useState<Step>("upload-invoice");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
 
-  // Get campaigns assigned to this provider
-  const providerCampaigns = campaigns.filter(
-    (c) => c.providerId === provider.id
-  );
-
-  // Invoice form state
-  const [invoiceData, setInvoiceData] = useState({
+  // Invoice Data
+  const [invoiceData, setInvoiceData] = useState<InvoiceFormState>({
     invoiceNumber: "",
     invoiceDate: "",
     invoiceAmount: "",
     description: "",
-    invoiceFile: null as File | null,
+    invoiceFile: null,
   });
 
-  const [previewUrl, setPreviewUrl] = useState<string>("");
-
-  const handleCampaignSelect = (campaign: any) => {
-    setSelectedCampaign(campaign);
-    setCurrentStep("upload-invoice");
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setInvoiceData((prev) => ({ ...prev, invoiceFile: file }));
-
-      // Create preview URL for PDFs or images
-      if (file.type.startsWith("image/") || file.type === "application/pdf") {
-        const url = URL.createObjectURL(file);
-        setPreviewUrl(url);
-      }
+  // -------------------------------------------------------
+  // Load Campaign
+  // -------------------------------------------------------
+  useEffect(() => {
+    if (!campaignId) {
+      navigate("/provider");
+      return;
     }
-  };
+
+    const campaign = campaigns.find((c) => c.id === campaignId);
+    if (!campaign) navigate("/provider");
+    else setSelectedCampaign(campaign as Campaign);
+  }, [campaignId, campaigns, navigate]);
+
+  // -------------------------------------------------------
+  // Handlers
+  // -------------------------------------------------------
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const { name, value } = e.target;
-    setInvoiceData((prev) => ({ ...prev, [name]: value }));
+    setInvoiceData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setInvoiceData((prev) => ({ ...prev, invoiceFile: file }));
+
+    if (file.type.startsWith("image/") || file.type === "application/pdf") {
+      setPreviewUrl(URL.createObjectURL(file));
+    }
   };
 
   const handleRemoveFile = () => {
@@ -75,28 +106,32 @@ const ProviderInvoiceUpload = () => {
     setPreviewUrl("");
   };
 
-  const canProceedToReview = () => {
+  const canProceed = () => {
+    const { invoiceNumber, invoiceDate, invoiceAmount, description, invoiceFile } =
+      invoiceData;
     return (
-      invoiceData.invoiceNumber &&
-      invoiceData.invoiceDate &&
-      invoiceData.invoiceAmount &&
-      invoiceData.description &&
-      invoiceData.invoiceFile
+      invoiceNumber &&
+      invoiceDate &&
+      invoiceAmount &&
+      description &&
+      invoiceFile
     );
   };
 
   const handleSubmitInvoice = async () => {
+    if (!selectedCampaign) return;
+
     setIsSubmitting(true);
 
-    // Simulate upload processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Update campaign with invoice
     const invoiceId = `invoice_${Date.now()}`;
-    const updatedCampaign = {
+
+    const updated = {
       ...selectedCampaign,
+      providerConfirmed: true,
       invoices: [
-        ...(selectedCampaign.invoices || []),
+        ...(selectedCampaign.invoices ?? []),
         {
           id: invoiceId,
           number: invoiceData.invoiceNumber,
@@ -111,163 +146,84 @@ const ProviderInvoiceUpload = () => {
       ],
     };
 
-    updateCampaign(selectedCampaign.id, updatedCampaign);
-    setCurrentStep("success");
+    updateCampaign(selectedCampaign.id, updated);
     setIsSubmitting(false);
+    setCurrentStep("success");
   };
 
-  const handleBackToDashboard = () => {
-    navigate("/provider");
-  };
+  const backToDashboard = () => navigate("/provider");
 
-  // Step 1: Select Campaign
-  if (currentStep === "select-campaign") {
+  // -------------------------------------------------------
+  // Loading State
+  // -------------------------------------------------------
+  if (!selectedCampaign) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <button
-              onClick={() => navigate("/provider")}
-              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium mb-6"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-bold text-gray-900">Upload Invoice</h1>
-            <p className="text-gray-600 mt-2">
-              Submit invoices for services rendered under your campaigns
-            </p>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {providerCampaigns.length === 0 ? (
-            <Card className="p-8 text-center">
-              <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
-              <p className="text-gray-700 mb-4">
-                No campaigns assigned to you yet.
-              </p>
-              <Button onClick={() => navigate("/provider")} variant="outline">
-                Return to Dashboard
-              </Button>
-            </Card>
-          ) : (
-            <div>
-              <p className="text-gray-600 mb-6">
-                Select a campaign to upload an invoice for:
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {providerCampaigns.map((campaign) => (
-                  <Card
-                    key={campaign.id}
-                    className="p-6 hover:shadow-lg transition cursor-pointer border-2 hover:border-indigo-500"
-                    onClick={() => handleCampaignSelect(campaign)}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-900">
-                          {campaign.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {campaign.description.substring(0, 100)}...
-                        </p>
-                      </div>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 capitalize">
-                        {campaign.status}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 text-sm text-gray-600 mb-4">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4" />
-                        <span>{campaign.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4" />
-                        <span>${campaign.targetAmount.toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span>
-                          {new Date(
-                            campaign.fundraisingDeadline
-                          ).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <Button
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCampaignSelect(campaign);
-                      }}
-                    >
-                      Upload Invoice
-                    </Button>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading campaign...</p>
         </div>
       </div>
     );
   }
 
-  // Step 2: Upload Invoice
+  // -------------------------------------------------------
+  // Upload Step
+  // -------------------------------------------------------
   if (currentStep === "upload-invoice") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <button
-              onClick={() => setCurrentStep("select-campaign")}
-              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium mb-6"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Select Different Campaign
-            </button>
+      <div className="min-h-screen p-6 bg-primary-bg text-foreground">
+        <div className="max-w-2xl mx-auto">
+          {/* Back */}
+          <button
+            onClick={backToDashboard}
+            className="flex items-center gap-2 text-primary font-medium mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </button>
 
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Upload Invoice
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Campaign:{" "}
-                <span className="font-semibold">{selectedCampaign?.title}</span>
-              </p>
+          {/* Header */}
+          <h1 className="text-3xl font-bold mb-2">Provider Confirmation</h1>
+          <p className="text-muted-foreground mb-6">
+            Upload your invoice to confirm service readiness for{" "}
+            <span className="font-semibold text-foreground">
+              {selectedCampaign.title}
+            </span>
+          </p>
+
+          {/* Info Box */}
+          <Card className="p-4 mb-6 bg-primary/5 border-primary/20">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-primary" />
+              <div className="text-sm">
+                <p className="font-semibold mb-1">What is Provider Confirmation?</p>
+                <p className="text-muted-foreground">
+                  Uploading your invoice confirms your readiness to deliver
+                  services as agreed under this campaign.
+                </p>
+              </div>
             </div>
-          </div>
-        </div>
+          </Card>
 
-        {/* Content */}
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card className="p-8 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">
-              Invoice Details
-            </h2>
+          {/* Invoice Form */}
+          <Card className="p-6 mb-6">
+            <h2 className="text-xl font-bold mb-4">Invoice Details</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium mb-2">
                   Invoice Number
                 </label>
                 <Input
-                  type="text"
                   name="invoiceNumber"
-                  placeholder="INV-2024-001"
                   value={invoiceData.invoiceNumber}
                   onChange={handleInputChange}
+                  placeholder="INV-2024-001"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium mb-2">
                   Invoice Date
                 </label>
                 <Input
@@ -279,83 +235,68 @@ const ProviderInvoiceUpload = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Invoice Amount (USD)
+                <label className="block text-sm font-medium mb-2">
+                  Amount (USD)
                 </label>
                 <Input
                   type="number"
                   name="invoiceAmount"
-                  placeholder="0.00"
-                  step="0.01"
                   value={invoiceData.invoiceAmount}
                   onChange={handleInputChange}
+                  placeholder="0.00"
+                  step="0.01"
                 />
               </div>
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="mt-6">
+              <label className="block text-sm font-medium mb-2">
                 Description of Services
               </label>
               <textarea
                 name="description"
-                placeholder="Describe the services rendered..."
                 value={invoiceData.description}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 rows={4}
+                className="w-full px-4 py-2 rounded-lg bg-card border border-border focus:ring-primary focus:ring-2"
               />
             </div>
           </Card>
 
           {/* File Upload */}
-          <Card className="p-8 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">
-              Upload Invoice File
-            </h2>
+          <Card className="p-6 mb-6">
+            <h2 className="text-xl font-bold mb-4">Upload Invoice File</h2>
 
             {!invoiceData.invoiceFile ? (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-2">
-                  Drag and drop your invoice here, or click to browse
+              <label className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer">
+                <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                <p>Click to upload or drag & drop</p>
+                <p className="text-sm text-muted-foreground">
+                  PDF, PNG, JPG — Max 10MB
                 </p>
-                <p className="text-sm text-gray-500 mb-4">
-                  Supported formats: PDF, PNG, JPG (Max 10MB)
-                </p>
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <span className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                    Browse Files
-                  </span>
-                </label>
-              </div>
+
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </label>
             ) : (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        {invoiceData.invoiceFile.name}
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {(invoiceData.invoiceFile.size / 1024).toFixed(2)} KB
-                      </p>
-                    </div>
+              <div className="p-4 border border-green-500/30 bg-green-500/10 rounded-lg flex items-start justify-between">
+                <div className="flex gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-green-600 mt-1" />
+                  <div>
+                    <p className="font-semibold">{invoiceData.invoiceFile.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(invoiceData.invoiceFile.size / 1024).toFixed(2)} KB
+                    </p>
                   </div>
-                  <button
-                    onClick={handleRemoveFile}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
                 </div>
+
+                <button onClick={handleRemoveFile} className="text-destructive">
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
             )}
           </Card>
@@ -363,16 +304,17 @@ const ProviderInvoiceUpload = () => {
           {/* Actions */}
           <div className="flex gap-4">
             <Button
-              onClick={() => setCurrentStep("select-campaign")}
               variant="outline"
               className="flex-1"
+              onClick={backToDashboard}
             >
-              Change Campaign
+              Cancel
             </Button>
+
             <Button
+              className="flex-1"
+              disabled={!canProceed()}
               onClick={() => setCurrentStep("review")}
-              disabled={!canProceedToReview()}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
             >
               Review & Submit
             </Button>
@@ -382,100 +324,84 @@ const ProviderInvoiceUpload = () => {
     );
   }
 
-  // Step 3: Review
+  // -------------------------------------------------------
+  // Review Step
+  // -------------------------------------------------------
   if (currentStep === "review") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-3xl font-bold text-gray-900">Review Invoice</h1>
-            <p className="text-gray-600 mt-2">
-              Please review the invoice details before submitting
-            </p>
-          </div>
-        </div>
+      <div className="min-h-screen p-6 bg-primary-bg text-foreground">
+        <div className="max-w-2xl mx-auto">
+          <button
+            onClick={() => setCurrentStep("upload-invoice")}
+            className="flex items-center gap-2 text-primary font-medium mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" /> Edit Invoice
+          </button>
 
-        {/* Content */}
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Campaign Summary */}
+          <h1 className="text-3xl font-bold mb-8">Review Invoice</h1>
+
+          {/* Campaign Info */}
           <Card className="p-6 mb-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Campaign</h2>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-900">
-                {selectedCampaign?.title}
-              </h3>
-              <p className="text-sm text-gray-600 mt-2">
-                {selectedCampaign?.description}
+            <h2 className="text-lg font-bold mb-3">Campaign</h2>
+            <div className="p-4 bg-card rounded-lg border border-border">
+              <p className="font-semibold">{selectedCampaign.title}</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {selectedCampaign.description}
               </p>
             </div>
           </Card>
 
           {/* Invoice Summary */}
           <Card className="p-6 mb-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
-              Invoice Details
-            </h2>
+            <h2 className="text-lg font-bold mb-4">Invoice Summary</h2>
 
-            <div className="space-y-4">
-              <div className="flex justify-between py-2 border-b border-gray-200">
-                <span className="text-gray-700">Invoice Number:</span>
-                <span className="font-semibold text-gray-900">
-                  {invoiceData.invoiceNumber}
-                </span>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between py-2 border-b border-border">
+                <span>Invoice Number</span>
+                <span className="font-semibold">{invoiceData.invoiceNumber}</span>
               </div>
 
-              <div className="flex justify-between py-2 border-b border-gray-200">
-                <span className="text-gray-700">Invoice Date:</span>
-                <span className="font-semibold text-gray-900">
+              <div className="flex justify-between py-2 border-b border-border">
+                <span>Date</span>
+                <span className="font-semibold">
                   {new Date(invoiceData.invoiceDate).toLocaleDateString()}
                 </span>
               </div>
 
-              <div className="flex justify-between py-2 border-b border-gray-200">
-                <span className="text-gray-700">Amount:</span>
-                <span className="font-semibold text-indigo-600 text-lg">
+              <div className="flex justify-between py-2 border-b border-border">
+                <span>Amount</span>
+                <span className="font-semibold text-primary">
                   $
-                  {parseFloat(invoiceData.invoiceAmount).toLocaleString(
-                    "en-US",
-                    {
-                      minimumFractionDigits: 2,
-                    }
-                  )}
+                  {Number(invoiceData.invoiceAmount).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
 
-              <div className="py-2 border-b border-gray-200">
-                <span className="text-gray-700 block mb-2">Description:</span>
-                <p className="text-gray-900 bg-gray-50 p-3 rounded">
-                  {invoiceData.description}
-                </p>
+              <div className="py-2 border-b border-border">
+                <p className="mb-1 font-medium">Description</p>
+                <p className="bg-card p-3 rounded">{invoiceData.description}</p>
               </div>
 
               <div className="py-2">
-                <span className="text-gray-700 block mb-2">File:</span>
-                <div className="flex items-center gap-2 text-gray-900">
-                  <FileText className="w-5 h-5 text-gray-400" />
+                <p className="mb-1 font-medium">File</p>
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-muted-foreground" />
                   <span>{invoiceData.invoiceFile?.name}</span>
                 </div>
               </div>
             </div>
           </Card>
 
-          {/* Confirmation */}
-          <Card className="p-6 mb-6 bg-blue-50 border border-blue-200">
+          {/* Warning */}
+          <Card className="p-4 mb-6 bg-primary/5 border-primary/20">
             <div className="flex gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-blue-900">
-                  Before you submit:
-                </p>
-                <ul className="text-sm text-blue-800 mt-2 space-y-1 list-disc list-inside">
-                  <li>
-                    Invoice must be for services rendered under this campaign
-                  </li>
-                  <li>Amount must match the actual services provided</li>
-                  <li>All required documents must be attached</li>
+              <AlertCircle className="w-5 h-5 text-primary" />
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium mb-1">Before you submit:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Ensure all invoice details are correct.</li>
+                  <li>Invoice must match services for this campaign.</li>
                 </ul>
               </div>
             </div>
@@ -484,18 +410,19 @@ const ProviderInvoiceUpload = () => {
           {/* Actions */}
           <div className="flex gap-4">
             <Button
-              onClick={() => setCurrentStep("upload-invoice")}
               variant="outline"
               className="flex-1"
+              onClick={() => setCurrentStep("upload-invoice")}
             >
               Edit
             </Button>
+
             <Button
-              onClick={handleSubmitInvoice}
+              className="flex-1"
               disabled={isSubmitting}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
+              onClick={handleSubmitInvoice}
             >
-              {isSubmitting ? "Submitting..." : "Submit Invoice"}
+              {isSubmitting ? "Submitting..." : "Confirm & Submit"}
             </Button>
           </div>
         </div>
@@ -503,40 +430,25 @@ const ProviderInvoiceUpload = () => {
     );
   }
 
-  // Step 4: Success
-  if (currentStep === "success") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8 text-center">
-          <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Invoice Submitted!
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Your invoice has been successfully submitted and is awaiting review.
-          </p>
+  // -------------------------------------------------------
+  // Success Step
+  // -------------------------------------------------------
+  return (
+    <div className="min-h-screen p-6 bg-primary-bg text-foreground flex items-start pt-12">
+      <div className="max-w-md mx-auto text-center">
+        <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
+        <h1 className="text-3xl font-bold mb-2">Invoice Submitted!</h1>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-blue-900">
-              <span className="font-semibold">What's next?</span>
-              <br />
-              The beneficiary will review and confirm receipt of services. Once
-              confirmed, your invoice amount will be marked for payout.
-            </p>
-          </div>
+        <p className="text-muted-foreground mb-6">
+          Your invoice has been successfully uploaded and sent for admin approval.
+        </p>
 
-          <Button
-            onClick={handleBackToDashboard}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-          >
-            Return to Dashboard
-          </Button>
-        </Card>
+        <Button onClick={backToDashboard} className="w-full">
+          Back to Dashboard
+        </Button>
       </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 };
 
 export default ProviderInvoiceUpload;

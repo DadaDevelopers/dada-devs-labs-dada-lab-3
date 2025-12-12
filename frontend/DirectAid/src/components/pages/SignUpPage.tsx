@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import FormInput from "../ui/FormInput";
-import Button from "../ui/Button";
+import {Button} from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
 type UserRole = "provider" | "beneficiary" | "donor" | "ngo";
@@ -603,11 +603,10 @@ const SignUpPage: React.FC = () => {
 
             <Button
               type="submit"
-              variant="primary"
-              size="md"
+              variant="secondary"
+              size="sm"
               disabled={isSubmitting}
-              className="w-full"
-            >
+              className="w-full btn-cta">
               {isSubmitting ? "Creating Account..." : "Create Account"}
             </Button>
           </form>

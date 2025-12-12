@@ -111,6 +111,7 @@ export type CampaignStatus =
   | "active"
   | "completed"
   | "cancelled"
+  | "in_progress"
   | "paused";
 export type ConfirmationStatus =
   | "pending"

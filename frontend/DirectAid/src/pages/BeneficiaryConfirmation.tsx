@@ -26,7 +26,9 @@ const BeneficiaryConfirmation = () => {
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmationNote, setConfirmationNote] = useState<Record<string, string>>({});
+  const [confirmationNote, setConfirmationNote] = useState<
+    Record<string, string>
+  >({});
 
   // Campaigns that need beneficiary confirmation
   const pendingCampaigns = campaigns.filter(
@@ -66,7 +68,9 @@ const BeneficiaryConfirmation = () => {
       <Card
         key={campaign.id}
         className={`overflow-hidden border-l-4 ${
-          isPending ? "border-l-yellow-500 hover:shadow-lg" : "border-l-green-500 bg-green-50"
+          isPending
+            ? "border-l-yellow-500 hover:shadow-lg"
+            : "border-l-green-500 bg-green-50"
         } transition`}
       >
         {/* Summary */}
@@ -79,25 +83,39 @@ const BeneficiaryConfirmation = () => {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-lg font-bold text-gray-900">{campaign.title}</h3>
+                <h3 className="text-lg font-bold text-white-900">
+                  {campaign.title}
+                </h3>
                 <span
                   className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    isPending ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"
+                    isPending
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-green-100 text-green-800"
                   }`}
                 >
                   {isPending ? "Awaiting Your Confirmation" : "Confirmed"}
                 </span>
               </div>
-              <p className="text-gray-600 line-clamp-1">{campaign.description}</p>
+              <p className="text-gray-600 line-clamp-1">
+                {campaign.description}
+              </p>
               <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-600">
                 <div className="flex items-center gap-1">
-                  {isPending ? <Clock className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                  {isPending ? (
+                    <Clock className="w-4 h-4" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  )}
                   {isPending
                     ? "Pending"
-                    : `Confirmed on ${new Date(campaign.beneficiaryConfirmedAt || campaign.providerConfirmedAt).toLocaleDateString()}`}
+                    : `Confirmed on ${new Date(
+                        campaign.beneficiaryConfirmedAt ||
+                          campaign.providerConfirmedAt
+                      ).toLocaleDateString()}`}
                 </div>
                 <div className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />${campaign.amountRaised.toLocaleString()}
+                  <DollarSign className="w-4 h-4" />$
+                  {campaign.amountRaised.toLocaleString()}
                 </div>
               </div>
             </div>
@@ -111,31 +129,44 @@ const BeneficiaryConfirmation = () => {
 
         {/* Expanded Details */}
         {isExpanded && (
-          <div className={`border-t border-gray-200 bg-gray-50 p-6 ${!isPending && "bg-white"}`}>
+          <div
+            className={`border-t border-gray-200 bg-gray-50 p-6 ${
+              !isPending && "bg-white"
+            }`}
+          >
             {/* Funding Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Campaign Details</h4>
+                <h4 className="font-semibold text-gray-900 mb-4">
+                  Campaign Details
+                </h4>
                 <div className="space-y-3 text-sm">
                   <div>
                     <p className="text-gray-600">Provider</p>
                     <p className="font-semibold text-gray-900">
-                      {mockDataService.getProviderById(campaign.providerId)?.name || "Not Assigned"}
+                      {mockDataService.getProviderById(campaign.providerId)
+                        ?.name || "Not Assigned"}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-600">Category</p>
-                    <p className="font-semibold text-gray-900 capitalize">{campaign.category}</p>
+                    <p className="font-semibold text-gray-900 capitalize">
+                      {campaign.category}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-600">Status</p>
-                    <p className="font-semibold text-gray-900 capitalize">{campaign.status}</p>
+                    <p className="font-semibold text-gray-900 capitalize">
+                      {campaign.status}
+                    </p>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Funding Summary</h4>
+                <h4 className="font-semibold text-gray-900 mb-4">
+                  Funding Summary
+                </h4>
                 <div className="space-y-3 text-sm">
                   <div>
                     <p className="text-gray-600">Amount Raised</p>
@@ -145,7 +176,9 @@ const BeneficiaryConfirmation = () => {
                   </div>
                   <div>
                     <p className="text-gray-600">Target Amount</p>
-                    <p className="font-semibold text-gray-900">${campaign.targetAmount.toLocaleString()}</p>
+                    <p className="font-semibold text-gray-900">
+                      ${campaign.targetAmount.toLocaleString()}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-600">Progress</p>
@@ -155,7 +188,9 @@ const BeneficiaryConfirmation = () => {
                         style={{ width: `${getProgress(campaign)}%` }}
                       />
                     </div>
-                    <p className="text-xs text-gray-600 mt-1">{getProgress(campaign).toFixed(0)}% funded</p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {getProgress(campaign).toFixed(0)}% funded
+                    </p>
                   </div>
                 </div>
               </div>
@@ -165,13 +200,17 @@ const BeneficiaryConfirmation = () => {
             {isPending && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <MessageSquare className="w-4 h-4 inline mr-2" /> Optional Confirmation Note
+                  <MessageSquare className="w-4 h-4 inline mr-2" /> Optional
+                  Confirmation Note
                 </label>
                 <textarea
                   placeholder="Add any notes about service receipt..."
                   value={confirmationNote[campaign.id] || ""}
                   onChange={(e) =>
-                    setConfirmationNote((prev) => ({ ...prev, [campaign.id]: e.target.value }))
+                    setConfirmationNote((prev) => ({
+                      ...prev,
+                      [campaign.id]: e.target.value,
+                    }))
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                   rows={3}
@@ -198,19 +237,34 @@ const BeneficiaryConfirmation = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+    <div
+      className="min-h-screen p-4 sm:p-6"
+      style={{ backgroundColor: "var(--color-primary-bg)" }}
+    >
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div
+        style={{ backgroundColor: "var(--color-secondary-bg)" }}
+        className="border-b sticky top-0 z-10"
+      >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <button
             onClick={() => navigate("/beneficiary")}
-            className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium mb-4"
+            className="flex items-center gap-2 font-medium mb-4"
+            style={{ color: "var(--color-accent)" }}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Confirm Service Receipt</h1>
-          <p className="text-gray-600 mt-2">
+          <h1
+            className="text-3xl font-bold"
+            style={{ color: "var(--color-text-light)" }}
+          >
+            Confirm Service Receipt
+          </h1>
+          <p
+            style={{ color: "var(--color-text-light)", opacity: 0.8 }}
+            className="mt-2"
+          >
             Confirm that you have received the services for your campaigns
           </p>
         </div>
@@ -220,31 +274,60 @@ const BeneficiaryConfirmation = () => {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
         {pendingCampaigns.length > 0 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Pending Confirmations <span className="text-lg font-normal text-gray-600">({pendingCampaigns.length})</span>
+            <h2 className="text-2xl font-bold text-white-900 mb-6">
+              Pending Confirmations{" "}
+              <span className="text-lg font-normal text-white-600">
+                ({pendingCampaigns.length})
+              </span>
             </h2>
-            <div className="space-y-4">{pendingCampaigns.map((c) => renderCampaignCard(c, true))}</div>
+            <div className="space-y-4">
+              {pendingCampaigns.map((c) => renderCampaignCard(c, true))}
+            </div>
           </div>
         )}
 
         {confirmedCampaigns.length > 0 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Completed Confirmations <span className="text-lg font-normal text-gray-600">({confirmedCampaigns.length})</span>
+            <h2 className="text-2xl font-bold text-white-900 mb-6">
+              Completed Confirmations{" "}
+              <span className="text-lg font-normal text-white-600">
+                ({confirmedCampaigns.length})
+              </span>
             </h2>
-            <div className="space-y-4">{confirmedCampaigns.map((c) => renderCampaignCard(c, false))}</div>
+            <div className="space-y-4">
+              {confirmedCampaigns.map((c) => renderCampaignCard(c, false))}
+            </div>
           </div>
         )}
 
         {/* Empty State */}
         {pendingCampaigns.length === 0 && confirmedCampaigns.length === 0 && (
-          <Card className="p-12 text-center">
-            <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-700 text-lg font-semibold">No campaigns to confirm</p>
-            <p className="text-gray-600 mt-2">You don't have any campaigns awaiting confirmation yet.</p>
+          <Card
+            className="p-12 text-center card-elevated"
+            style={{
+              backgroundColor: "var(--color-secondary-bg)",
+              borderColor: "var(--color-accent)",
+            }}
+          >
+            <AlertCircle
+              className="w-16 h-16 mx-auto mb-4"
+              style={{ color: "var(--color-accent)" }}
+            />
+            <p
+              className="text-lg font-semibold"
+              style={{ color: "var(--color-text-light)" }}
+            >
+              No campaigns to confirm
+            </p>
+            <p
+              style={{ color: "var(--color-text-light)", opacity: 0.8 }}
+              className="mt-2"
+            >
+              You don't have any campaigns awaiting confirmation yet.
+            </p>
             <Button
               onClick={() => navigate("/beneficiary")}
-              className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="mt-6 w-full rounded-full btn-cta"
             >
               Return to Dashboard
             </Button>
