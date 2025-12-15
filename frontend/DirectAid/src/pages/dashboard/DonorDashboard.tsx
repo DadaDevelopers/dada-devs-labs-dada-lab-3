@@ -505,7 +505,7 @@ const DonorDashboard = () => {
         </div>
 
         {/* Tax Information */}
-        <Card className="p-4 sm:p-6 card-elevated">
+        {/* <Card className="p-4 sm:p-6 card-elevated">
           <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">
             Tax Information
           </h2>
@@ -532,7 +532,7 @@ const DonorDashboard = () => {
               details.
             </p>
           </div>
-        </Card>
+        </Card> */}
       </div>
     </DashboardLayout>
   );
