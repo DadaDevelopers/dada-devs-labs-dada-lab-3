@@ -106,6 +106,11 @@ const ProviderDashboard = () => {
       icon: <Wallet className="w-5 h-5" />,
     },
     {
+      label: "Proof Upload",
+      href: "/provider/proof-upload",
+      icon: <FileText className="w-5 h-5" />,
+    },
+    {
       label: "Settings",
       href: "/provider/settings",
       icon: <Settings className="w-5 h-5" />,
@@ -860,6 +865,28 @@ const ProviderDashboard = () => {
             </h2>
 
             <div className="space-y-4">
+              <div className="p-3 sm:p-4 rounded-2xl bg-primary/5 border border-primary/20">
+                <div className="flex items-start gap-3 mb-3">
+                  <Upload className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-sm sm:text-base mb-1">
+                      Upload Invoices
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3">
+                      Submit invoices for your active campaigns
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full rounded-full gap-2 btn-cta"
+                  onClick={() => navigate("/provider/invoices")}
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Invoices
+                </Button>
+              </div>
+
               <div className="p-3 sm:p-4 rounded-2xl bg-primary/5 border border-primary/20">
                 <div className="flex items-start gap-3 mb-3">
                   <Upload className="w-5 h-5 text-primary mt-0.5 shrink-0" />

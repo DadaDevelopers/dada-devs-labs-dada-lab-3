@@ -268,9 +268,9 @@ const ProviderInvoiceUpload = () => {
             <h2 className="text-xl font-bold mb-4">Upload Invoice File</h2>
 
             {!invoiceData.invoiceFile ? (
-              <label className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer">
+              <label className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer block hover:bg-secondary/50 transition">
                 <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                <p>Click to upload or drag & drop</p>
+                <p className="font-medium mb-1">Click to upload or drag & drop</p>
                 <p className="text-sm text-muted-foreground">
                   PDF, PNG, JPG — Max 10MB
                 </p>

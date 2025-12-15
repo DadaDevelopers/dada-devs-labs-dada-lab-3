@@ -726,7 +726,8 @@ const BeneficiaryDashboard = () => {
                     <Button
                       size="sm"
                       className="gap-2 rounded-full w-full sm:w-auto btn-cta"
-                      onClick={handleUploadReport}
+                      // onClick={handleUploadReport}
+                      onClick={() => navigate("/beneficiary/reporting")}
                     >
                       <Upload className="w-4 h-4" />
                       Upload Report
@@ -795,21 +796,44 @@ const BeneficiaryDashboard = () => {
 
                 <div className="p-3 sm:p-4 rounded-2xl bg-primary/5 border border-primary/20">
                   <h4 className="font-semibold text-sm sm:text-base mb-2 text-primary">
-                    Total Target
+                    Funding Status
                   </h4>
-                  <p className="text-xl sm:text-2xl font-bold mb-1">
-                    ${(primaryCampaign.targetAmount / 100).toFixed(0)}
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    ${(primaryCampaign.amountRaised / 100).toFixed(0)} raised so
-                    far
-                  </p>
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Amount Raised</p>
+                      <p className="text-lg sm:text-xl font-bold">
+                        ${(primaryCampaign.amountRaised / 100).toFixed(0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Target Amount</p>
+                      <p className="text-lg sm:text-xl font-bold">
+                        ${(primaryCampaign.targetAmount / 100).toFixed(0)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Progress</span>
+                      <span className="font-semibold">
+                        {primaryCampaign.progressPercentage}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={primaryCampaign.progressPercentage}
+                      className="h-2"
+                    />
+                  </div>
+                  <div className="pt-2 border-t border-primary/20">
+                    <p className="text-xs text-muted-foreground mb-1">Donors</p>
+                    <p className="font-semibold">{primaryCampaign.donorCount} supporters</p>
+                  </div>
                 </div>
 
                 <Button
                   variant="outline"
                   className="w-full rounded-full btn-cta"
-                  onClick={() => navigate(`/campaign/${primaryCampaign.id}`)}
+                  onClick={() => navigate(`/campaigns/${primaryCampaign.id}`)}
                 >
                   View Full Details
                 </Button>

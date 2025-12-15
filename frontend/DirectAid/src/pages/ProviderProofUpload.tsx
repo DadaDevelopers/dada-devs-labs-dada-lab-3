@@ -12,6 +12,10 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
+  LayoutDashboard,
+  FolderKanban,
+  Wallet,
+  Settings,
 } from "lucide-react";
 
 type Step = "select-campaign" | "upload-proof" | "review" | "success";
@@ -51,17 +55,32 @@ const ProviderProofUpload = () => {
     {
       label: "Dashboard",
       href: "/provider",
-      icon: null,
+      icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
-      label: "Invoices",
+      label: "Campaigns",
+      href: "/campaigns",
+      icon: <FolderKanban className="w-5 h-5" />,
+    },
+    {
+      label: "Upload Invoices",
       href: "/provider/invoices",
-      icon: null,
+      icon: <Upload className="w-5 h-5" />,
+    },
+    {
+      label: "Withdrawals",
+      href: "/provider/withdrawals",
+      icon: <Wallet className="w-5 h-5" />,
     },
     {
       label: "Proof Upload",
       href: "/provider/proof-upload",
-      icon: null,
+      icon: <FileText className="w-5 h-5" />,
+    },
+    {
+      label: "Settings",
+      href: "/provider/settings",
+      icon: <Settings className="w-5 h-5" />,
     },
   ];
 
@@ -112,22 +131,25 @@ const ProviderProofUpload = () => {
 
     setIsUploading(true);
     try {
-      // Simulate file upload
-      const fileList = proofFiles.map((f) => ({
-        name: f.name,
-        url: `https://example.com/proofs/${f.name}`,
-      }));
+      // Comment out API call for demo
+      // const fileList = proofFiles.map((f) => ({
+      //   name: f.name,
+      //   url: `https://example.com/proofs/${f.name}`,
+      // }));
 
-      await api.post("/uploads/campaign-documents", {
-        campaignId: chosenCampaign.id,
-        documentType: "proof",
-        description: description,
-        files: fileList,
-      });
+      // await api.post("/uploads/campaign-documents", {
+      //   campaignId: chosenCampaign.id,
+      //   documentType: "proof",
+      //   description: description,
+      //   files: fileList,
+      // });
+
+      // Simulate upload delay
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       setCurrentStep("success");
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to upload proof");
+      setError("Failed to upload proof");
     } finally {
       setIsUploading(false);
     }

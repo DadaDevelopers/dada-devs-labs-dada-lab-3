@@ -200,7 +200,7 @@ const DonorDashboard = () => {
               variant="outline"
               size="sm"
               className="rounded-full w-full sm:w-auto btn-cta"
-              onClick={() => navigate("/campaigns")}
+              onClick={() => navigate("/donor/donations")}
             >
               View All
             </Button>
