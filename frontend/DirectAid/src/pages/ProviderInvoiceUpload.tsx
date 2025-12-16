@@ -67,15 +67,44 @@ const ProviderInvoiceUpload = () => {
   // Load Campaign
   // -------------------------------------------------------
   useEffect(() => {
+    // Comment out parameter requirement for now to allow direct navigation
+    // if (!campaignId) {
+    //   navigate("/provider");
+    //   return;
+    // }
+
+    // For demo purposes, just use the first available campaign if no ID provided
     if (!campaignId) {
-      navigate("/provider");
+      const providerCampaigns = campaigns.filter(c => c.providerId === provider.id);
+      if (providerCampaigns.length > 0) {
+        setSelectedCampaign(providerCampaigns[0] as Campaign);
+      } else {
+        // Create a mock campaign for demo
+        setSelectedCampaign({
+          id: "demo_campaign_001",
+          title: "Demo Medical Campaign",
+          description: "Sample campaign for invoice upload demonstration",
+          invoices: [],
+          providerConfirmed: false
+        });
+      }
       return;
     }
 
     const campaign = campaigns.find((c) => c.id === campaignId);
-    if (!campaign) navigate("/provider");
-    else setSelectedCampaign(campaign as Campaign);
-  }, [campaignId, campaigns, navigate]);
+    if (!campaign) {
+      // Don't redirect, just use demo campaign
+      setSelectedCampaign({
+        id: "demo_campaign_001",
+        title: "Demo Medical Campaign", 
+        description: "Sample campaign for invoice upload demonstration",
+        invoices: [],
+        providerConfirmed: false
+      });
+    } else {
+      setSelectedCampaign(campaign as Campaign);
+    }
+  }, [campaignId, campaigns, navigate, provider.id]);
 
   // -------------------------------------------------------
   // Handlers

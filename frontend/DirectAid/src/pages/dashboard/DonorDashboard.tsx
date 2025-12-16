@@ -187,6 +187,7 @@ const DonorDashboard = () => {
                 amountRaised={campaign.amountRaised / 100}
                 targetAmount={campaign.targetAmount / 100}
                 donorCount={campaign.donorCount}
+                onClick={() => navigate(`/campaigns/${campaign.id}`)}
               />
             ))}
           </div>

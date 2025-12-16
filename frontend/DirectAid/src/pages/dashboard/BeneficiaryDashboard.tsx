@@ -239,7 +239,7 @@ const BeneficiaryDashboard = () => {
   };
 
   const handleViewProof = (c: any) => {
-    navigate(`/campaign/${c.id}`);
+    navigate(`/campaigns/${c.id}`);
   };
 
   return (
