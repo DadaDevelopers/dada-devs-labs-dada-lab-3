@@ -93,10 +93,10 @@ const LoginPage: React.FC = () => {
 
       // navigate based on role
       if (role === "provider" || role === "Provider")
-        navigate("/providerdashboard");
+        navigate("/provider");
       else if (role === "beneficiary" || role === "Beneficiary")
-        navigate("/userdashboard");
-      else navigate("/donordashboard");
+        navigate("/beneficiary");
+      else navigate("/donor");
     } catch {
       setErrors({
         general: "Invalid email or password. Please try again.",

@@ -14,7 +14,6 @@ interface SignUpFormData {
   phone: string;
   country: string;
   city: string;
-  address: string;
   organization: string;
   role: UserRole;
   // Provider-specific
@@ -43,7 +42,8 @@ interface FormErrors {
   password?: string;
   confirmPassword?: string;
   phone?: string;
-  address?: string;
+  city?: string;
+  country?: string;
   organization?: string;
   role?: string;
   general?: string;
@@ -59,7 +59,6 @@ const SignUpPage: React.FC = () => {
     phone: "",
     country: "",
     city: "",
-    address: "",
     organization: "",
     role: "beneficiary",
     acceptTerms: false,
@@ -115,12 +114,12 @@ const SignUpPage: React.FC = () => {
       newErrors.phone = "Please enter a valid phone number";
     }
 
-    if (!formData.address.trim()) {
-      newErrors.address = "Address is required";
+    if (!formData.country?.trim()) {
+      newErrors.country = "Country is required";
     }
 
-    if (!formData.country?.trim()) {
-      newErrors.address = "Country is required";
+    if (!formData.city?.trim()) {
+      newErrors.city = "City is required";
     }
 
     if (formData.role === "provider" && !formData.organization.trim()) {
@@ -186,24 +185,27 @@ const SignUpPage: React.FC = () => {
     setErrors({});
 
     try {
-      // Use auth context to signup
-      const result = await signup({ ...formData });
+      // Comment out backend API call for demo
+      // const result = await signup({ ...formData });
 
-      if (!result.ok) {
-        setErrors({
-          general:
-            result.error ||
-            "An error occurred during signup. Please try again.",
-        });
-        setIsSubmitting(false);
-        return;
-      }
+      // if (!result.ok) {
+      //   setErrors({
+      //     general:
+      //       result.error ||
+      //       "An error occurred during signup. Please try again.",
+      //   });
+      //   setIsSubmitting(false);
+      //   return;
+      // }
 
-      // Signup successful - navigate to appropriate dashboard based on role
+      // Simulate account creation delay for demo
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Navigate directly to appropriate dashboard based on role
       const role = formData.role || "donor";
-      if (role === "provider") navigate("/providerdashboard");
-      else if (role === "beneficiary") navigate("/userdashboard");
-      else navigate("/donordashboard");
+      if (role === "provider") navigate("/provider");
+      else if (role === "beneficiary") navigate("/beneficiary");
+      else navigate("/donor");
     } catch {
       setErrors({
         general: "An error occurred during signup. Please try again.",
@@ -356,7 +358,7 @@ const SignUpPage: React.FC = () => {
                   name="country"
                   value={formData.country}
                   onChange={handleChange}
-                  error={errors.address}
+                  error={errors.country}
                   required
                   placeholder="Country"
                 />
@@ -367,7 +369,7 @@ const SignUpPage: React.FC = () => {
                   name="city"
                   value={formData.city}
                   onChange={handleChange}
-                  error={errors.address}
+                  error={errors.city}
                   required
                   placeholder="City"
                 />

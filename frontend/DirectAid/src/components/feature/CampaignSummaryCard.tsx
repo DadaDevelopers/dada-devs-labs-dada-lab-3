@@ -9,6 +9,7 @@ interface CampaignSummaryCardProps {
   targetAmount: number;
   donorCount: number;
   imageUrl?: string;
+  onClick?: () => void;
 }
 
 export const CampaignSummaryCard = ({
@@ -19,6 +20,7 @@ export const CampaignSummaryCard = ({
   targetAmount,
   donorCount,
   imageUrl,
+  onClick,
 }: CampaignSummaryCardProps) => {
   const progressPercentage = Math.min((amountRaised / targetAmount) * 100, 100);
 
@@ -73,7 +75,10 @@ export const CampaignSummaryCard = ({
               </div>
             </div>
             
-            <button className="bg-[var(--color-accent)] text-black font-medium text-sm px-2 py-2 rounded-full shadow-md hover:bg-primary/90 transition-colors duration-300 ">
+            <button 
+              className="bg-[var(--color-accent)] text-black font-medium text-sm px-2 py-2 rounded-full shadow-md hover:bg-primary/90 transition-colors duration-300"
+              onClick={onClick}
+            >
               View Campaign
             </button>
           </div>

@@ -13,6 +13,11 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
+  LayoutDashboard,
+  FolderKanban,
+  Upload,
+  FileText,
+  Settings,
 } from "lucide-react";
 
 type Step = "select-campaign" | "confirm-withdrawal" | "processing" | "success";
@@ -60,17 +65,32 @@ const ProviderWithdrawal = () => {
     {
       label: "Dashboard",
       href: "/provider",
-      icon: null,
+      icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
-      label: "Invoices",
+      label: "Campaigns",
+      href: "/campaigns",
+      icon: <FolderKanban className="w-5 h-5" />,
+    },
+    {
+      label: "Upload Invoices",
       href: "/provider/invoices",
-      icon: null,
+      icon: <Upload className="w-5 h-5" />,
     },
     {
       label: "Withdrawals",
       href: "/provider/withdrawals",
-      icon: null,
+      icon: <Wallet className="w-5 h-5" />,
+    },
+    {
+      label: "Proof Upload",
+      href: "/provider/proof-upload",
+      icon: <FileText className="w-5 h-5" />,
+    },
+    {
+      label: "Settings",
+      href: "/provider/settings",
+      icon: <Settings className="w-5 h-5" />,
     },
   ];
 
@@ -108,18 +128,22 @@ const ProviderWithdrawal = () => {
 
     setIsProcessing(true);
     try {
-      const cents = Math.round(amount * 100);
-      await api.post("/payouts", {
-        providerId: provider.id,
-        amount: cents,
-        currency: "USD",
-        campaignId: chosenCampaign.id,
-        payoutMethodId: selectedPayoutId,
-      });
+      // Comment out API call for demo
+      // const cents = Math.round(amount * 100);
+      // await api.post("/payouts", {
+      //   providerId: provider.id,
+      //   amount: cents,
+      //   currency: "USD",
+      //   campaignId: chosenCampaign.id,
+      //   payoutMethodId: selectedPayoutId,
+      // });
+
+      // Simulate processing delay
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       setCurrentStep("success");
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to process withdrawal");
+      setError("Failed to process withdrawal");
     } finally {
       setIsProcessing(false);
     }
@@ -144,19 +168,11 @@ const ProviderWithdrawal = () => {
     >
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleBackToDashboard}
-            className="p-2 hover:bg-secondary rounded-lg transition"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold">Campaign Fund Withdrawal</h1>
-            <p className="text-muted-foreground mt-1">
-              Request withdrawal of campaign funds to your payout method
-            </p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Withdraw Funds</h1>
+          <p className="text-muted-foreground">
+            Request withdrawal of campaign funds to your payout method
+          </p>
         </div>
 
         {/* Step: Select Campaign */}

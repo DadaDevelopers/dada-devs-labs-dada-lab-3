@@ -19,6 +19,10 @@ import BeneficiaryConfirmation from "../pages/BeneficiaryConfirmation";
 import ProviderSettings from "../pages/ProviderSettings";
 import BeneficiarySettings from "../pages/BeneficiarySettings";
 import DonorSettings from "../pages/DonorSettings";
+import DonorDonations from "../pages/donor/DonorDonations";
+import DonorReceipts from "../pages/donor/DonorReceipts";
+import BeneficiaryReporting from "../pages/beneficiary/BeneficiaryReporting";
+import BeneficiaryFunds from "../pages/beneficiary/BeneficiaryFunds";
 
 export default function AppRouter() {
   return (
@@ -52,9 +56,13 @@ export default function AppRouter() {
         element={<BeneficiaryConfirmation />}
       />
       <Route path="/beneficiary/settings" element={<BeneficiarySettings />} />
+      <Route path="/beneficiary/reporting" element={<BeneficiaryReporting />} />
+      <Route path="/beneficiary/funds" element={<BeneficiaryFunds />} />
 
       {/* Donor */}
       <Route path="/donor/settings" element={<DonorSettings />} />
+      <Route path="/donor/donations" element={<DonorDonations />} />
+      <Route path="/donor/receipts" element={<DonorReceipts />} />
 
       {/* Dashboards */}
       <Route path="/admin" element={<AdminDashboard />} />

@@ -187,6 +187,7 @@ const DonorDashboard = () => {
                 amountRaised={campaign.amountRaised / 100}
                 targetAmount={campaign.targetAmount / 100}
                 donorCount={campaign.donorCount}
+                onClick={() => navigate(`/campaigns/${campaign.id}`)}
               />
             ))}
           </div>
@@ -200,7 +201,7 @@ const DonorDashboard = () => {
               variant="outline"
               size="sm"
               className="rounded-full w-full sm:w-auto btn-cta"
-              onClick={() => navigate("/campaigns")}
+              onClick={() => navigate("/donor/donations")}
             >
               View All
             </Button>
