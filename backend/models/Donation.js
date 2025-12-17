@@ -35,9 +35,9 @@ const DonationSchema = new Schema({
     index: true 
   },
   provider: { type: String, default: null },     // e.g., 'mpesa', 'stripe', 'opennode'
-  paymentReference: { type: String, sparse: true, index: true }, // provider reference (Mpesa ref, bank ref)
-  externalId: { type: String, sparse: true, index: true },       // provider-side ID (for idempotency)
-  transactionHash: { type: String, sparse: true, index: true },  // on-chain tx hash if available
+  paymentReference: { type: String }, // provider reference (Mpesa ref, bank ref)
+  externalId: { type: String },       // provider-side ID (for idempotency)
+  transactionHash: { type: String },  // on-chain tx hash if available
   confirmations: { type: Number, default: 0 },
 
   // Processor raw response (webhook payload etc.) - helpful for troubleshooting/reconciliation
@@ -86,9 +86,9 @@ const DonationSchema = new Schema({
  * Indexes
  * - transactionHash, externalId, paymentReference are sparse so uniqueness isn't required when absent.
  */
-DonationSchema.index({ transactionHash: 1 }, { sparse: true });
-DonationSchema.index({ externalId: 1 }, { sparse: true });
-DonationSchema.index({ paymentReference: 1 }, { sparse: true });
+DonationSchema.index({ transactionHash: 1 }, { unique: true, sparse: true });
+DonationSchema.index({ provider: 1, externalId: 1 }, { unique: true, sparse: true });
+DonationSchema.index({ provider: 1, paymentReference: 1 }, { unique: true, sparse: true });
 
 /**
  * Pre-save: update updatedAt
