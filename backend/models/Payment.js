@@ -38,7 +38,7 @@ const paymentSchema = new mongoose.Schema(
     },
 
     // -------- Provider identifiers ----------
-    externalId: { type: String, index: true },        // CheckoutRequestID / PaymentIntentID
+    externalId: { type: String },        // CheckoutRequestID / PaymentIntentID
     paymentReference: { type: String },               // MpesaReceiptNumber
     idempotencyKey: { type: String, index: true },
 
