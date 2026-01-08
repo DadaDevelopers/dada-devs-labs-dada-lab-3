@@ -7,8 +7,16 @@ export const protect = (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
 
   const token = authHeader.split(" ")[1];
+
   try {
     const payload = verifyAccessToken(token);
+    //Block login for deleted accounts. This prevents donations, campaign creations, payouts, login abuse.
+    if (payload.isDeleted) {
+      return res.status(403).json({
+        message: "Account is scheduled for deletion. Restore to continue."
+      });
+    } 
+
     req.user = payload; // { userId, role }
     next();
   } catch (err) {

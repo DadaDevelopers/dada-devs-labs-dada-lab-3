@@ -1,4 +1,5 @@
 // src/utils/mpesa.js
+//STK push + callbacks
 import config from "../config/config.js";
 
 const isSandbox = (config.MPESA_ENV || "sandbox") === "sandbox";

@@ -1,4 +1,5 @@
 // src/utils/stripe.js
+//PaymentIntents + webhooks
 import Stripe from "stripe";
 import config from "../config/config.js";
 
