@@ -3,7 +3,7 @@ import { User } from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { verifyAccessToken } from "../utils/token.js";
 import { RefreshToken } from "../models/User.js";
-import { logActivity } from "../utils/activityLogger.js";
+// import { logActivity } from "../utils/activityLogger.js";
 import ActivityLog from "../models/ActivityLog.js"; // optional if you need it here
 
 // Get current logged-in user info

@@ -15,7 +15,7 @@ const UserSchema = new Schema({
   lastName: String,
   email: { type: String, required: true, unique: true, lowercase: true },
   passwordHash: { type: String, required: true },
-  role: { type: String, enum: ["DONOR","BENEFICIARY","PROVIDER","ADMIN"], default: "DONOR" },
+  role: { type: String, enum: ["DONOR","BENEFICIARY","PROVIDER","ADMIN", "UNASSIGNED"], default: "DONOR" },
   kycStatus: { type: String, enum: ["PENDING","APPROVED","REJECTED"], default: "PENDING" },
   phoneNumber: String,
   isEmailVerified: { type: Boolean, default: false },
@@ -25,7 +25,6 @@ const UserSchema = new Schema({
 
 UserSchema.pre("save", function(next) {
   this.updatedAt = new Date();
-  next();
 });
 
 UserSchema.methods.matchPassword = async function(plain) {
