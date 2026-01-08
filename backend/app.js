@@ -9,9 +9,9 @@ import stripeWebhookRouter from "./routes/stripeWebhookRoutes.js";
 
 import config from "./config/config.js";
 
-import { startUserPurgeJob } from "./jobs/purgeDeletedUsers.js";
+// import { startUserPurgeJob } from "./jobs/purgeDeletedUsers.js";
 
-startUserPurgeJob();
+// startUserPurgeJob();
 
 
 // Import routes
@@ -63,7 +63,7 @@ app.get("/", (req, res) => {
 // Routes
 app.use("/api/auth", authRoutes); // auth: login, register, refresh, logout
 app.use("/api/users", userRoutes); // user management & profile
-app.use("/api/admin", userRoutes); //admin stats dashboard 
+app.use("/api/admin", userRoutes); //admin stats dashboard
 app.use("/api/providers", providerRoutes); // provider CRUD & listing
 app.use("/api/campaigns", campaignRoutes); // campaigns CRUD & listing
 app.use("/api/donations", donationRoutes); // donations CRUD & stats

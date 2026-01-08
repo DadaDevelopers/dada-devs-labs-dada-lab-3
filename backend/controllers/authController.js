@@ -156,7 +156,7 @@ export async function logout(req, res, next) {
 /**
  * Me: return current user from Bearer access token
  */
-/*export async function me(req, res, next) {
+export async function me(req, res, next) {
   try {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith("Bearer ")) return res.status(401).json({ message: "Unauthorized" });
@@ -166,7 +166,7 @@ export async function logout(req, res, next) {
     if (!user) return res.status(401).json({ message: "Unauthorized" });
     res.json({ user });
   } catch (err) { next(err); }
-}*/
+}
 
 export async function verifyEmail(req, res, next) {
   try {

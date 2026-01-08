@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import Campaign from "../models/Campaign.js";
-import { logActivity } from "../utils/activityLogger.js";
+// import { logActivity } from "../utils/activityLogger.js";
 
 // formatCampaign (keeps Decimal128 -> number)
 function formatCampaign(c) {
