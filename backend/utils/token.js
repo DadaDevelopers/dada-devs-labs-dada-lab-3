@@ -11,11 +11,13 @@ export function hashToken(token) {
 }
 
 export function signAccessToken(payload) {
-  return jwt.sign(payload, config.JWT_ACCESS_SECRET, { expiresIn: config.ACCESS_TOKEN_EXPIRES_IN });
+  return jwt.sign(payload, config.JWT_ACCESS_SECRET, { expiresIn: config.ACCESS_EXPIRES_IN });
 }
 
 export function signRefreshToken(payload) {
-  return jwt.sign(payload, config.JWT_REFRESH_SECRET, { expiresIn: `${config.REFRESH_TOKEN_EXPIRES_DAYS}d` });
+  return jwt.sign(payload, config.JWT_REFRESH_SECRET, {
+    expiresIn: config.REFRESH_EXPIRES_IN
+  });
 }
 
 export function verifyAccessToken(token) {

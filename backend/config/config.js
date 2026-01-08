@@ -40,6 +40,8 @@ export default {
   ACCESS_EXPIRES_IN: process.env.ACCESS_EXPIRES_IN || "15m",
   REFRESH_EXPIRES_IN: process.env.REFRESH_EXPIRES_IN || "7d",
 
+  REFRESH_TOKEN_EXPIRES_DAYS: parseNum(process.env.REFRESH_TOKEN_EXPIRES_DAYS, 7),
+
   //Cookies
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || undefined, // e.g. ".directaiddomain.com"
 
@@ -56,6 +58,9 @@ export default {
   MPESA_CONSUMER_SECRET: process.env.MPESA_CONSUMER_SECRET || null,
   MPESA_SHORTCODE: process.env.MPESA_SHORTCODE || null,
   MPESA_PASSKEY: process.env.MPESA_PASSKEY || null,
+
+  // Bcrypt rounds
+  BCRYPT_ROUNDS: parseNum(process.env.BCRYPT_ROUNDS, 10),
 
   // Mailer (exposed canonical names)
   SMTP_HOST,

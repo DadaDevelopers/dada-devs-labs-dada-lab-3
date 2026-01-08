@@ -3,7 +3,7 @@ import { User } from "../models/User.js";
 import Campaign from "../models/Campaign.js";
 import Donation from "../models/Donation.js";
 import ActivityLog from "../models/ActivityLog.js";
-import { logActivity } from "../utils/activityLogger.js"; // optional if admin controller will write logs too
+// import { logActivity } from "../utils/activityLogger.js"; // optional if admin controller will write logs too
 import mongoose from "mongoose";
 
 export const getAdminStats = async (req, res, next) => {
