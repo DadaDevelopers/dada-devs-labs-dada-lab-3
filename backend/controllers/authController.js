@@ -24,7 +24,24 @@ export async function register(req, res, next) {
     if (existing) return res.status(409).json({ message: "Email already in use" });
 
     const passwordHash = await bcrypt.hash(password, config.BCRYPT_ROUNDS);
-    const user = await User.create({ firstName, lastName, email, passwordHash, role: role || "DONOR" });
+    // capture acceptedTerms (record version if you have it in config)
+    const termsVersion = config.TERMS_VERSION || "v1.0";
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      passwordHash,
+      role: "UNASSIGNED",
+      isDeleted:false,
+      isActive: true,
+      acceptedTerms: {
+        accepted: true,
+        version: termsVersion,
+        acceptedAt: new Date()
+      }
+    });
+    // invalidate previous verification tokens for user
+    await VerificationToken.updateMany({ userId: user._id }, { $set: { used: true } });
 
     // verification token (raw -> send, hashed -> store)
     const rawToken = generateRandomToken(32);
@@ -52,19 +69,39 @@ export async function login(req, res, next) {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+    if (user.isDeleted) {
+      return res.status(403).json({
+        message: "Account scheduled for deletion. Restore to continue."
+      });
+    }
+
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ message: "Invalid credentials" });
-    if (!user.isEmailVerified) return res.status(403).json({ message: "Please verify email" });
 
-    const accessToken = signAccessToken({ userId: user._id.toString(), role: user.role });
-    const refreshToken = signRefreshToken({ userId: user._id.toString(), role: user.role });
+    if (!user.isEmailVerified) {
+      // You may choose to return 401 to hide state. Here we return 403 with hint.
+      return res.status(403).json({ message: "Email not verified" });
+    }
+
+    // update last login timestamp - This helps auditing and detecting suspicious accounts.
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const accessToken = signAccessToken({ userId: user._id.toString(), role: user.role, isDeleted: user.isDeleted });
+    const refreshToken = signRefreshToken({ userId: user._id.toString(), role: user.role, isDeleted: user.isDeleted });
 
     const refreshHash = hashToken(refreshToken);
     const refreshExpiry = new Date(Date.now() + config.REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
     await RefreshToken.create({ userId: user._id, tokenHash: refreshHash, expiresAt: refreshExpiry });
 
     setRefreshCookie(res, refreshToken);
-    res.json({ accessToken, user: { id: user._id, email: user.email, firstName: user.firstName, role: user.role } });
+    
+    res.json({
+      accessToken,
+      refreshToken,
+      user: { id: user._id, email: user.email, firstName: user.firstName, role: user.role, isDeleted: user.isDeleted }
+    });
   } catch (err) { next(err); }
 }
 
@@ -116,8 +153,10 @@ export async function logout(req, res, next) {
   } catch (err) { next(err); }
 }
 
-export async function me(req, res, next) {
-  // expects Authorization: Bearer <accessToken>
+/**
+ * Me: return current user from Bearer access token
+ */
+/*export async function me(req, res, next) {
   try {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith("Bearer ")) return res.status(401).json({ message: "Unauthorized" });
@@ -127,7 +166,7 @@ export async function me(req, res, next) {
     if (!user) return res.status(401).json({ message: "Unauthorized" });
     res.json({ user });
   } catch (err) { next(err); }
-}
+}*/
 
 export async function verifyEmail(req, res, next) {
   try {
@@ -156,6 +195,58 @@ export async function resendVerification(req, res, next) {
   } catch (err) { next(err); }
 }
 
+/**
+ * selectRole: user selects role after signing up & verifying & logging in.
+ * Protected endpoint - require access token (use requireAuth middleware)
+ */
+export async function selectRole(req, res, next) {
+  try {
+    const { role, phoneNumber, country, city, organization } = req.body;
+    const allowed = ["DONOR", "BENEFICIARY", "PROVIDER"];
+
+    if (req.user.role !== "UNASSIGNED") {
+  return res.status(400).json({ message: "Role already set" });
+}
+
+if (!role || !allowed.includes(role)) {
+  return res.status(400).json({ message: "Invalid role" });
+}
+
+    const { userId } = req.user; // provided by requireAuth
+
+    const updates = { role };
+
+    // For beneficiaries/providers require contact/location info
+    if (role === "BENEFICIARY" || role === "PROVIDER") {
+      if (!phoneNumber || !country || !city) {
+        return res.status(400).json({ message: "phoneNumber, country and city are required for this role" });
+      }
+      updates.phoneNumber = phoneNumber;
+      updates.country = country;
+      updates.city = city;
+    }
+
+    // For providers: organization required and set KYC status
+    if (role === "PROVIDER") {
+      if (!organization) {
+        return res.status(400).json({ message: "organization is required for providers" });
+      }
+      updates.organization = organization;
+      updates.kycStatus = "PENDING";
+    } else {
+      // For donors and beneficiaries (default)
+      updates.kycStatus = "NOT_REQUIRED";
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true }).select("-passwordHash");
+
+    res.json({ message: "Role updated", role: user.role, user });
+  } catch (err) { next(err); }
+}
+
+/**
+ * forgotPassword / resetPassword
+ */
 export async function forgotPassword(req, res, next) {
   try {
     const { email } = req.body;
