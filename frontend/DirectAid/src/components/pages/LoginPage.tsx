@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import FormInput from "../ui/FormInput";
-import Button from "../ui/Button";
+import {Button} from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface LoginFormData {
@@ -93,10 +93,10 @@ const LoginPage: React.FC = () => {
 
       // navigate based on role
       if (role === "provider" || role === "Provider")
-        navigate("/providerdashboard");
+        navigate("/provider");
       else if (role === "beneficiary" || role === "Beneficiary")
-        navigate("/userdashboard");
-      else navigate("/donordashboard");
+        navigate("/beneficiary");
+      else navigate("/donor");
     } catch {
       setErrors({
         general: "Invalid email or password. Please try again.",
@@ -166,11 +166,10 @@ const LoginPage: React.FC = () => {
 
             <Button
               type="submit"
-              variant="primary"
-              size="md"
+              variant="secondary"
+              size="sm"
               disabled={isSubmitting}
-              className="w-full"
-            >
+              className="w-full btn-cta">
               {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>
           </form>

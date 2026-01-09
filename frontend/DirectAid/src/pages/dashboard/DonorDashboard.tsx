@@ -187,6 +187,7 @@ const DonorDashboard = () => {
                 amountRaised={campaign.amountRaised / 100}
                 targetAmount={campaign.targetAmount / 100}
                 donorCount={campaign.donorCount}
+                onClick={() => navigate(`/campaigns/${campaign.id}`)}
               />
             ))}
           </div>
@@ -200,7 +201,7 @@ const DonorDashboard = () => {
               variant="outline"
               size="sm"
               className="rounded-full w-full sm:w-auto btn-cta"
-              onClick={() => navigate("/campaigns")}
+              onClick={() => navigate("/donor/donations")}
             >
               View All
             </Button>
@@ -505,7 +506,7 @@ const DonorDashboard = () => {
         </div>
 
         {/* Tax Information */}
-        <Card className="p-4 sm:p-6 card-elevated">
+        {/* <Card className="p-4 sm:p-6 card-elevated">
           <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">
             Tax Information
           </h2>
@@ -532,7 +533,7 @@ const DonorDashboard = () => {
               details.
             </p>
           </div>
-        </Card>
+        </Card> */}
       </div>
     </DashboardLayout>
   );
