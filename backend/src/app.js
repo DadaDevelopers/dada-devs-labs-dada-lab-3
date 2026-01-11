@@ -9,9 +9,9 @@ import stripeWebhookRouter from "./routes/stripeWebhookRoutes.js";
 
 import config from "./config/config.js";
 
-// import { startUserPurgeJob } from "./jobs/purgeDeletedUsers.js";
+import { startUserPurgeJob } from "./jobs/purgeDeletedUsers.js";
 
-// startUserPurgeJob();
+startUserPurgeJob();
 
 
 // Import routes
