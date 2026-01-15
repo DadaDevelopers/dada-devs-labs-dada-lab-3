@@ -1,3 +1,4 @@
+// /services/mockData.ts
 import type {
   User,
   Provider,
@@ -167,6 +168,7 @@ export const mockCampaigns: Campaign[] = [
     amountRaised: 4500000, // $45,000
     donorCount: 342,
     status: "active",
+    adminStatus: "approved",  // ← ADDED
     confirmationStatus: "both_confirmed",
     providerConfirmedAt: "2024-11-20",
     beneficiaryConfirmedAt: "2024-11-21",
@@ -186,36 +188,11 @@ export const mockCampaigns: Campaign[] = [
     fundraisingDeadline: "2025-01-29",
     progressPercentage: 45,
     donationTimeline: [
-      {
-        date: "2024-11-01",
-        amount: 500000,
-        donorCount: 10,
-        cumulativeAmount: 500000,
-      },
-      {
-        date: "2024-11-05",
-        amount: 800000,
-        donorCount: 25,
-        cumulativeAmount: 1300000,
-      },
-      {
-        date: "2024-11-10",
-        amount: 1200000,
-        donorCount: 60,
-        cumulativeAmount: 2500000,
-      },
-      {
-        date: "2024-11-15",
-        amount: 1000000,
-        donorCount: 100,
-        cumulativeAmount: 3500000,
-      },
-      {
-        date: "2024-11-20",
-        amount: 1000000,
-        donorCount: 147,
-        cumulativeAmount: 4500000,
-      },
+      { date: "2024-11-01", amount: 500000, donorCount: 10, cumulativeAmount: 500000 },
+      { date: "2024-11-05", amount: 800000, donorCount: 25, cumulativeAmount: 1300000 },
+      { date: "2024-11-10", amount: 1200000, donorCount: 60, cumulativeAmount: 2500000 },
+      { date: "2024-11-15", amount: 1000000, donorCount: 100, cumulativeAmount: 3500000 },
+      { date: "2024-11-20", amount: 1000000, donorCount: 147, cumulativeAmount: 4500000 },
     ],
   },
   {
@@ -239,6 +216,7 @@ export const mockCampaigns: Campaign[] = [
     amountRaised: 7800000, // $78,000
     donorCount: 589,
     status: "active",
+    adminStatus: "approved",  // ← ADDED
     confirmationStatus: "provider_confirmed",
     providerConfirmedAt: "2024-11-22",
     proofDocuments: [
@@ -257,36 +235,11 @@ export const mockCampaigns: Campaign[] = [
     fundraisingDeadline: "2025-02-08",
     progressPercentage: 32,
     donationTimeline: [
-      {
-        date: "2024-11-10",
-        amount: 1000000,
-        donorCount: 50,
-        cumulativeAmount: 1000000,
-      },
-      {
-        date: "2024-11-12",
-        amount: 1500000,
-        donorCount: 100,
-        cumulativeAmount: 2500000,
-      },
-      {
-        date: "2024-11-15",
-        amount: 2000000,
-        donorCount: 150,
-        cumulativeAmount: 4500000,
-      },
-      {
-        date: "2024-11-18",
-        amount: 1800000,
-        donorCount: 189,
-        cumulativeAmount: 6300000,
-      },
-      {
-        date: "2024-11-22",
-        amount: 1500000,
-        donorCount: 150,
-        cumulativeAmount: 7800000,
-      },
+      { date: "2024-11-10", amount: 1000000, donorCount: 50, cumulativeAmount: 1000000 },
+      { date: "2024-11-12", amount: 1500000, donorCount: 100, cumulativeAmount: 2500000 },
+      { date: "2024-11-15", amount: 2000000, donorCount: 150, cumulativeAmount: 4500000 },
+      { date: "2024-11-18", amount: 1800000, donorCount: 189, cumulativeAmount: 6300000 },
+      { date: "2024-11-22", amount: 1500000, donorCount: 150, cumulativeAmount: 7800000 },
     ],
   },
   {
@@ -310,6 +263,7 @@ export const mockCampaigns: Campaign[] = [
     amountRaised: 2300000, // $23,000
     donorCount: 156,
     status: "active",
+    adminStatus: "pending",  // ← ADDED (for testing pending state)
     confirmationStatus: "pending",
     proofDocuments: [
       {
@@ -327,30 +281,10 @@ export const mockCampaigns: Campaign[] = [
     fundraisingDeadline: "2025-02-13",
     progressPercentage: 28,
     donationTimeline: [
-      {
-        date: "2024-11-15",
-        amount: 500000,
-        donorCount: 30,
-        cumulativeAmount: 500000,
-      },
-      {
-        date: "2024-11-17",
-        amount: 700000,
-        donorCount: 50,
-        cumulativeAmount: 1200000,
-      },
-      {
-        date: "2024-11-20",
-        amount: 600000,
-        donorCount: 76,
-        cumulativeAmount: 1800000,
-      },
-      {
-        date: "2024-11-22",
-        amount: 500000,
-        donorCount: 156,
-        cumulativeAmount: 2300000,
-      },
+      { date: "2024-11-15", amount: 500000, donorCount: 30, cumulativeAmount: 500000 },
+      { date: "2024-11-17", amount: 700000, donorCount: 50, cumulativeAmount: 1200000 },
+      { date: "2024-11-20", amount: 600000, donorCount: 76, cumulativeAmount: 1800000 },
+      { date: "2024-11-22", amount: 500000, donorCount: 156, cumulativeAmount: 2300000 },
     ],
   },
 ];

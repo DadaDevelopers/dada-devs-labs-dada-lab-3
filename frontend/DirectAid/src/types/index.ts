@@ -1,3 +1,4 @@
+// src/types/index.ts
 // ============================================================================
 // USER & AUTHENTICATION TYPES
 // ============================================================================
@@ -48,6 +49,8 @@ export interface Provider extends User {
   totalCampaigns: number;
   totalFundsRaised: number;
   totalBeneficiaries: number;
+  location?: string;
+  // category: string;
 }
 
 export interface PayoutMethod {
@@ -124,7 +127,7 @@ export type ConfirmationStatus =
 export interface Campaign {
   id: string;
   providerId: string;
-  provider: Partial<Provider>;
+  provider?: Partial<Provider>;
   beneficiaryId: string;
   beneficiary: Partial<Beneficiary>;
   invoiceId: string;
@@ -141,7 +144,7 @@ export interface Campaign {
   // ADMIN APPROVAL FLOW — NEW
   adminStatus: "pending" | "approved" | "rejected" | "flagged";
 
-  // CONFIRMATION FLOW (Provider + Beneficiary) — KEEP ONLY ONE
+  // CONFIRMATION FLOW (P"approved" | "rejected";rovider + Beneficiary) — KEEP ONLY ONE
   confirmationStatus: ConfirmationStatus;
   providerConfirmedAt?: string;
   beneficiaryConfirmedAt?: string;
