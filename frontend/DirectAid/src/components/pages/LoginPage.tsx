@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import FormInput from "../ui/FormInput";
-import Button from "../ui/Button";
+import { Button } from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface LoginFormData {
@@ -166,8 +166,8 @@ const LoginPage: React.FC = () => {
 
             <Button
               type="submit"
-              variant="primary"
-              size="md"
+              variant="default" 
+              size="default"  
               disabled={isSubmitting}
               className="w-full"
             >
