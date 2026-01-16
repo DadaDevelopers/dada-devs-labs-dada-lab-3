@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { mockDataService } from "../../services/mockData";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
@@ -49,6 +50,7 @@ import {
 const BeneficiaryDashboard = () => {
   const navigate = useNavigate();
   const { campaigns, updateCampaign } = useApp();
+  const { logout } = useAuth();
   const beneficiary = mockDataService.getBeneficiaryUser();
   const metrics = mockDataService.getBeneficiaryMetrics();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -155,9 +157,16 @@ const BeneficiaryDashboard = () => {
     },
     {
       label: "Settings",
-      href: "/beneficiary/settings",
+      href: "/beneficiary/settings?tab=profile",
       icon: <Settings className="w-5 h-5" />,
     },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/beneficiary/settings?tab=profile" },
+    { id: "address", label: "Address", href: "/beneficiary/settings?tab=address" },
+    { id: "notifications", label: "Notifications", href: "/beneficiary/settings?tab=notifications" },
+    { id: "change-password", label: "Change Password", href: "/beneficiary/settings?tab=change-password" },
   ];
 
   const handleConfirmServiceAccess = () => {
@@ -247,6 +256,11 @@ const BeneficiaryDashboard = () => {
       navItems={navItems}
       userName={beneficiary.name}
       userRole="Aid Beneficiary"
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
     >
       <div className="space-y-6 sm:space-y-8">
         {/* Header */}

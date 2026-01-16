@@ -15,7 +15,7 @@ interface User {
   id: string | number;
   name?: string;
   email?: string;
-  role?: Role;
+  role?: Role | string;
   [key: string]: any;
 }
 
@@ -30,6 +30,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: any }>;
   signup: (payload: any) => Promise<{ ok: boolean; error?: any }>;
   updateProfile: (updates: Partial<User>) => Promise<{ ok: boolean; user?: User; error?: any }>;
+  selectRoleAndOnboard: (payload: any) => Promise<{ ok: boolean; user?: User; error?: any }>;
   logout: () => void;
   hasRole: (r: Role) => boolean;
 }
@@ -95,12 +96,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const res = await api.post("/auth/login", { email, password });
-      const { user: u, token: t } = res.data as { user: User; token: string };
+      const { user: u, accessToken } = res.data as {
+        user: User;
+        accessToken: string;
+        refreshToken?: string;
+      };
+
+      const tokenToStore = accessToken;
 
       setUser(u);
       setRole(u.role || null);
-      setToken(t);
-      saveToStorage(u, t);
+      setToken(tokenToStore);
+      saveToStorage(u, tokenToStore);
 
       setLoading(false);
       return { ok: true };
@@ -117,13 +124,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post("/auth/signup", payload);
-      const { user: u, token: t } = res.data as { user: User; token: string };
+      // Backend expects firstName / lastName / email / password at /auth/register
+      const res = await api.post("/auth/register", payload);
+      const { user: u, accessToken } = res.data as {
+        user: User;
+        accessToken: string;
+      };
+
+      const tokenToStore = accessToken;
 
       setUser(u);
       setRole(u.role || null);
-      setToken(t);
-      saveToStorage(u, t);
+      setToken(tokenToStore);
+      saveToStorage(u, tokenToStore);
 
       setLoading(false);
       return { ok: true };
@@ -140,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.put("/user/me", updates);
+      const res = await api.put("/users/me", updates);
       const updatedUser = res.data as User;
 
       setUser(updatedUser);
@@ -156,12 +169,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Role selection + basic onboarding (calls /auth/select-role)
+  const selectRoleAndOnboard = async (payload: any) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post("/auth/select-role", payload);
+      const { user: updatedUser } = res.data as { user: User };
+
+      setUser(updatedUser);
+      setRole(updatedUser.role || null);
+      saveToStorage(updatedUser, token);
+
+      setLoading(false);
+      return { ok: true, user: updatedUser };
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Onboarding failed";
+      setError(message);
+      setLoading(false);
+      return { ok: false, error: message };
+    }
+  };
+
   // Logout
-  const logout = () => {
-    setUser(null);
-    setRole(null);
-    setToken(null);
-    saveToStorage(null, null);
+  const logout = async () => {
+    try {
+      // Call backend logout endpoint to revoke refresh token
+      await api.post("/auth/logout");
+    } catch (err) {
+      // Even if API call fails, clear local state
+      console.warn("Logout API call failed, clearing local state anyway", err);
+    } finally {
+      // Always clear local state
+      setUser(null);
+      setRole(null);
+      setToken(null);
+      saveToStorage(null, null);
+    }
   };
 
   // Role checker
@@ -181,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     signup,
     updateProfile,
+    selectRoleAndOnboard,
     logout,
     hasRole,
   };
