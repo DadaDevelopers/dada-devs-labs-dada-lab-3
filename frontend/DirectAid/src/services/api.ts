@@ -1,5 +1,6 @@
 // API client with axios-like interface for frontend
-const API_BASE = "/api";
+// Point to deployed backend by default; adjust path if needed.
+export const API_BASE = "https://direct-aid-staging.onrender.com/api";
 
 // Create an axios-like API instance
 interface ApiInstance {
@@ -78,16 +79,16 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
     };
   }
 
-  // Signup endpoint
-  if (url.includes("/auth/signup")) {
+  // Register endpoint
+  if (url.includes("/auth/register")) {
     return {
       data: {
-        token: "demo-token-" + Date.now(),
+        accessToken: "demo-access-token-" + Date.now(),
         user: {
           id: "demo-user-" + Date.now(),
           email: data?.email || "demo@example.com",
-          name: data?.name || "Demo User",
-          role: data?.role || "donor",
+          firstName: data?.firstName || "Demo",
+          role: data?.role || "UNASSIGNED",
         },
       },
     };
@@ -127,6 +128,37 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
   if (url.includes("/donate/guest")) {
     return {
       data: { success: true, receiptId: "demo-receipt-1234" },
+    };
+  }
+
+  // Public providers list endpoint
+  if (url.includes("/providers/public")) {
+    return {
+      data: {
+        providers: [
+          {
+            id: "provider_001",
+            organizationName: "Global Relief Foundation",
+            organizationType: "other",
+            city: "Lagos",
+            country: "Nigeria",
+          },
+          {
+            id: "provider_002",
+            organizationName: "City General Hospital",
+            organizationType: "hospital",
+            city: "Nairobi",
+            country: "Kenya",
+          },
+          {
+            id: "provider_003",
+            organizationName: "Hope Education Center",
+            organizationType: "school",
+            city: "Accra",
+            country: "Ghana",
+          },
+        ],
+      },
     };
   }
 
