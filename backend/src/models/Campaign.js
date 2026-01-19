@@ -8,6 +8,8 @@ function cryptoRandomId() {
 
 const CampaignSchema = new Schema(
   {
+  providerVerificationStatus: { type: String, enum: ["NONE", "REQUESTED", "VERIFIED", "DECLINED", "NEEDS_INFO"], default: "NONE" },
+  providerVerificationRecords: [{ type: Schema.Types.ObjectId, ref: "ProviderVerification" }],
     publicId: { type: String, unique: true, default: cryptoRandomId, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },

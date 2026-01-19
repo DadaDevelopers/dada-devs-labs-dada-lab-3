@@ -1,10 +1,10 @@
 // src/utils/stripe.js
 //PaymentIntents + webhooks
-import Stripe from "stripe";
-import config from "../config/config.js";
+// import Stripe from 'stripe';
+// import dotenv from 'dotenv';
+// dotenv.config();
 
-const stripe = new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: "2022-11-15" });
-
+// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // Commented out for development, add your key in .env when ready
 export async function createPaymentIntent({ amountCents, currency = "usd", metadata = {} }) {
   // amountCents is integer (e.g., 1000 = $10.00)
   const pi = await stripe.paymentIntents.create({
@@ -21,4 +21,4 @@ export function constructEvent(payload, sigHeader) {
   return stripe.webhooks.constructEvent(payload, sigHeader, webhookSecret);
 }
 
-export default stripe;
+// export default stripe; // Disabled: stripe is not defined when commented out for development

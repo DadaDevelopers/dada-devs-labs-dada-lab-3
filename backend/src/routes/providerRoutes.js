@@ -1,3 +1,4 @@
+
 import express from "express";
 import {
   getProviderByUser,
@@ -8,12 +9,26 @@ import {
   approveKYC,
   addPayoutMethod,
   requestPayout,
-  deleteProvider
+  deleteProvider,
+  sendProviderInvite,
+  acceptProviderInvite,
+  verifyCampaignDocs,
+  listPublicProviders
 } from "../controllers/providerController.js";
-
 import { protect, authorize } from "../middlewares/auth.js";
 
 const router = express.Router();
+// Invite external provider (auth required)
+router.post("/invite", protect, sendProviderInvite);
+
+// Accept provider invite (public)
+router.get("/invite/accept", acceptProviderInvite);
+
+// Provider verifies campaign docs (auth required)
+router.post("/verifications", protect, verifyCampaignDocs);
+
+// Public: List verified/active providers (minimal info, no auth)
+router.get("/public", listPublicProviders);
 
 // Provider self-service
 router.post("/", protect, authorize("PROVIDER", "ADMIN"), createProvider);

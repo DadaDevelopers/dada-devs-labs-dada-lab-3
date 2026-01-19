@@ -35,6 +35,27 @@ const ProviderSchema = new Schema({
   email: { type: String },
   phone: { type: String },
 
+  // Advanced profile fields
+  organizationType: {
+    type: String,
+    enum: ["hospital", "school", "pharmacy", "vendor", "ngo", "other"],
+    default: "other"
+  },
+  businessRegNumber: { type: String },
+  contactPerson: { type: String },
+  bankAccountName: { type: String },
+  bankAccountNumber: { type: String },
+  bankName: { type: String },
+  lightningPubkey: { type: String },
+  shortDescription: { type: String },
+  licenseDocs: [
+    {
+      url: String,
+      name: String,
+      mimeType: String
+    }
+  ],
+
   // Campaigns handled by provider
   campaigns: [{
     type: Schema.Types.ObjectId,
@@ -65,9 +86,8 @@ const ProviderSchema = new Schema({
 });
 
 // Auto-update timestamp
-ProviderSchema.pre("save", function (next) {
+ProviderSchema.pre("save", function () {
   this.updatedAt = new Date();
-  next();
 });
 
 // Safe API output

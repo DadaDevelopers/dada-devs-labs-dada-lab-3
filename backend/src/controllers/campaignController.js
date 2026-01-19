@@ -1,3 +1,29 @@
+// Beneficiary submits campaign for review
+export const submitCampaignForReview = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const campaign = await Campaign.findById(id);
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+    if (!campaign.owner.equals(req.user._id)) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+    // Check required fields (example: title, targetAmount, currency, providerId, supportingDocs, consentContact)
+    const requiredFields = ["title", "targetAmount", "currency", "providerId", "supportingDocs", "consentContact"];
+    for (const field of requiredFields) {
+      if (!campaign[field] || (Array.isArray(campaign[field]) && campaign[field].length === 0)) {
+        return res.status(400).json({ message: `Missing required field: ${field}` });
+      }
+    }
+    if (campaign.status !== "DRAFT") {
+      return res.status(400).json({ message: "Campaign is not in DRAFT status" });
+    }
+    campaign.status = "PENDING_REVIEW";
+    await campaign.save();
+    res.json({ message: "Campaign submitted for review", campaign });
+  } catch (err) {
+    next(err);
+  }
+};
 import mongoose from "mongoose";
 import Campaign from "../models/Campaign.js";
 import { logActivity } from "../utils/activityLogger.js";

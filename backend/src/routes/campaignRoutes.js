@@ -5,11 +5,14 @@ import {
   getCampaignById,
   updateCampaign,
   adminUpdateCampaignStatus,
-  deleteCampaign
+  deleteCampaign,
+  submitCampaignForReview
 } from "../controllers/campaignController.js";
 import { protect, authorize } from "../middlewares/auth.js";
 
 const router = express.Router();
+// Beneficiary submits campaign for review
+router.post(":id/submit", protect, submitCampaignForReview);
 
 // Create a campaign — only BENEFICIARY users
 router.post("/", protect, authorize("BENEFICIARY"), createCampaign);

@@ -1,2 +1,12 @@
 .env
+.env.*
+*.env
 node_modules/
+*.pem
+*.key
+*.crt
+*.log
+package-lock.json
+backend@1.0.0
+src/config/*.js
+src/config/*.json
