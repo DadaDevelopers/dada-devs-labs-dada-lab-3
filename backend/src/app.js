@@ -21,12 +21,31 @@ import providerRoutes from "./routes/providerRoutes.js";
 import campaignRoutes from "./routes/campaignRoutes.js";
 import donationRoutes from "./routes/donationRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 // Error middleware
 import { notFound, errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
 
+/* -------------------------------------------------------------------------- */
+/*                               BACKGROUND JOBS                               */
+/* -------------------------------------------------------------------------- */
+startUserPurgeJob();
+
+/* -------------------------------------------------------------------------- */
+/*                              STRIPE WEBHOOK                                 */
+/* IMPORTANT: Must come BEFORE express.json()                                  */
+/* -------------------------------------------------------------------------- */
+app.use(
+  "/api/payments/webhooks/stripe",
+  express.raw({ type: "application/json" }),
+  stripeWebhookRouter
+);
+
+/* -------------------------------------------------------------------------- */
+/*                                  MIDDLEWARE                                 */
+/* -------------------------------------------------------------------------- */
 // CORS setup
 const corsOptions = {
   origin: (origin, cb) => {
@@ -49,7 +68,6 @@ app.use(cookieParser()); // httpOnly cookies
 app.use(compression()); // gzip compression
 app.use(morgan(config.NODE_ENV === "production" ? "combined" : "dev"));
 
-app.use("/api/payments/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRouter);
 
 // Basic health check
 app.get("/", (req, res) => {
@@ -63,7 +81,8 @@ app.get("/", (req, res) => {
 // Routes
 app.use("/api/auth", authRoutes); // auth: login, register, refresh, logout
 app.use("/api/users", userRoutes); // user management & profile
-app.use("/api/admin", userRoutes); //admin stats dashboard
+app.use("/api/uploads", uploadRoutes); // uploaded documents
+//app.use("/api/admin", userRoutes); //admin stats dashboard
 app.use("/api/providers", providerRoutes); // provider CRUD & listing
 app.use("/api/campaigns", campaignRoutes); // campaigns CRUD & listing
 app.use("/api/donations", donationRoutes); // donations CRUD & stats
