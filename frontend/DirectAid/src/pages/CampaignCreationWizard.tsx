@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../contexts/AppContext";
-import { mockDataService } from "../services/mockData";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -13,16 +11,14 @@ import {
   MapPin,
   DollarSign,
   UploadCloud,
-  AlertCircle,
   Clock,
 } from "lucide-react";
 
-type Step = "info" | "invoice" | "review" | "success";
+type Step = "details" | "documents" | "review" | "success";
 
 const CampaignCreationWizard = () => {
   const navigate = useNavigate();
-  const { currentUser, campaigns } = useApp();
-  const [currentStep, setCurrentStep] = useState<Step>("info");
+  const [currentStep, setCurrentStep] = useState<Step>("details");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
@@ -30,92 +26,75 @@ const CampaignCreationWizard = () => {
     title: "",
     description: "",
     targetAmount: "",
-    fundraisingDeadline: "",
-    location: "",
     category: "medical",
+    location: "",
+    preferredProvider: "",
+    providerLocation: "",
   });
 
-  const [invoiceData, setInvoiceData] = useState({
-    invoiceFile: null as File | null,
-    invoiceAmount: "",
-    invoiceDate: "",
-  });
+  // Supporting documents
+  const [documents, setDocuments] = useState<File[]>([]);
+  const [newCampaignId, setNewCampaignId] = useState<string | null>(null);
 
-  const [newCampaign, setNewCampaign] = useState<any>(null);
-
-  // Handlers for Step 1: Campaign Info
   const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const canProceedToInvoice = () => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setDocuments((prev) => [...prev, ...files]);
+  };
+
+  const removeDocument = (index: number) => {
+    setDocuments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const canProceedToDocuments = () => {
     return (
       formData.title.trim() &&
       formData.description.trim() &&
       formData.targetAmount &&
-      formData.fundraisingDeadline &&
       formData.location.trim()
     );
   };
 
-  // Handlers for Step 2: Invoice Upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setInvoiceData((prev) => ({ ...prev, invoiceFile: file }));
-    }
-  };
-
   const canProceedToReview = () => {
-    return (
-      invoiceData.invoiceFile &&
-      invoiceData.invoiceAmount &&
-      invoiceData.invoiceDate
-    );
+    return documents.length > 0;
   };
 
-  // Handlers for Step 3: Review
-  const handleCreateCampaign = async () => {
+  const handleSubmitRequest = async () => {
     setIsSubmitting(true);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Create campaign object
-    const campaign = {
-      id: `camp_${Date.now()}`,
-      providerId: currentUser?.id || "",
-      title: formData.title,
-      description: formData.description,
-      targetAmount: parseFloat(formData.targetAmount) * 250000, // Convert to satoshis
-      raisedAmount: 0,
-      lockedFunds: 0,
-      unlockedFunds: 0,
-      category: formData.category,
-      status: "active" as const,
-      location: formData.location,
-      beneficiaryId: "",
-      invoiceHash: `0x${Math.random().toString(16).slice(2)}`,
-      dualConfirmationRequired: true,
-      confirmedByProvider: true,
-      confirmedByBeneficiary: false,
-      createdAt: new Date().toISOString(),
-      deadline: formData.fundraisingDeadline,
-      beneficiaryName: "",
-      invoiceAmount: parseFloat(invoiceData.invoiceAmount) * 250000,
-      invoiceDate: invoiceData.invoiceDate,
-    };
-
-    setNewCampaign(campaign);
+    const campaignId = `camp_${Date.now()}`;
+    setNewCampaignId(campaignId);
+    
     setCurrentStep("success");
     setIsSubmitting(false);
   };
 
   const handleBackToDashboard = () => {
     navigate("/beneficiary");
+  };
+
+  const handleStartOver = () => {
+    setCurrentStep("details");
+    setFormData({
+      title: "",
+      description: "",
+      targetAmount: "",
+      category: "medical",
+      location: "",
+      preferredProvider: "",
+      providerLocation: "",
+    });
+    setDocuments([]);
+    setNewCampaignId(null);
   };
 
   return (
@@ -127,15 +106,15 @@ const CampaignCreationWizard = () => {
       <div className="max-w-2xl mx-auto mb-8">
         <button
           onClick={() =>
-            currentStep === "info"
+            currentStep === "details"
               ? navigate("/beneficiary")
-              : setCurrentStep("info")
+              : setCurrentStep("details")
           }
           className="flex items-center gap-2 text-sm hover:opacity-80 mb-6 transition"
           style={{ color: "var(--color-accent)" }}
         >
           <ArrowLeft className="w-4 h-4" />
-          {currentStep === "info" ? "Back to Dashboard" : "Start Over"}
+          {currentStep === "details" ? "Back to Dashboard" : "Start Over"}
         </button>
 
         {/* Progress Indicator */}
@@ -144,22 +123,22 @@ const CampaignCreationWizard = () => {
             className="text-3xl sm:text-4xl font-bold mb-4"
             style={{ color: "var(--color-text-light)" }}
           >
-            Create Campaign
+            Submit Help Request
           </h1>
           <div className="flex gap-2 sm:gap-4">
-            {["info", "invoice", "review", "success"].map((step, idx) => (
+            {["details", "documents", "review", "success"].map((step, idx) => (
               <div key={step} className="flex items-center">
                 <div
                   className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm transition border"
                   style={{
                     backgroundColor:
-                      ["info", "invoice", "review", "success"].indexOf(
+                      ["details", "documents", "review", "success"].indexOf(
                         currentStep
                       ) >= idx
                         ? "var(--color-accent)"
                         : "var(--color-secondary-bg)",
                     color:
-                      ["info", "invoice", "review", "success"].indexOf(
+                      ["details", "documents", "review", "success"].indexOf(
                         currentStep
                       ) >= idx
                         ? "var(--color-primary-bg)"
@@ -174,7 +153,7 @@ const CampaignCreationWizard = () => {
                     className="w-4 sm:w-8 h-1 mx-2 transition"
                     style={{
                       backgroundColor:
-                        ["info", "invoice", "review", "success"].indexOf(
+                        ["details", "documents", "review", "success"].indexOf(
                           currentStep
                         ) > idx
                           ? "var(--color-accent)"
@@ -190,8 +169,8 @@ const CampaignCreationWizard = () => {
 
       {/* Content */}
       <div className="max-w-2xl mx-auto">
-        {/* Step 1: Campaign Information */}
-        {currentStep === "info" && (
+        {/* Step 1: Campaign Details */}
+        {currentStep === "details" && (
           <Card
             className="p-6 sm:p-8 card-elevated"
             style={{
@@ -296,17 +275,18 @@ const CampaignCreationWizard = () => {
                     className="block text-sm font-medium mb-2"
                     style={{ color: "var(--color-text-light)" }}
                   >
-                    Fundraising Deadline *
+                    Location *
                   </label>
                   <div className="relative">
-                    <Clock
+                    <MapPin
                       className="absolute left-3 top-3 w-5 h-5"
                       style={{ color: "var(--color-accent)", opacity: 0.7 }}
                     />
                     <Input
-                      type="date"
-                      name="fundraisingDeadline"
-                      value={formData.fundraisingDeadline}
+                      type="text"
+                      name="location"
+                      placeholder="e.g., Lagos, Nigeria"
+                      value={formData.location}
                       onChange={handleFormChange}
                       className="rounded-lg pl-10"
                       style={{
@@ -316,34 +296,6 @@ const CampaignCreationWizard = () => {
                       }}
                     />
                   </div>
-                </div>
-              </div>
-
-              <div>
-                <label
-                  className="block text-sm font-medium mb-2"
-                  style={{ color: "var(--color-text-light)" }}
-                >
-                  Location *
-                </label>
-                <div className="relative">
-                  <MapPin
-                    className="absolute left-3 top-3 w-5 h-5"
-                    style={{ color: "var(--color-accent)", opacity: 0.7 }}
-                  />
-                  <Input
-                    type="text"
-                    name="location"
-                    placeholder="e.g., Lagos, Nigeria"
-                    value={formData.location}
-                    onChange={handleFormChange}
-                    className="rounded-lg pl-10"
-                    style={{
-                      backgroundColor: "var(--color-primary-bg)",
-                      color: "var(--color-text-light)",
-                      borderColor: "var(--color-accent)",
-                    }}
-                  />
                 </div>
               </div>
 
@@ -373,25 +325,80 @@ const CampaignCreationWizard = () => {
                 </select>
               </div>
 
+              <div className="border-t pt-5" style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}>
+                <h3 className="text-lg font-semibold mb-2" style={{ color: "var(--color-accent)" }}>
+                  Preferred Provider (Optional)
+                </h3>
+                <p className="text-sm mb-4" style={{ color: "var(--color-text-light)", opacity: 0.7 }}>
+                  If you already know a hospital, school, or service provider, specify them here.
+                </p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--color-text-light)" }}
+                    >
+                      Provider Name
+                    </label>
+                    <Input
+                      type="text"
+                      name="preferredProvider"
+                      placeholder="e.g., Lagos University Teaching Hospital"
+                      value={formData.preferredProvider}
+                      onChange={handleFormChange}
+                      className="rounded-lg"
+                      style={{
+                        backgroundColor: "var(--color-primary-bg)",
+                        color: "var(--color-text-light)",
+                        borderColor: "var(--color-accent)",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--color-text-light)" }}
+                    >
+                      Provider Location
+                    </label>
+                    <Input
+                      type="text"
+                      name="providerLocation"
+                      placeholder="e.g., Idi-Araba, Lagos"
+                      value={formData.providerLocation}
+                      onChange={handleFormChange}
+                      className="rounded-lg"
+                      style={{
+                        backgroundColor: "var(--color-primary-bg)",
+                        color: "var(--color-text-light)",
+                        borderColor: "var(--color-accent)",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-4">
                 <Button
-                  onClick={() => setCurrentStep("invoice")}
-                  disabled={!canProceedToInvoice()}
+                  onClick={() => setCurrentStep("documents")}
+                  disabled={!canProceedToDocuments()}
                   className="w-full rounded-full"
                   style={{
                     backgroundColor: "var(--color-accent)",
                     color: "var(--color-primary-bg)",
                   }}
                 >
-                  Next: Upload Invoice
+                  Next: Upload Supporting Documents
                 </Button>
               </div>
             </div>
           </Card>
         )}
 
-        {/* Step 2: Invoice Upload */}
-        {currentStep === "invoice" && (
+        {/* Step 2: Supporting Documents */}
+        {currentStep === "documents" && (
           <Card
             className="p-6 sm:p-8 card-elevated"
             style={{
@@ -408,7 +415,7 @@ const CampaignCreationWizard = () => {
                 className="text-2xl font-bold"
                 style={{ color: "var(--color-text-light)" }}
               >
-                Invoice Details
+                Supporting Documents
               </h2>
             </div>
 
@@ -419,12 +426,9 @@ const CampaignCreationWizard = () => {
                   backgroundColor: "rgba(0, 255, 255, 0.1)",
                   borderColor: "var(--color-accent)",
                 }}
-                
               >
                 <p className="text-sm" style={{ color: "var(--color-accent)" }}>
-                  Upload the invoice or receipt that validates this campaign.
-                  This ensures transparency and dual confirmation from
-                  beneficiary.
+                  Upload documents that verify your need (medical reports, school admission letters, receipts, etc.)
                 </p>
               </div>
 
@@ -433,7 +437,7 @@ const CampaignCreationWizard = () => {
                   className="block text-sm font-medium mb-3"
                   style={{ color: "var(--color-text-light)" }}
                 >
-                  Invoice/Receipt File *
+                  Upload Documents *
                 </label>
                 <div
                   className="border-2 border-dashed rounded-lg p-6 text-center hover:opacity-80 transition"
@@ -457,94 +461,49 @@ const CampaignCreationWizard = () => {
                       className="text-xs"
                       style={{ color: "var(--color-text-light)", opacity: 0.6 }}
                     >
-                      PDF, PNG, JPG (Max 5MB)
+                      PDF, PNG, JPG (Max 5MB per file)
                     </p>
                     <input
                       type="file"
                       accept="image/*,.pdf"
+                      multiple
                       onChange={handleFileUpload}
                       className="hidden"
                     />
                   </label>
-                  {invoiceData.invoiceFile && (
-                    <p
-                      className="text-sm mt-3 font-medium"
-                      style={{ color: "var(--color-accent)" }}
+                </div>
+              </div>
+
+              {documents.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium" style={{ color: "var(--color-text-light)" }}>
+                    Uploaded Files ({documents.length})
+                  </p>
+                  {documents.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 rounded-lg"
+                      style={{ backgroundColor: "var(--color-primary-bg)" }}
                     >
-                      ✓ {invoiceData.invoiceFile.name}
-                    </p>
-                  )}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 flex-shrink-0" style={{ color: "var(--color-accent)" }} />
+                        <span className="text-sm truncate" style={{ color: "var(--color-text-light)" }}>{file.name}</span>
+                      </div>
+                      <button
+                        onClick={() => removeDocument(index)}
+                        className="text-xs hover:opacity-80 flex-shrink-0 ml-2"
+                        style={{ color: "#ef4444" }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--color-text-light)" }}
-                  >
-                    Invoice Amount (USD) *
-                  </label>
-                  <div className="relative">
-                    <DollarSign
-                      className="absolute left-3 top-3 w-5 h-5"
-                      style={{ color: "var(--color-accent)", opacity: 0.7 }}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="5000"
-                      value={invoiceData.invoiceAmount}
-                      onChange={(e) =>
-                        setInvoiceData((prev) => ({
-                          ...prev,
-                          invoiceAmount: e.target.value,
-                        }))
-                      }
-                      className="rounded-lg pl-10"
-                      style={{
-                        backgroundColor: "var(--color-primary-bg)",
-                        color: "var(--color-text-light)",
-                        borderColor: "var(--color-accent)",
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--color-text-light)" }}
-                  >
-                    Invoice Date *
-                  </label>
-                  <div className="relative">
-                    <Clock
-                      className="absolute left-3 top-3 w-5 h-5"
-                      style={{ color: "var(--color-accent)", opacity: 0.7 }}
-                    />
-                    <Input
-                      type="date"
-                      value={invoiceData.invoiceDate}
-                      onChange={(e) =>
-                        setInvoiceData((prev) => ({
-                          ...prev,
-                          invoiceDate: e.target.value,
-                        }))
-                      }
-                      className="rounded-lg pl-10"
-                      style={{
-                        backgroundColor: "var(--color-primary-bg)",
-                        color: "var(--color-text-light)",
-                        borderColor: "var(--color-accent)",
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <Button
-                  onClick={() => setCurrentStep("info")}
+                  onClick={() => setCurrentStep("details")}
                   variant="outline"
                   className="flex-1 rounded-full"
                   style={{
@@ -588,7 +547,7 @@ const CampaignCreationWizard = () => {
                 className="text-2xl font-bold"
                 style={{ color: "var(--color-text-light)" }}
               >
-                Review Campaign
+                Review Request
               </h2>
             </div>
 
@@ -599,16 +558,12 @@ const CampaignCreationWizard = () => {
                   backgroundColor: "rgba(0, 255, 255, 0.1)",
                   borderColor: "var(--color-accent)",
                 }}
-                
               >
                 <p className="text-sm" style={{ color: "var(--color-accent)" }}>
-                  Please review your campaign details. Once submitted, the
-                  beneficiary must confirm the campaign details for funds to be
-                  unlocked after donations.
+                  Your request will be reviewed by our admin team. Once approved, we'll match you with a verified provider.
                 </p>
               </div>
 
-              {/* Campaign Summary */}
               <div className="space-y-4">
                 <div
                   className="border-b pb-4"
@@ -669,13 +624,13 @@ const CampaignCreationWizard = () => {
                       className="text-sm"
                       style={{ color: "var(--color-text-light)", opacity: 0.7 }}
                     >
-                      Deadline
+                      Category
                     </p>
                     <p
-                      className="font-semibold"
+                      className="font-semibold capitalize"
                       style={{ color: "var(--color-accent)" }}
                     >
-                      {formData.fundraisingDeadline}
+                      {formData.category}
                     </p>
                   </div>
                 </div>
@@ -698,46 +653,54 @@ const CampaignCreationWizard = () => {
                   </p>
                 </div>
 
-                <div
-                  className="border-b pb-4"
-                  style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
-                >
-                  <p
-                    className="text-sm"
-                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
+                {formData.preferredProvider && (
+                  <div
+                    className="border-b pb-4"
+                    style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
                   >
-                    Invoice File
-                  </p>
-                  <p
-                    className="font-semibold"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    ✓ {invoiceData.invoiceFile?.name}
-                  </p>
-                </div>
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--color-text-light)", opacity: 0.7 }}
+                    >
+                      Preferred Provider
+                    </p>
+                    <p
+                      className="font-semibold"
+                      style={{ color: "var(--color-accent)" }}
+                    >
+                      {formData.preferredProvider}
+                    </p>
+                    {formData.providerLocation && (
+                      <p className="text-xs mt-1" style={{ color: "var(--color-text-light)", opacity: 0.6 }}>
+                        {formData.providerLocation}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div
                   className="border-b pb-4"
                   style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
                 >
                   <p
-                    className="text-sm"
+                    className="text-sm mb-2"
                     style={{ color: "var(--color-text-light)", opacity: 0.7 }}
                   >
-                    Invoice Amount
+                    Supporting Documents
                   </p>
-                  <p
-                    className="font-semibold"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    ${invoiceData.invoiceAmount}
-                  </p>
+                  <div className="space-y-1">
+                    {documents.map((file, index) => (
+                      <p key={index} className="text-sm" style={{ color: "var(--color-accent)" }}>
+                        ✓ {file.name}
+                      </p>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               <div className="flex gap-3 pt-4">
                 <Button
-                  onClick={() => setCurrentStep("invoice")}
+                  onClick={() => setCurrentStep("documents")}
                   variant="outline"
                   className="flex-1 rounded-full"
                   style={{
@@ -748,7 +711,7 @@ const CampaignCreationWizard = () => {
                   Back
                 </Button>
                 <Button
-                  onClick={handleCreateCampaign}
+                  onClick={handleSubmitRequest}
                   disabled={isSubmitting}
                   className="flex-1 rounded-full"
                   style={{
@@ -756,7 +719,7 @@ const CampaignCreationWizard = () => {
                     color: "var(--color-primary-bg)",
                   }}
                 >
-                  {isSubmitting ? "Creating..." : "Create Campaign"}
+                  {isSubmitting ? "Submitting..." : "Submit Request"}
                 </Button>
               </div>
             </div>
@@ -780,15 +743,13 @@ const CampaignCreationWizard = () => {
               className="text-2xl sm:text-3xl font-bold mb-2"
               style={{ color: "var(--color-text-light)" }}
             >
-              Campaign Created!
+              Request Submitted!
             </h2>
             <p
               style={{ color: "var(--color-text-light)", opacity: 0.7 }}
               className="mb-6 max-w-md mx-auto"
             >
-              Your campaign has been successfully created. The beneficiary will
-              need to confirm the campaign details for funds to be unlocked
-              after donations are received.
+              Your help request has been submitted for review. Our team will review it and match you with a verified provider.
             </p>
 
             <div
@@ -797,19 +758,18 @@ const CampaignCreationWizard = () => {
                 backgroundColor: "var(--color-primary-bg)",
                 borderColor: "var(--color-accent)",
               }}
-              
             >
               <p
                 className="text-sm"
                 style={{ color: "var(--color-text-light)", opacity: 0.6 }}
               >
-                Campaign ID
+                Request ID
               </p>
               <p
                 className="font-mono text-sm break-all"
                 style={{ color: "var(--color-accent)" }}
               >
-                {newCampaign?.id}
+                {newCampaignId}
               </p>
             </div>
 
@@ -826,29 +786,14 @@ const CampaignCreationWizard = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  setCurrentStep("info");
-                  setFormData({
-                    title: "",
-                    description: "",
-                    targetAmount: "",
-                    fundraisingDeadline: "",
-                    location: "",
-                    category: "medical",
-                  });
-                  setInvoiceData({
-                    invoiceFile: null,
-                    invoiceAmount: "",
-                    invoiceDate: "",
-                  });
-                }}
+                onClick={handleStartOver}
                 className="w-full rounded-full"
                 style={{
                   borderColor: "var(--color-accent)",
                   color: "var(--color-accent)",
                 }}
               >
-                Create Another Campaign
+                Create Another Request
               </Button>
             </div>
           </Card>
