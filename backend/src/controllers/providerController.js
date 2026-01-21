@@ -91,6 +91,7 @@ export const listPublicProviders = async (req, res, next) => {
   }
 };
 import Provider from "../models/Provider.js";
+import { User } from "../models/User.js";
 import Campaign from "../models/Campaign.js";
 
 // --------------------------
