@@ -22,6 +22,7 @@ import campaignRoutes from "./routes/campaignRoutes.js";
 import donationRoutes from "./routes/donationRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import donorRoutes from "./routes/donorRoutes.js";
 
 // Error middleware
 import { notFound, errorHandler } from "./middlewares/errorHandler.js";
@@ -90,6 +91,7 @@ app.use("/api/providers", providerRoutes); // provider CRUD & listing
 app.use("/api/campaigns", campaignRoutes); // campaigns CRUD & listing
 app.use("/api/donations", donationRoutes); // donations CRUD & stats
 app.use("/api/invoices", invoiceRoutes); // invoice generation & retrieval
+app.use("/api/donors", donorRoutes); // donor CRUD & listing
 
 // Error handling
 app.use(notFound); // catch all unhandled routes
