@@ -16,16 +16,37 @@ const CampaignSchema = new Schema(
 
     // beneficiary/provider point to User model (role-based)
     beneficiaryId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    providerId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
+  providerId: { type: Schema.Types.ObjectId, ref: "Provider", default: null, index: true },
+  providerAccepted: { type: Boolean, default: false },
 
-    // money fields stored as Decimal128 for precision
-    targetAmount: { type: Schema.Types.Decimal128, required: true },
-    amountRaised: { type: Schema.Types.Decimal128, default: mongoose.Types.Decimal128.fromString("0") },
+  // money fields stored as Decimal128 for precision
+  goalSats: { type: Number },
+  raisedSats: { type: Number, default: 0 },
+  targetAmount: { type: Schema.Types.Decimal128, required: true },
+  amountRaised: { type: Schema.Types.Decimal128, default: mongoose.Types.Decimal128.fromString("0") },
 
     currency: { type: String, required: true, default: "USD" },
 
-    // lifecycle vs admin moderation
-    status: { type: String, enum: ["ACTIVE", "COMPLETED", "CANCELLED"], default: "ACTIVE", index: true },
+  // lifecycle vs admin moderation
+  status: { type: String, enum: ["DRAFT", "ACTIVE", "FUNDED", "COMPLETED"], default: "DRAFT", index: true },
+    // Allocations ledger
+    allocations: [
+      {
+        donationId: { type: Schema.Types.ObjectId, ref: "Donation" },
+        satsAllocated: { type: Number },
+        released: { type: Boolean, default: false },
+        releasedAt: { type: Date }
+      }
+    ],
+    // Donations (Lightning events)
+    donations: [
+      {
+        paymentHash: { type: String },
+        sats: { type: Number },
+        timestamp: { type: Date },
+        settled: { type: Boolean, default: false }
+      }
+    ],
 
     // admin moderation status (what admin sees/sets)
     adminStatus: {

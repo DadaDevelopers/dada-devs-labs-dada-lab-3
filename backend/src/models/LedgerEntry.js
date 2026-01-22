@@ -27,3 +27,7 @@ const LedgerEntrySchema = new mongoose.Schema({
 
 /*Every transaction produces ≥2 ledger rows
 System is provably balanced */
+
+import mongoose from "mongoose";
+const LedgerEntry = mongoose.model("LedgerEntry", LedgerEntrySchema);
+export default LedgerEntry;
