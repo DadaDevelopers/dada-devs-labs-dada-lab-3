@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useApp } from "../../contexts/AppContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { mockDataService } from "../../services/mockData";
 import api from "../../services/api";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
@@ -12,7 +13,6 @@ import {
   LayoutDashboard,
   FolderKanban,
   Wallet,
-  Settings,
   DollarSign,
   Users,
   ArrowUpRight,
@@ -25,6 +25,8 @@ import {
   FileText,
   AlertCircle,
   CheckSquare,
+  User,
+  Lock,
 } from "lucide-react";
 import {
   Sheet,
@@ -50,6 +52,7 @@ import {
 const ProviderDashboard = () => {
   const navigate = useNavigate();
   const { campaigns } = useApp();
+  const { logout } = useAuth();
 
   // Get provider data
   const provider = mockDataService.getProviderUser();
@@ -92,7 +95,7 @@ const ProviderDashboard = () => {
     },
     {
       label: "Campaigns",
-      href: "/campaigns",
+      href: "/provider/campaigns",
       icon: <FolderKanban className="w-5 h-5" />,
     },
     {
@@ -110,11 +113,13 @@ const ProviderDashboard = () => {
       href: "/provider/proof-upload",
       icon: <FileText className="w-5 h-5" />,
     },
-    {
-      label: "Settings",
-      href: "/provider/settings",
-      icon: <Settings className="w-5 h-5" />,
-    },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/provider/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "payouts", label: "Payouts", href: "/provider/settings/payouts", icon: <Wallet className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/provider/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/provider/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -267,6 +272,11 @@ const ProviderDashboard = () => {
       navItems={navItems}
       userName={provider.name}
       userRole="Aid Provider"
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
     >
       <div className="space-y-6 sm:space-y-8">
         {/* Header */}
@@ -985,15 +995,6 @@ const ProviderDashboard = () => {
                   {provider.registrationNumber}
                 </p>
               </div>
-
-              <Button
-                variant="outline"
-                className="w-full rounded-full btn-cta gap-2"
-                onClick={() => navigate("/provider/settings")}
-              >
-                <Settings className="w-4 h-4" />
-                Update Profile
-              </Button>
             </div>
           </Card>
         </div>

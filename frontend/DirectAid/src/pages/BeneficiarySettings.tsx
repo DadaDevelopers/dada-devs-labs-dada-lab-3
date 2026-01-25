@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useApp } from "../contexts/AppContext";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { mockDataService } from "../services/mockData";
+import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import {
-  ArrowLeft,
   Save,
   Bell,
   Lock,
@@ -15,18 +16,47 @@ import {
   MapPin,
   Mail,
   Phone,
+  LayoutDashboard,
+  DollarSign,
+  FileText,
+  User,
 } from "lucide-react";
 
 const BeneficiarySettings = () => {
   const navigate = useNavigate();
-  const { logout } = useApp();
+  const location = useLocation();
+  const { updateProfile, logout } = useAuth();
   const beneficiary = mockDataService.getBeneficiaryUser();
+  
+  // Get active tab from pathname, default to "profile"
+  const getActiveTabFromPath = () => {
+    const pathParts = location.pathname.split("/");
+    const tab = pathParts[pathParts.length - 1];
+    if (["profile", "address", "notifications", "change-password"].includes(tab)) {
+      return tab as "profile" | "address" | "notifications" | "change-password";
+    }
+    return "profile";
+  };
+  
   const [activeTab, setActiveTab] = useState<
-    "profile" | "address" | "notifications" | "security"
-  >("profile");
+    "profile" | "address" | "notifications" | "change-password"
+  >(getActiveTabFromPath());
+  
+  // Sync with URL changes and redirect if needed
+  useEffect(() => {
+    // If we're at /beneficiary/settings (without a tab), redirect to profile
+    if (location.pathname === "/beneficiary/settings") {
+      navigate("/beneficiary/settings/profile", { replace: true });
+      return;
+    }
+    const tab = getActiveTabFromPath();
+    setActiveTab(tab);
+  }, [location.pathname, navigate]);
+  
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [errors, setErrors] = useState<{ general?: string }>({});
 
   const [profileData, setProfileData] = useState({
     firstName: beneficiary.name.split(" ")[0],
@@ -71,10 +101,30 @@ const BeneficiarySettings = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setSuccessMessage("Saved successfully!");
-    setIsSaving(false);
-    setTimeout(() => setSuccessMessage(""), 3000);
+    setErrors({});
+    try {
+      // Call backend API to update profile
+      const result = await updateProfile({
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        phoneNumber: profileData.phone,
+        country: addressData.country,
+        city: addressData.city,
+      });
+      
+      if (!result.ok) {
+        setErrors({ general: result.error || "Failed to save profile" });
+        setIsSaving(false);
+        return;
+      }
+      
+      setSuccessMessage("Saved successfully!");
+      setIsSaving(false);
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setErrors({ general: "An error occurred while saving" });
+      setIsSaving(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -94,51 +144,60 @@ const BeneficiarySettings = () => {
     setTimeout(() => setSuccessMessage(""), 3000);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
+  const navItems = [
+    {
+      label: "Dashboard",
+      href: "/beneficiary",
+      icon: <LayoutDashboard className="w-5 h-5" />,
+    },
+    {
+      label: "Funds Received",
+      href: "/beneficiary/funds",
+      icon: <DollarSign className="w-5 h-5" />,
+    },
+    {
+      label: "Reporting",
+      href: "/beneficiary/reporting",
+      icon: <FileText className="w-5 h-5" />,
+    },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/beneficiary/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "address", label: "Address", href: "/beneficiary/settings/address", icon: <MapPin className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/beneficiary/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+  ];
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ backgroundColor: "var(--color-primary-bg)" }}
+    <DashboardLayout
+      navItems={navItems}
+      userName={beneficiary.name}
+      userRole="Beneficiary"
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
     >
-      {/* Header */}
-      <div
-        style={{
-          backgroundColor: "var(--color-secondary-bg)",
-          borderBottomColor: "var(--color-accent)",
-        }}
-        className="border-b sticky top-0 z-10"
-      >
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <button
-            onClick={() => navigate("/beneficiary")}
-            className="flex items-center gap-2 font-medium mb-4 transition hover:opacity-80"
-            style={{ color: "var(--color-accent)" }}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </button>
-          <h1
-            className="text-3xl font-bold"
-            style={{ color: "var(--color-text-light)" }}
-          >
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2">
             Settings
           </h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Manage your account settings and preferences
+          </p>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {successMessage && (
           <div
             style={{
               backgroundColor: "rgba(0, 255, 255, 0.1)",
               borderColor: "var(--color-accent)",
             }}
-            className="mb-6 p-4 rounded-lg flex gap-3 items-start border"
+            className="p-4 rounded-lg flex gap-3 items-start border"
           >
             <CheckCircle2
               className="w-5 h-5 flex-shrink-0 mt-0.5"
@@ -150,71 +209,16 @@ const BeneficiarySettings = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div
-              style={{
-                backgroundColor: "var(--color-secondary-bg)",
-                borderColor: "var(--color-accent)",
-              }}
-              className="rounded-lg border overflow-hidden sticky top-24 card-elevated"
-            >
-              <nav className="space-y-1">
-                {[
-                  { id: "profile", label: "Profile" },
-                  { id: "address", label: "Address" },
-                  { id: "notifications", label: "Notifications" },
-                  { id: "security", label: "Security" },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className="w-full px-4 py-3 text-left font-medium transition"
-                    style={{
-                      backgroundColor:
-                        activeTab === tab.id
-                          ? "var(--color-accent)"
-                          : "transparent",
-                      color:
-                        activeTab === tab.id
-                          ? "var(--color-primary-bg)"
-                          : "var(--color-text-light)",
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </nav>
-              <div
-                style={{
-                  backgroundColor: "var(--color-primary-bg)",
-                  borderTopColor: "var(--color-accent)",
-                }}
-                className="border-t p-4"
-              >
-                <Button
-                  onClick={handleLogout}
-                  className="w-full"
-                  style={{ borderColor: "var(--color-accent)" }}
-                  variant="outline"
-                >
-                  Logout
-                </Button>
-              </div>
-            </div>
+        {errors.general && (
+          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
+            {errors.general}
           </div>
+        )}
 
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {activeTab === "profile" && (
-              <div
-                style={{
-                  backgroundColor: "var(--color-secondary-bg)",
-                  borderColor: "var(--color-accent)",
-                }}
-                className="rounded-lg border p-8 card-elevated"
-              >
+        {/* Main Content */}
+        <div>
+          {activeTab === "profile" && (
+            <Card className="p-6 sm:p-8">
                 <h2
                   className="text-2xl font-bold mb-6"
                   style={{ color: "var(--color-text-light)" }}
@@ -279,17 +283,11 @@ const BeneficiarySettings = () => {
                     {isSaving ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
-              </div>
-            )}
+            </Card>
+          )}
 
-            {activeTab === "address" && (
-              <div
-                style={{
-                  backgroundColor: "var(--color-secondary-bg)",
-                  borderColor: "var(--color-accent)",
-                }}
-                className="rounded-lg border p-8 card-elevated"
-              >
+          {activeTab === "address" && (
+            <Card className="p-6 sm:p-8">
                 <h2
                   className="text-2xl font-bold mb-6"
                   style={{ color: "var(--color-text-light)" }}
@@ -330,17 +328,11 @@ const BeneficiarySettings = () => {
                     {isSaving ? "Saving..." : "Save Address"}
                   </Button>
                 </div>
-              </div>
-            )}
+            </Card>
+          )}
 
-            {activeTab === "notifications" && (
-              <div
-                style={{
-                  backgroundColor: "var(--color-secondary-bg)",
-                  borderColor: "var(--color-accent)",
-                }}
-                className="rounded-lg border p-8 card-elevated"
-              >
+          {activeTab === "notifications" && (
+            <Card className="p-6 sm:p-8">
                 <h2
                   className="text-2xl font-bold mb-6"
                   style={{ color: "var(--color-text-light)" }}
@@ -374,17 +366,11 @@ const BeneficiarySettings = () => {
                     </label>
                   ))}
                 </div>
-              </div>
-            )}
+            </Card>
+          )}
 
-            {activeTab === "security" && (
-              <div
-                style={{
-                  backgroundColor: "var(--color-secondary-bg)",
-                  borderColor: "var(--color-accent)",
-                }}
-                className="rounded-lg border p-8 card-elevated"
-              >
+            {activeTab === "change-password" && (
+            <Card className="p-6 sm:p-8">
                 <h2
                   className="text-2xl font-bold mb-6"
                   style={{ color: "var(--color-text-light)" }}
@@ -446,12 +432,12 @@ const BeneficiarySettings = () => {
                     {isSaving ? "Updating..." : "Update Password"}
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
+            </Card>
+          )}
+
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

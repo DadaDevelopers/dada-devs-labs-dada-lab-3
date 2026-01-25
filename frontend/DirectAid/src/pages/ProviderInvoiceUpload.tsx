@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
+import { useAuth } from "../contexts/AuthContext";
 import { mockDataService } from "../services/mockData";
+import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -13,6 +15,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
+  LayoutDashboard,
+  FolderKanban,
+  Wallet,
+  User,
+  Bell,
+  Lock,
 } from "lucide-react";
 
 // -------------------------------------------------------
@@ -45,9 +53,49 @@ const ProviderInvoiceUpload = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { campaigns, updateCampaign } = useApp();
+  const { user, role, logout } = useAuth();
 
   const provider = mockDataService.getProviderUser();
   const campaignId = searchParams.get("campaignId");
+
+  // Provider navigation items
+  const navItems = [
+    {
+      label: "Dashboard",
+      href: "/provider",
+      icon: <LayoutDashboard className="w-5 h-5" />,
+    },
+    {
+      label: "Campaigns",
+      href: "/provider/campaigns",
+      icon: <FolderKanban className="w-5 h-5" />,
+    },
+    {
+      label: "Upload Invoices",
+      href: "/provider/invoices",
+      icon: <Upload className="w-5 h-5" />,
+    },
+    {
+      label: "Withdrawals",
+      href: "/provider/withdrawals",
+      icon: <Wallet className="w-5 h-5" />,
+    },
+    {
+      label: "Proof Upload",
+      href: "/provider/proof-upload",
+      icon: <FileText className="w-5 h-5" />,
+    },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/provider/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "payouts", label: "Payouts", href: "/provider/settings/payouts", icon: <Wallet className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/provider/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/provider/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+  ];
+
+  const userName = user?.name || user?.email || "User";
+  const userRole = role || "Guest";
 
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>("upload-invoice");
@@ -187,12 +235,23 @@ const ProviderInvoiceUpload = () => {
   // -------------------------------------------------------
   if (!selectedCampaign) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading campaign...</p>
+      <DashboardLayout
+        navItems={navItems}
+        userName={userName}
+        userRole={userRole}
+        settingsNavItems={settingsNavItems}
+        onLogout={async () => {
+          await logout();
+          navigate("/");
+        }}
+      >
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading campaign...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -201,15 +260,25 @@ const ProviderInvoiceUpload = () => {
   // -------------------------------------------------------
   if (currentStep === "upload-invoice") {
     return (
-      <div className="min-h-screen p-6 bg-primary-bg text-foreground">
-        <div className="max-w-2xl mx-auto">
-          {/* Back */}
-          <button
-            onClick={backToDashboard}
-            className="flex items-center gap-2 text-primary font-medium mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-          </button>
+      <DashboardLayout
+        navItems={navItems}
+        userName={userName}
+        userRole={userRole}
+        settingsNavItems={settingsNavItems}
+        onLogout={async () => {
+          await logout();
+          navigate("/");
+        }}
+      >
+        <div className="space-y-6">
+          <div className="max-w-2xl mx-auto">
+            {/* Back */}
+            <button
+              onClick={backToDashboard}
+              className="flex items-center gap-2 text-primary font-medium mb-6"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+            </button>
 
           {/* Header */}
           <h1 className="text-3xl font-bold mb-2">Provider Confirmation</h1>
@@ -330,26 +399,27 @@ const ProviderInvoiceUpload = () => {
             )}
           </Card>
 
-          {/* Actions */}
-          <div className="flex gap-4">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={backToDashboard}
-            >
-              Cancel
-            </Button>
+            {/* Actions */}
+            <div className="flex gap-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={backToDashboard}
+              >
+                Cancel
+              </Button>
 
-            <Button
-              className="flex-1"
-              disabled={!canProceed()}
-              onClick={() => setCurrentStep("review")}
-            >
-              Review & Submit
-            </Button>
+              <Button
+                className="flex-1"
+                disabled={!canProceed()}
+                onClick={() => setCurrentStep("review")}
+              >
+                Review & Submit
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -358,8 +428,18 @@ const ProviderInvoiceUpload = () => {
   // -------------------------------------------------------
   if (currentStep === "review") {
     return (
-      <div className="min-h-screen p-6 bg-primary-bg text-foreground">
-        <div className="max-w-2xl mx-auto">
+      <DashboardLayout
+        navItems={navItems}
+        userName={userName}
+        userRole={userRole}
+        settingsNavItems={settingsNavItems}
+        onLogout={async () => {
+          await logout();
+          navigate("/");
+        }}
+      >
+        <div className="space-y-6">
+          <div className="max-w-2xl mx-auto">
           <button
             onClick={() => setCurrentStep("upload-invoice")}
             className="flex items-center gap-2 text-primary font-medium mb-6"
@@ -436,26 +516,27 @@ const ProviderInvoiceUpload = () => {
             </div>
           </Card>
 
-          {/* Actions */}
-          <div className="flex gap-4">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setCurrentStep("upload-invoice")}
-            >
-              Edit
-            </Button>
+            {/* Actions */}
+            <div className="flex gap-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setCurrentStep("upload-invoice")}
+              >
+                Edit
+              </Button>
 
-            <Button
-              className="flex-1"
-              disabled={isSubmitting}
-              onClick={handleSubmitInvoice}
-            >
-              {isSubmitting ? "Submitting..." : "Confirm & Submit"}
-            </Button>
+              <Button
+                className="flex-1"
+                disabled={isSubmitting}
+                onClick={handleSubmitInvoice}
+              >
+                {isSubmitting ? "Submitting..." : "Confirm & Submit"}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -463,8 +544,18 @@ const ProviderInvoiceUpload = () => {
   // Success Step
   // -------------------------------------------------------
   return (
-    <div className="min-h-screen p-6 bg-primary-bg text-foreground flex items-start pt-12">
-      <div className="max-w-md mx-auto text-center">
+    <DashboardLayout
+      navItems={navItems}
+      userName={userName}
+      userRole={userRole}
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
+    >
+      <div className="flex items-start pt-12">
+        <div className="max-w-md mx-auto text-center">
         <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
         <h1 className="text-3xl font-bold mb-2">Invoice Submitted!</h1>
 
@@ -472,11 +563,12 @@ const ProviderInvoiceUpload = () => {
           Your invoice has been successfully uploaded and sent for admin approval.
         </p>
 
-        <Button onClick={backToDashboard} className="w-full">
-          Back to Dashboard
-        </Button>
+          <Button onClick={backToDashboard} className="w-full">
+            Back to Dashboard
+          </Button>
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

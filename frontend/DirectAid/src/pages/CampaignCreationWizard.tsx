@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
+import { useAuth } from "../contexts/AuthContext";
 import { mockDataService } from "../services/mockData";
+import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -15,15 +17,59 @@ import {
   UploadCloud,
   AlertCircle,
   Clock,
+  LayoutDashboard,
+  FolderKanban,
+  Building2,
+  X,
+  User,
+  Bell,
+  Lock,
 } from "lucide-react";
+import { useRef, useEffect } from "react";
+import api from "../services/api";
 
 type Step = "info" | "invoice" | "review" | "success";
 
 const CampaignCreationWizard = () => {
   const navigate = useNavigate();
   const { currentUser, campaigns } = useApp();
+  const { user, role, logout } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Beneficiary navigation items
+  const navItems = [
+    {
+      label: "Dashboard",
+      href: "/beneficiary",
+      icon: <LayoutDashboard className="w-5 h-5" />,
+    },
+    {
+      label: "Campaigns",
+      href: "/campaigns",
+      icon: <FolderKanban className="w-5 h-5" />,
+    },
+    {
+      label: "Funds Received",
+      href: "/beneficiary/funds",
+      icon: <DollarSign className="w-5 h-5" />,
+    },
+    {
+      label: "Reporting",
+      href: "/beneficiary/reporting",
+      icon: <FileText className="w-5 h-5" />,
+    },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/beneficiary/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "address", label: "Address", href: "/beneficiary/settings/address", icon: <MapPin className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/beneficiary/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+  ];
+
+  const userName = user?.name || user?.email || "User";
+  const userRole = role || "Guest";
 
   // Form state
   const [formData, setFormData] = useState({
@@ -41,7 +87,39 @@ const CampaignCreationWizard = () => {
     invoiceDate: "",
   });
 
+  // Provider selection state
+  const [providerSelection, setProviderSelection] = useState<"platform" | "manual">("platform");
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
+  const [manualProvider, setManualProvider] = useState({
+    name: "",
+    phone: "",
+    email: "",
+  });
+  const [providers, setProviders] = useState<any[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(false);
+
+  // Supporting documents state
+  const [supportingDocs, setSupportingDocs] = useState<File[]>([]);
+  const supportingDocsRef = useRef<HTMLInputElement>(null);
+
   const [newCampaign, setNewCampaign] = useState<any>(null);
+
+  // Fetch providers on mount
+  useEffect(() => {
+    const fetchProviders = async () => {
+      setLoadingProviders(true);
+      try {
+        const res = await api.get("/providers/public");
+        setProviders(res.data.providers || []);
+      } catch (err) {
+        console.warn("Failed to fetch providers, using empty list", err);
+        setProviders([]);
+      } finally {
+        setLoadingProviders(false);
+      }
+    };
+    fetchProviders();
+  }, []);
 
   // Handlers for Step 1: Campaign Info
   const handleFormChange = (
@@ -52,13 +130,21 @@ const CampaignCreationWizard = () => {
   };
 
   const canProceedToInvoice = () => {
-    return (
+    const hasBasicInfo =
       formData.title.trim() &&
       formData.description.trim() &&
       formData.targetAmount &&
       formData.fundraisingDeadline &&
-      formData.location.trim()
-    );
+      formData.location.trim();
+
+    const hasProvider =
+      providerSelection === "platform"
+        ? selectedProviderId !== ""
+        : manualProvider.name.trim() && (manualProvider.phone.trim() || manualProvider.email.trim());
+
+    const hasSupportingDocs = supportingDocs.length > 0;
+
+    return hasBasicInfo && hasProvider && hasSupportingDocs;
   };
 
   // Handlers for Step 2: Invoice Upload
@@ -67,6 +153,16 @@ const CampaignCreationWizard = () => {
     if (file) {
       setInvoiceData((prev) => ({ ...prev, invoiceFile: file }));
     }
+  };
+
+  // Handler for supporting documents
+  const handleSupportingDocsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setSupportingDocs((prev) => [...prev, ...files]);
+  };
+
+  const removeSupportingDoc = (index: number) => {
+    setSupportingDocs((prev) => prev.filter((_, i) => i !== index));
   };
 
   const canProceedToReview = () => {
@@ -119,742 +215,683 @@ const CampaignCreationWizard = () => {
   };
 
   return (
-    <div
-      className="min-h-screen p-4 sm:p-6"
-      style={{ backgroundColor: "var(--color-primary-bg)" }}
+    <DashboardLayout
+      navItems={navItems}
+      userName={userName}
+      userRole={userRole}
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
     >
-      {/* Header */}
-      <div className="max-w-2xl mx-auto mb-8">
-        <button
-          onClick={() =>
-            currentStep === "info"
-              ? navigate("/beneficiary")
-              : setCurrentStep("info")
-          }
-          className="flex items-center gap-2 text-sm hover:opacity-80 mb-6 transition"
-          style={{ color: "var(--color-accent)" }}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {currentStep === "info" ? "Back to Dashboard" : "Start Over"}
-        </button>
-
-        {/* Progress Indicator */}
-        <div className="mb-8">
-          <h1
-            className="text-3xl sm:text-4xl font-bold mb-4"
-            style={{ color: "var(--color-text-light)" }}
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <button
+            onClick={() =>
+              currentStep === "info"
+                ? navigate("/beneficiary")
+                : setCurrentStep("info")
+            }
+            className="flex items-center gap-2 text-sm hover:opacity-80 mb-6 transition text-primary"
           >
-            Create Campaign
-          </h1>
-          <div className="flex gap-2 sm:gap-4">
-            {["info", "invoice", "review", "success"].map((step, idx) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm transition border"
-                  style={{
-                    backgroundColor:
-                      ["info", "invoice", "review", "success"].indexOf(
-                        currentStep
-                      ) >= idx
-                        ? "var(--color-accent)"
-                        : "var(--color-secondary-bg)",
-                    color:
-                      ["info", "invoice", "review", "success"].indexOf(
-                        currentStep
-                      ) >= idx
-                        ? "var(--color-primary-bg)"
-                        : "var(--color-text-light)",
-                    borderColor: "var(--color-accent)",
-                  }}
-                >
-                  {idx + 1}
-                </div>
-                {idx < 3 && (
-                  <div
-                    className="w-4 sm:w-8 h-1 mx-2 transition"
-                    style={{
-                      backgroundColor:
-                        ["info", "invoice", "review", "success"].indexOf(
-                          currentStep
-                        ) > idx
-                          ? "var(--color-accent)"
-                          : "var(--color-secondary-bg)",
-                    }}
-                  />
-                )}
-              </div>
-            ))}
+            <ArrowLeft className="w-4 h-4" />
+            {currentStep === "info" ? "Back to Dashboard" : "Start Over"}
+          </button>
+
+          {/* Progress Indicator */}
+          <div className="mb-8">
+            <h1 className="text-3xl sm:text-4xl font-bold mb-4">
+              Create Campaign
+            </h1>
+            <div className="flex gap-2 sm:gap-4">
+              {["info", "invoice", "review", "success"].map((step, idx) => {
+                const isActive = ["info", "invoice", "review", "success"].indexOf(currentStep) >= idx;
+                return (
+                  <div key={step} className="flex items-center">
+                    <div
+                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm transition border ${
+                        isActive
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card text-foreground border-border"
+                      }`}
+                    >
+                      {idx + 1}
+                    </div>
+                    {idx < 3 && (
+                      <div
+                        className={`w-4 sm:w-8 h-1 mx-2 transition ${
+                          ["info", "invoice", "review", "success"].indexOf(currentStep) > idx
+                            ? "bg-primary"
+                            : "bg-muted"
+                        }`}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-2xl mx-auto">
-        {/* Step 1: Campaign Information */}
-        {currentStep === "info" && (
-          <Card
-            className="p-6 sm:p-8 card-elevated"
-            style={{
-              backgroundColor: "var(--color-secondary-bg)",
-              borderColor: "var(--color-accent)",
-            }}
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <Heart
-                className="w-6 h-6"
-                style={{ color: "var(--color-accent)" }}
-              />
-              <h2
-                className="text-2xl font-bold"
-                style={{ color: "var(--color-text-light)" }}
-              >
-                Campaign Details
-              </h2>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <label
-                  className="block text-sm font-medium mb-2"
-                  style={{ color: "var(--color-text-light)" }}
-                >
-                  Campaign Title *
-                </label>
-                <Input
-                  type="text"
-                  name="title"
-                  placeholder="e.g., Heart Surgery Fund for Ahmed"
-                  value={formData.title}
-                  onChange={handleFormChange}
-                  className="rounded-lg"
-                  style={{
-                    backgroundColor: "var(--color-primary-bg)",
-                    color: "var(--color-text-light)",
-                    borderColor: "var(--color-accent)",
-                  }}
-                />
+        {/* Content */}
+        <div className="max-w-2xl mx-auto">
+          {/* Step 1: Campaign Information */}
+          {currentStep === "info" && (
+            <Card className="p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <Heart className="w-6 h-6 text-primary" />
+                <h2 className="text-2xl font-bold">
+                  Campaign Details
+                </h2>
               </div>
 
-              <div>
-                <label
-                  className="block text-sm font-medium mb-2"
-                  style={{ color: "var(--color-text-light)" }}
-                >
-                  Campaign Description *
-                </label>
-                <textarea
-                  name="description"
-                  placeholder="Explain the campaign, why funds are needed, and how they'll be used..."
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  className="w-full p-3 rounded-lg border"
-                  style={{
-                    backgroundColor: "var(--color-primary-bg)",
-                    color: "var(--color-text-light)",
-                    borderColor: "var(--color-accent)",
-                  }}
-                  rows={4}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-5">
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--color-text-light)" }}
-                  >
-                    Target Amount (USD) *
+                  <label className="block text-sm font-medium mb-2">
+                    Campaign Title *
                   </label>
-                  <div className="relative">
-                    <DollarSign
-                      className="absolute left-3 top-3 w-5 h-5"
-                      style={{ color: "var(--color-accent)", opacity: 0.7 }}
-                    />
-                    <Input
-                      type="number"
-                      name="targetAmount"
-                      placeholder="5000"
-                      value={formData.targetAmount}
-                      onChange={handleFormChange}
-                      className="rounded-lg pl-10"
-                      style={{
-                        backgroundColor: "var(--color-primary-bg)",
-                        color: "var(--color-text-light)",
-                        borderColor: "var(--color-accent)",
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--color-text-light)" }}
-                  >
-                    Fundraising Deadline *
-                  </label>
-                  <div className="relative">
-                    <Clock
-                      className="absolute left-3 top-3 w-5 h-5"
-                      style={{ color: "var(--color-accent)", opacity: 0.7 }}
-                    />
-                    <Input
-                      type="date"
-                      name="fundraisingDeadline"
-                      value={formData.fundraisingDeadline}
-                      onChange={handleFormChange}
-                      className="rounded-lg pl-10"
-                      style={{
-                        backgroundColor: "var(--color-primary-bg)",
-                        color: "var(--color-text-light)",
-                        borderColor: "var(--color-accent)",
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label
-                  className="block text-sm font-medium mb-2"
-                  style={{ color: "var(--color-text-light)" }}
-                >
-                  Location *
-                </label>
-                <div className="relative">
-                  <MapPin
-                    className="absolute left-3 top-3 w-5 h-5"
-                    style={{ color: "var(--color-accent)", opacity: 0.7 }}
-                  />
                   <Input
                     type="text"
-                    name="location"
-                    placeholder="e.g., Lagos, Nigeria"
-                    value={formData.location}
+                    name="title"
+                    placeholder="e.g., Heart Surgery Fund for Ahmed"
+                    value={formData.title}
                     onChange={handleFormChange}
-                    className="rounded-lg pl-10"
-                    style={{
-                      backgroundColor: "var(--color-primary-bg)",
-                      color: "var(--color-text-light)",
-                      borderColor: "var(--color-accent)",
-                    }}
+                    className="rounded-lg"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label
-                  className="block text-sm font-medium mb-2"
-                  style={{ color: "var(--color-text-light)" }}
-                >
-                  Category
-                </label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleFormChange}
-                  className="w-full p-2 rounded-lg border"
-                  style={{
-                    backgroundColor: "var(--color-primary-bg)",
-                    color: "var(--color-text-light)",
-                    borderColor: "var(--color-accent)",
-                  }}
-                >
-                  <option value="medical">Medical</option>
-                  <option value="education">Education</option>
-                  <option value="emergency">Emergency Relief</option>
-                  <option value="livelihood">Livelihood</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div className="pt-4">
-                <Button
-                  onClick={() => setCurrentStep("invoice")}
-                  disabled={!canProceedToInvoice()}
-                  className="w-full rounded-full"
-                  style={{
-                    backgroundColor: "var(--color-accent)",
-                    color: "var(--color-primary-bg)",
-                  }}
-                >
-                  Next: Upload Invoice
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Step 2: Invoice Upload */}
-        {currentStep === "invoice" && (
-          <Card
-            className="p-6 sm:p-8 card-elevated"
-            style={{
-              backgroundColor: "var(--color-secondary-bg)",
-              borderColor: "var(--color-accent)",
-            }}
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <FileText
-                className="w-6 h-6"
-                style={{ color: "var(--color-accent)" }}
-              />
-              <h2
-                className="text-2xl font-bold"
-                style={{ color: "var(--color-text-light)" }}
-              >
-                Invoice Details
-              </h2>
-            </div>
-
-            <div className="space-y-5">
-              <div
-                className="p-4 rounded-lg border"
-                style={{
-                  backgroundColor: "rgba(0, 255, 255, 0.1)",
-                  borderColor: "var(--color-accent)",
-                }}
-                
-              >
-                <p className="text-sm" style={{ color: "var(--color-accent)" }}>
-                  Upload the invoice or receipt that validates this campaign.
-                  This ensures transparency and dual confirmation from
-                  beneficiary.
-                </p>
-              </div>
-
-              <div>
-                <label
-                  className="block text-sm font-medium mb-3"
-                  style={{ color: "var(--color-text-light)" }}
-                >
-                  Invoice/Receipt File *
-                </label>
-                <div
-                  className="border-2 border-dashed rounded-lg p-6 text-center hover:opacity-80 transition"
-                  style={{
-                    borderColor: "var(--color-accent)",
-                    backgroundColor: "var(--color-primary-bg)",
-                  }}
-                >
-                  <UploadCloud
-                    className="w-10 h-10 mx-auto mb-3"
-                    style={{ color: "var(--color-accent)" }}
-                  />
-                  <label className="cursor-pointer">
-                    <p
-                      className="font-semibold"
-                      style={{ color: "var(--color-text-light)" }}
-                    >
-                      Click to upload or drag and drop
-                    </p>
-                    <p
-                      className="text-xs"
-                      style={{ color: "var(--color-text-light)", opacity: 0.6 }}
-                    >
-                      PDF, PNG, JPG (Max 5MB)
-                    </p>
-                    <input
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Campaign Description *
                   </label>
-                  {invoiceData.invoiceFile && (
-                    <p
-                      className="text-sm mt-3 font-medium"
-                      style={{ color: "var(--color-accent)" }}
-                    >
-                      ✓ {invoiceData.invoiceFile.name}
+                  <textarea
+                    name="description"
+                    placeholder="Explain the campaign, why funds are needed, and how they'll be used..."
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    className="w-full p-3 rounded-lg border border-border bg-background"
+                    rows={4}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Target Amount (USD) *
+                    </label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        name="targetAmount"
+                        placeholder="5000"
+                        value={formData.targetAmount}
+                        onChange={handleFormChange}
+                        className="rounded-lg pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Fundraising Deadline *
+                    </label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        type="date"
+                        name="fundraisingDeadline"
+                        value={formData.fundraisingDeadline}
+                        onChange={handleFormChange}
+                        className="rounded-lg pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Location *
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      name="location"
+                      placeholder="e.g., Lagos, Nigeria"
+                      value={formData.location}
+                      onChange={handleFormChange}
+                      className="rounded-lg pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Category
+                  </label>
+                  <select
+                    name="category"
+                    value={formData.category}
+                    onChange={handleFormChange}
+                    className="w-full p-2 rounded-lg border border-border bg-background"
+                  >
+                    <option value="medical">Medical</option>
+                    <option value="education">Education</option>
+                    <option value="emergency">Emergency Relief</option>
+                    <option value="livelihood">Livelihood</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                {/* Preferred Provider Section */}
+                <div className="pt-2">
+                  <label className="block text-sm font-medium mb-3">
+                    Preferred Provider <span className="text-destructive">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Select a provider from the platform or provide details if they're not yet registered.
+                  </p>
+
+                  {/* Provider Selection Method */}
+                  <div className="flex gap-4 mb-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="providerSelection"
+                        checked={providerSelection === "platform"}
+                        onChange={() => {
+                          setProviderSelection("platform");
+                          setManualProvider({ name: "", phone: "", email: "" });
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Select from platform</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="providerSelection"
+                        checked={providerSelection === "manual"}
+                        onChange={() => {
+                          setProviderSelection("manual");
+                          setSelectedProviderId("");
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Provider not on platform</span>
+                    </label>
+                  </div>
+
+                  {/* Platform Provider Dropdown */}
+                  {providerSelection === "platform" && (
+                    <div>
+                      {loadingProviders ? (
+                        <div className="text-sm text-muted-foreground">Loading providers...</div>
+                      ) : (
+                        <select
+                          value={selectedProviderId}
+                          onChange={(e) => setSelectedProviderId(e.target.value)}
+                          className="w-full p-2 rounded-lg border border-border bg-background"
+                          required
+                        >
+                          <option value="">Select a provider</option>
+                          {providers.map((provider) => (
+                            <option key={provider.id} value={provider.id}>
+                              {provider.organizationName} - {provider.organizationType} ({provider.city}, {provider.country})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {providers.length === 0 && !loadingProviders && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          No providers available. Please use manual entry.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Manual Provider Entry */}
+                  {providerSelection === "manual" && (
+                    <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Provider Name <span className="text-destructive">*</span>
+                        </label>
+                        <Input
+                          type="text"
+                          value={manualProvider.name}
+                          onChange={(e) =>
+                            setManualProvider((prev) => ({ ...prev, name: e.target.value }))
+                          }
+                          placeholder="Hospital, school, or organization name"
+                          className="rounded-lg"
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Phone Number
+                          </label>
+                          <Input
+                            type="tel"
+                            value={manualProvider.phone}
+                            onChange={(e) =>
+                              setManualProvider((prev) => ({ ...prev, phone: e.target.value }))
+                            }
+                            placeholder="+1234567890"
+                            className="rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Email Address
+                          </label>
+                          <Input
+                            type="email"
+                            value={manualProvider.email}
+                            onChange={(e) =>
+                              setManualProvider((prev) => ({ ...prev, email: e.target.value }))
+                            }
+                            placeholder="provider@example.com"
+                            className="rounded-lg"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        At least one contact method (phone or email) is required. The platform admin will contact this provider to verify and onboard them.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Supporting Documents Section */}
+                <div className="pt-2">
+                  <label className="block text-sm font-medium mb-3">
+                    Upload Supporting Documents <span className="text-destructive">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Upload invoices, doctor letters, or other supporting documents (PDF, PNG, JPG). At least one document is required.
+                  </p>
+                  <input
+                    ref={supportingDocsRef}
+                    type="file"
+                    accept=".pdf,image/*"
+                    multiple
+                    onChange={handleSupportingDocsChange}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => supportingDocsRef.current?.click()}
+                    className="mb-3"
+                  >
+                    <UploadCloud className="w-4 h-4 mr-2" />
+                    Choose Files
+                  </Button>
+                  {supportingDocs.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      {supportingDocs.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm truncate">{file.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({(file.size / 1024).toFixed(1)} KB)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeSupportingDoc(index)}
+                            className="text-destructive hover:text-destructive/80 ml-2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {supportingDocs.length === 0 && (
+                    <p className="text-xs text-destructive mt-2">
+                      Please upload at least one supporting document.
                     </p>
                   )}
                 </div>
+
+                <div className="pt-4">
+                  <Button
+                    onClick={() => setCurrentStep("invoice")}
+                    disabled={!canProceedToInvoice()}
+                    className="w-full rounded-full"
+                  >
+                    Next: Upload Invoice
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Step 2: Invoice Upload */}
+          {currentStep === "invoice" && (
+            <Card className="p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <FileText className="w-6 h-6 text-primary" />
+                <h2 className="text-2xl font-bold">
+                  Invoice Details
+                </h2>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--color-text-light)" }}
-                  >
-                    Invoice Amount (USD) *
-                  </label>
-                  <div className="relative">
-                    <DollarSign
-                      className="absolute left-3 top-3 w-5 h-5"
-                      style={{ color: "var(--color-accent)", opacity: 0.7 }}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="5000"
-                      value={invoiceData.invoiceAmount}
-                      onChange={(e) =>
-                        setInvoiceData((prev) => ({
-                          ...prev,
-                          invoiceAmount: e.target.value,
-                        }))
-                      }
-                      className="rounded-lg pl-10"
-                      style={{
-                        backgroundColor: "var(--color-primary-bg)",
-                        color: "var(--color-text-light)",
-                        borderColor: "var(--color-accent)",
-                      }}
-                    />
-                  </div>
+              <div className="space-y-5">
+                <div className="p-4 rounded-lg border border-primary bg-primary/10">
+                  <p className="text-sm text-primary">
+                    Upload the invoice or receipt that validates this campaign.
+                    This ensures transparency and dual confirmation from
+                    beneficiary.
+                  </p>
                 </div>
 
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--color-text-light)" }}
-                  >
-                    Invoice Date *
+                  <label className="block text-sm font-medium mb-3">
+                    Invoice/Receipt File *
                   </label>
-                  <div className="relative">
-                    <Clock
-                      className="absolute left-3 top-3 w-5 h-5"
-                      style={{ color: "var(--color-accent)", opacity: 0.7 }}
-                    />
-                    <Input
-                      type="date"
-                      value={invoiceData.invoiceDate}
-                      onChange={(e) =>
-                        setInvoiceData((prev) => ({
-                          ...prev,
-                          invoiceDate: e.target.value,
-                        }))
-                      }
-                      className="rounded-lg pl-10"
-                      style={{
-                        backgroundColor: "var(--color-primary-bg)",
-                        color: "var(--color-text-light)",
-                        borderColor: "var(--color-accent)",
-                      }}
-                    />
+                  <div className="border-2 border-dashed border-primary rounded-lg p-6 text-center hover:opacity-80 transition bg-muted/50">
+                    <UploadCloud className="w-10 h-10 mx-auto mb-3 text-primary" />
+                    <label className="cursor-pointer">
+                      <p className="font-semibold">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        PDF, PNG, JPG (Max 5MB)
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {invoiceData.invoiceFile && (
+                      <p className="text-sm mt-3 font-medium text-primary">
+                        ✓ {invoiceData.invoiceFile.name}
+                      </p>
+                    )}
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Invoice Amount (USD) *
+                    </label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        placeholder="5000"
+                        value={invoiceData.invoiceAmount}
+                        onChange={(e) =>
+                          setInvoiceData((prev) => ({
+                            ...prev,
+                            invoiceAmount: e.target.value,
+                          }))
+                        }
+                        className="rounded-lg pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Invoice Date *
+                    </label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        type="date"
+                        value={invoiceData.invoiceDate}
+                        onChange={(e) =>
+                          setInvoiceData((prev) => ({
+                            ...prev,
+                            invoiceDate: e.target.value,
+                          }))
+                        }
+                        className="rounded-lg pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={() => setCurrentStep("info")}
+                    variant="outline"
+                    className="flex-1 rounded-full"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={() => setCurrentStep("review")}
+                    disabled={!canProceedToReview()}
+                    className="flex-1 rounded-full"
+                  >
+                    Review
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Step 3: Review */}
+          {currentStep === "review" && (
+            <Card className="p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <CheckCircle2 className="w-6 h-6 text-primary" />
+                <h2 className="text-2xl font-bold">
+                  Review Campaign
+                </h2>
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <Button
-                  onClick={() => setCurrentStep("info")}
-                  variant="outline"
-                  className="flex-1 rounded-full"
-                  style={{
-                    borderColor: "var(--color-accent)",
-                    color: "var(--color-accent)",
-                  }}
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={() => setCurrentStep("review")}
-                  disabled={!canProceedToReview()}
-                  className="flex-1 rounded-full"
-                  style={{
-                    backgroundColor: "var(--color-accent)",
-                    color: "var(--color-primary-bg)",
-                  }}
-                >
-                  Review
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
+              <div className="space-y-5">
+                <div className="p-4 rounded-lg border border-primary bg-primary/10">
+                  <p className="text-sm text-primary">
+                    Please review your campaign details. Once submitted, the
+                    beneficiary must confirm the campaign details for funds to be
+                    unlocked after donations.
+                  </p>
+                </div>
 
-        {/* Step 3: Review */}
-        {currentStep === "review" && (
-          <Card
-            className="p-6 sm:p-8 card-elevated"
-            style={{
-              backgroundColor: "var(--color-secondary-bg)",
-              borderColor: "var(--color-accent)",
-            }}
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <CheckCircle2
-                className="w-6 h-6"
-                style={{ color: "var(--color-accent)" }}
-              />
-              <h2
-                className="text-2xl font-bold"
-                style={{ color: "var(--color-text-light)" }}
-              >
-                Review Campaign
+                {/* Campaign Summary */}
+                <div className="space-y-4">
+                  <div className="border-b border-border pb-4">
+                    <p className="text-sm text-muted-foreground">
+                      Title
+                    </p>
+                    <p className="text-lg font-semibold text-primary">
+                      {formData.title}
+                    </p>
+                  </div>
+
+                  <div className="border-b border-border pb-4">
+                    <p className="text-sm text-muted-foreground">
+                      Description
+                    </p>
+                    <p className="text-sm">
+                      {formData.description}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 border-b border-border pb-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Target Amount
+                      </p>
+                      <p className="font-semibold text-primary">
+                        ${formData.targetAmount}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Deadline
+                      </p>
+                      <p className="font-semibold text-primary">
+                        {formData.fundraisingDeadline}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-b border-border pb-4">
+                    <p className="text-sm text-muted-foreground">
+                      Location
+                    </p>
+                    <p className="font-semibold text-primary">
+                      {formData.location}
+                    </p>
+                  </div>
+
+                  <div className="border-b border-border pb-4">
+                    <p className="text-sm text-muted-foreground">
+                      Preferred Provider
+                    </p>
+                    <p className="font-semibold text-primary">
+                      {providerSelection === "platform"
+                        ? providers.find((p) => p.id === selectedProviderId)?.organizationName ||
+                          "Not selected"
+                        : manualProvider.name || "Not provided"}
+                    </p>
+                    {providerSelection === "manual" && (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {manualProvider.phone && <div>Phone: {manualProvider.phone}</div>}
+                        {manualProvider.email && <div>Email: {manualProvider.email}</div>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-b border-border pb-4">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Supporting Documents
+                    </p>
+                    {supportingDocs.length > 0 ? (
+                      <div className="space-y-1">
+                        {supportingDocs.map((file, index) => (
+                          <p key={index} className="text-sm flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-primary" />
+                            {file.name}
+                          </p>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-destructive">No documents uploaded</p>
+                    )}
+                  </div>
+
+                  <div className="border-b border-border pb-4">
+                    <p className="text-sm text-muted-foreground">
+                      Invoice File
+                    </p>
+                    <p className="font-semibold text-primary">
+                      ✓ {invoiceData.invoiceFile?.name}
+                    </p>
+                  </div>
+
+                  <div className="border-b border-border pb-4">
+                    <p className="text-sm text-muted-foreground">
+                      Invoice Amount
+                    </p>
+                    <p className="font-semibold text-primary">
+                      ${invoiceData.invoiceAmount}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={() => setCurrentStep("invoice")}
+                    variant="outline"
+                    className="flex-1 rounded-full"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleCreateCampaign}
+                    disabled={isSubmitting}
+                    className="flex-1 rounded-full"
+                  >
+                    {isSubmitting ? "Creating..." : "Create Campaign"}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Step 4: Success */}
+          {currentStep === "success" && (
+            <Card className="p-6 sm:p-8 text-center">
+              <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-primary" />
+              <h2 className="text-2xl sm:text-3xl font-bold mb-2">
+                Campaign Created!
               </h2>
-            </div>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                Your campaign has been successfully created. The beneficiary will
+                need to confirm the campaign details for funds to be unlocked
+                after donations are received.
+              </p>
 
-            <div className="space-y-5">
-              <div
-                className="p-4 rounded-lg border"
-                style={{
-                  backgroundColor: "rgba(0, 255, 255, 0.1)",
-                  borderColor: "var(--color-accent)",
-                }}
-                
-              >
-                <p className="text-sm" style={{ color: "var(--color-accent)" }}>
-                  Please review your campaign details. Once submitted, the
-                  beneficiary must confirm the campaign details for funds to be
-                  unlocked after donations.
+              <div className="p-4 rounded-lg mb-6 text-left border border-border bg-muted">
+                <p className="text-sm text-muted-foreground">
+                  Campaign ID
+                </p>
+                <p className="font-mono text-sm break-all text-primary">
+                  {newCampaign?.id}
                 </p>
               </div>
 
-              {/* Campaign Summary */}
-              <div className="space-y-4">
-                <div
-                  className="border-b pb-4"
-                  style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
-                >
-                  <p
-                    className="text-sm"
-                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                  >
-                    Title
-                  </p>
-                  <p
-                    className="text-lg font-semibold"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    {formData.title}
-                  </p>
-                </div>
-
-                <div
-                  className="border-b pb-4"
-                  style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
-                >
-                  <p
-                    className="text-sm"
-                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                  >
-                    Description
-                  </p>
-                  <p
-                    className="text-sm"
-                    style={{ color: "var(--color-text-light)" }}
-                  >
-                    {formData.description}
-                  </p>
-                </div>
-
-                <div
-                  className="grid grid-cols-2 gap-4 border-b pb-4"
-                  style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
-                >
-                  <div>
-                    <p
-                      className="text-sm"
-                      style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                    >
-                      Target Amount
-                    </p>
-                    <p
-                      className="font-semibold"
-                      style={{ color: "var(--color-accent)" }}
-                    >
-                      ${formData.targetAmount}
-                    </p>
-                  </div>
-                  <div>
-                    <p
-                      className="text-sm"
-                      style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                    >
-                      Deadline
-                    </p>
-                    <p
-                      className="font-semibold"
-                      style={{ color: "var(--color-accent)" }}
-                    >
-                      {formData.fundraisingDeadline}
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  className="border-b pb-4"
-                  style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
-                >
-                  <p
-                    className="text-sm"
-                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                  >
-                    Location
-                  </p>
-                  <p
-                    className="font-semibold"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    {formData.location}
-                  </p>
-                </div>
-
-                <div
-                  className="border-b pb-4"
-                  style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
-                >
-                  <p
-                    className="text-sm"
-                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                  >
-                    Invoice File
-                  </p>
-                  <p
-                    className="font-semibold"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    ✓ {invoiceData.invoiceFile?.name}
-                  </p>
-                </div>
-
-                <div
-                  className="border-b pb-4"
-                  style={{ borderColor: "var(--color-accent)", opacity: 0.3 }}
-                >
-                  <p
-                    className="text-sm"
-                    style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-                  >
-                    Invoice Amount
-                  </p>
-                  <p
-                    className="font-semibold"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    ${invoiceData.invoiceAmount}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
+              <div className="space-y-3">
                 <Button
-                  onClick={() => setCurrentStep("invoice")}
+                  onClick={handleBackToDashboard}
+                  className="w-full rounded-full"
+                >
+                  Back to Dashboard
+                </Button>
+                <Button
                   variant="outline"
-                  className="flex-1 rounded-full"
-                  style={{
-                    borderColor: "var(--color-accent)",
-                    color: "var(--color-accent)",
+                  onClick={() => {
+                    setCurrentStep("info");
+                    setFormData({
+                      title: "",
+                      description: "",
+                      targetAmount: "",
+                      fundraisingDeadline: "",
+                      location: "",
+                      category: "medical",
+                    });
+                    setInvoiceData({
+                      invoiceFile: null,
+                      invoiceAmount: "",
+                      invoiceDate: "",
+                    });
                   }}
+                  className="w-full rounded-full"
                 >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleCreateCampaign}
-                  disabled={isSubmitting}
-                  className="flex-1 rounded-full"
-                  style={{
-                    backgroundColor: "var(--color-accent)",
-                    color: "var(--color-primary-bg)",
-                  }}
-                >
-                  {isSubmitting ? "Creating..." : "Create Campaign"}
+                  Create Another Campaign
                 </Button>
               </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Step 4: Success */}
-        {currentStep === "success" && (
-          <Card
-            className="p-6 sm:p-8 card-elevated text-center"
-            style={{
-              backgroundColor: "var(--color-secondary-bg)",
-              borderColor: "var(--color-accent)",
-            }}
-          >
-            <CheckCircle2
-              className="w-16 h-16 mx-auto mb-4"
-              style={{ color: "var(--color-accent)" }}
-            />
-            <h2
-              className="text-2xl sm:text-3xl font-bold mb-2"
-              style={{ color: "var(--color-text-light)" }}
-            >
-              Campaign Created!
-            </h2>
-            <p
-              style={{ color: "var(--color-text-light)", opacity: 0.7 }}
-              className="mb-6 max-w-md mx-auto"
-            >
-              Your campaign has been successfully created. The beneficiary will
-              need to confirm the campaign details for funds to be unlocked
-              after donations are received.
-            </p>
-
-            <div
-              className="p-4 rounded-lg mb-6 text-left border"
-              style={{
-                backgroundColor: "var(--color-primary-bg)",
-                borderColor: "var(--color-accent)",
-              }}
-              
-            >
-              <p
-                className="text-sm"
-                style={{ color: "var(--color-text-light)", opacity: 0.6 }}
-              >
-                Campaign ID
-              </p>
-              <p
-                className="font-mono text-sm break-all"
-                style={{ color: "var(--color-accent)" }}
-              >
-                {newCampaign?.id}
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <Button
-                onClick={handleBackToDashboard}
-                className="w-full rounded-full"
-                style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-primary-bg)",
-                }}
-              >
-                Back to Dashboard
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setCurrentStep("info");
-                  setFormData({
-                    title: "",
-                    description: "",
-                    targetAmount: "",
-                    fundraisingDeadline: "",
-                    location: "",
-                    category: "medical",
-                  });
-                  setInvoiceData({
-                    invoiceFile: null,
-                    invoiceAmount: "",
-                    invoiceDate: "",
-                  });
-                }}
-                className="w-full rounded-full"
-                style={{
-                  borderColor: "var(--color-accent)",
-                  color: "var(--color-accent)",
-                }}
-              >
-                Create Another Campaign
-              </Button>
-            </div>
-          </Card>
-        )}
+            </Card>
+          )}
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 
