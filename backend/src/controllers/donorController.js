@@ -1,4 +1,9 @@
 import Donor from "../models/Donor.js";
+import DonationM from "../models/DonorDonation.js"; // the donations model
+import Campaign from "../models/Campaign.js";
+import crypto from "crypto";
+import mongoose from "mongoose";
+
 
 /* --------------------------
    Create donor profile
@@ -83,32 +88,44 @@ export const updateDonor = async (req, res, next) => {
 -------------------------- */
 export const addPaymentMethod = async (req, res, next) => {
   try {
-    const { method, mpesaPhone, bankName, accountName, accountNumber } = req.body;
+    const { method, mpesaPhone, lightningPubKey, bitcoinAddress } = req.body;
 
     const donor = await Donor.findOne({ userId: req.user.userId });
     if (!donor) {
       return res.status(404).json({ message: "Donor not found" });
     }
 
-    if (method === "MPESA" && !mpesaPhone) {
-      return res.status(400).json({ message: "Mpesa phone required" });
+    // Validate based on selected method
+    switch (method) {
+      case "MPESA":
+        if (!mpesaPhone) return res.status(400).json({ message: "MPESA phone required" });
+        break;
+      case "LIGHTNING":
+        if (!lightningPubKey) return res.status(400).json({ message: "Lightning invoice/public key required" });
+        break;
+      case "BITCOIN":
+        if (!bitcoinAddress) return res.status(400).json({ message: "Bitcoin address required" });
+        break;
+      default:
+        return res.status(400).json({ message: "Invalid payment method" });
     }
 
+    // Save new payment method
     donor.paymentMethods.push({
       method,
       mpesaPhone,
-      bankName,
-      accountName,
-      accountNumber
+      lightningPubKey,
+      bitcoinAddress
     });
 
     await donor.save();
 
-    res.json({ donor: donor.toClient() });
+    res.status(200).json({ donor: donor.toClient() });
   } catch (err) {
     next(err);
   }
 };
+
 
 /* --------------------------
    Admin: list donors
@@ -158,3 +175,120 @@ export const deleteDonor = async (req, res, next) => {
     next(err);
   }
 };
+
+/* --------------------------
+   Donor: create donation
+-------------------------- */
+const initiateMpesaStk = async ({ phone, amount }) => {
+  return {
+    checkoutRequestId: "ws_CO_" + crypto.randomBytes(6).toString("hex")
+  };
+};
+
+// Campaign resolver
+const resolveCampaign = async (campaignId) => {
+  let campaign = null;
+
+  if (mongoose.Types.ObjectId.isValid(campaignId)) {
+    campaign = await Campaign.findById(campaignId);
+    if (campaign) return campaign;
+  }
+
+  campaign = await Campaign.findOne({ publicId: campaignId });
+  if (campaign) return campaign;
+
+  campaign = await Campaign.findOne({ uuid: campaignId });
+  if (campaign) return campaign;
+
+  return null;
+};
+
+export const createDonation = async (req, res, next) => {
+  try {
+    const {
+      amount,
+      paymentMethod,
+      campaignId,
+      phone,
+      donorName,
+      donorEmail,
+      lightningInvoice,
+      bitcoinAddress
+    } = req.body;
+
+    if (!amount || amount <= 0)
+      return res.status(400).json({ message: "Amount is required" });
+
+    if (!paymentMethod)
+      return res.status(400).json({ message: "Payment method required" });
+
+    if (!campaignId)
+      return res.status(400).json({ message: "Campaign ID required" });
+
+    if (!donorName)
+      return res.status(400).json({ message: "Donor name required" });
+
+    if (!donorEmail)
+      return res.status(400).json({ message: "Donor email required" });
+
+    const donor = await Donor.findOne({ userId: req.user.userId });
+    if (!donor) return res.status(404).json({ message: "Donor not found" });
+
+    const campaign = await resolveCampaign(campaignId);
+    if (!campaign)
+      return res.status(404).json({ message: "Campaign not found" });
+
+    let mpesaCheckoutId = null;
+
+    switch (paymentMethod) {
+      case "LIGHTNING":
+        if (!lightningInvoice)
+          return res.status(400).json({ message: "Lightning invoice required" });
+        break;
+
+      case "BITCOIN":
+        if (!bitcoinAddress)
+          return res.status(400).json({ message: "Bitcoin address required" });
+        break;
+
+      case "MPESA":
+        if (!phone)
+          return res.status(400).json({ message: "Phone required for MPESA" });
+        const mpesaRes = await initiateMpesaStk({ phone, amount });
+        mpesaCheckoutId = mpesaRes.checkoutRequestId;
+        break;
+
+      default:
+        return res.status(400).json({ message: "Invalid payment method" });
+    }
+
+    const donation = await DonationM.create({
+      donor: donor._id,
+      campaign: campaign._id,
+      donorName,
+      donorEmail,
+      paymentMethod,
+      amount,
+      currency: "USD",
+      lightningInvoice: lightningInvoice || null,
+      bitcoinAddress: bitcoinAddress || null,
+      checkoutId: mpesaCheckoutId,
+      status: "PENDING"
+    });
+
+    res.status(201).json({
+      donationId: donation._id,
+      donorName,
+      donorEmail,
+      paymentMethod,
+      amount,
+      currency: "USD",
+      lightningInvoice,
+      bitcoinAddress,
+      mpesaCheckoutId
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

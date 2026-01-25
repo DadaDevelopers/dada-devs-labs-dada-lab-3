@@ -4,21 +4,20 @@ const { Schema } = mongoose;
 const PaymentMethodSchema = new Schema({
   method: {
     type: String,
-    enum: ["MPESA", "CARD", "BANK"],
+    enum: ["MPESA", "LIGHTNING", "BITCOIN"], // updated methods
     required: true
   },
 
   // MPESA
   mpesaPhone: String,
 
-  // CARD (future)
-  cardLast4: String,
-  cardBrand: String,
+  // Lightning Network
+  lightningInvoice: String, // or wallet public key
+  lightningLabel: String,   // optional label/note
 
-  // BANK (future)
-  bankName: String,
-  accountName: String,
-  accountNumber: String,
+  // Bitcoin on-chain
+  btcAddress: String,
+  btcLabel: String,         // optional label/note
 
   active: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now }
@@ -79,27 +78,24 @@ const DonorSchema = new Schema({
 });
 
 // Auto-update timestamp
-DonorSchema.pre("save", function (next) {
+DonorSchema.pre("save", function () {
   this.updatedAt = new Date();
-  next();
 });
 
 // Safe API output
 DonorSchema.methods.toClient = function () {
   const obj = this.toObject({ versionKey: false });
 
-  // Convert Decimal128
   if (obj.totalDonated) {
     obj.totalDonated = parseFloat(obj.totalDonated.toString());
   }
 
-  // Mask bank numbers
+  // Mask sensitive info
   if (Array.isArray(obj.paymentMethods)) {
     obj.paymentMethods = obj.paymentMethods.map(pm => {
-      if (pm.accountNumber) {
-        pm.accountNumberMasked = "****" + pm.accountNumber.slice(-4);
-        delete pm.accountNumber;
-      }
+      if (pm.mpesaPhone) pm.mpesaPhone = "****" + pm.mpesaPhone.slice(-3);
+      if (pm.btcAddress) pm.btcAddress = pm.btcAddress.slice(0, 6) + "..." + pm.btcAddress.slice(-4);
+      if (pm.lightningInvoice) pm.lightningInvoice = pm.lightningInvoice.slice(0, 6) + "..." + pm.lightningInvoice.slice(-6);
       return pm;
     });
   }

@@ -8,6 +8,7 @@ import {
   getDonorById,
   deleteDonor
 } from "../controllers/donorController.js";
+import { createDonation } from "../controllers/donationController.js";
 
 import { protect, authorize } from "../middlewares/auth.js";
 
@@ -18,6 +19,9 @@ router.post("/", protect, authorize("DONOR"), createDonor);
 router.get("/me", protect, authorize("DONOR"), getMyDonor);
 router.put("/me", protect, authorize("DONOR"), updateDonor);
 router.post("/me/payment-methods", protect, authorize("DONOR"), addPaymentMethod);
+
+// NEW: create a donation
+router.post("/donate", protect, authorize("DONOR"), createDonation);
 
 // Admin
 router.get("/", protect, authorize("ADMIN"), listDonors);

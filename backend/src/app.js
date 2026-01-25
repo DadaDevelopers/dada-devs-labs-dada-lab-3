@@ -20,6 +20,7 @@ import userRoutes from "./routes/userRoutes.js";
 import providerRoutes from "./routes/providerRoutes.js";
 import campaignRoutes from "./routes/campaignRoutes.js";
 import donationRoutes from "./routes/donationRoutes.js";
+import receiptRoutes from "./routes/receiptRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import donorRoutes from "./routes/donorRoutes.js";
@@ -92,6 +93,7 @@ app.use("/api/campaigns", campaignRoutes); // campaigns CRUD & listing
 app.use("/api/donations", donationRoutes); // donations CRUD & stats
 app.use("/api/invoices", invoiceRoutes); // invoice generation & retrieval
 app.use("/api/donors", donorRoutes); // donor CRUD & listing
+app.use("/api/receipts", receiptRoutes); // donor CRUD & listing
 
 // Error handling
 app.use(notFound); // catch all unhandled routes
