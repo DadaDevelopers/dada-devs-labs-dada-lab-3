@@ -34,7 +34,7 @@ const ProviderInvoices = () => {
     },
     {
       label: "Campaigns",
-      href: "/campaigns",
+      href: "/provider/campaigns",
       icon: <FolderKanban className="w-5 h-5" />,
     },
     {

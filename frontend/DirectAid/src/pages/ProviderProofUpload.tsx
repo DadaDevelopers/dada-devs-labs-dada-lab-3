@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { mockDataService } from "../services/mockData";
 import api from "../services/api";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
@@ -15,7 +16,9 @@ import {
   LayoutDashboard,
   FolderKanban,
   Wallet,
-  Settings,
+  User,
+  Bell,
+  Lock,
 } from "lucide-react";
 
 type Step = "select-campaign" | "upload-proof" | "review" | "success";
@@ -59,7 +62,7 @@ const ProviderProofUpload = () => {
     },
     {
       label: "Campaigns",
-      href: "/campaigns",
+      href: "/provider/campaigns",
       icon: <FolderKanban className="w-5 h-5" />,
     },
     {
@@ -77,11 +80,13 @@ const ProviderProofUpload = () => {
       href: "/provider/proof-upload",
       icon: <FileText className="w-5 h-5" />,
     },
-    {
-      label: "Settings",
-      href: "/provider/settings",
-      icon: <Settings className="w-5 h-5" />,
-    },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/provider/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "payouts", label: "Payouts", href: "/provider/settings/payouts", icon: <Wallet className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/provider/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/provider/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
   const handleCampaignSelect = (campaign: any) => {
@@ -172,6 +177,11 @@ const ProviderProofUpload = () => {
       navItems={navItems}
       userName={provider.name}
       userRole="Aid Provider"
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
     >
       <div className="space-y-6">
         {/* Header */}
