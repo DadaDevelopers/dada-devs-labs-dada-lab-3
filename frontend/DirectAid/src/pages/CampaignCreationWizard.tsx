@@ -15,7 +15,6 @@ import {
   MapPin,
   DollarSign,
   UploadCloud,
-  AlertCircle,
   Clock,
   LayoutDashboard,
   FolderKanban,
@@ -28,7 +27,7 @@ import {
 import { useRef, useEffect } from "react";
 import api from "../services/api";
 
-type Step = "info" | "invoice" | "review" | "success";
+type Step = "details" | "documents" | "review" | "success";
 
 const CampaignCreationWizard = () => {
   const navigate = useNavigate();
@@ -76,8 +75,6 @@ const CampaignCreationWizard = () => {
     title: "",
     description: "",
     targetAmount: "",
-    fundraisingDeadline: "",
-    location: "",
     category: "medical",
   });
 
@@ -121,9 +118,8 @@ const CampaignCreationWizard = () => {
     fetchProviders();
   }, []);
 
-  // Handlers for Step 1: Campaign Info
   const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -166,52 +162,39 @@ const CampaignCreationWizard = () => {
   };
 
   const canProceedToReview = () => {
-    return (
-      invoiceData.invoiceFile &&
-      invoiceData.invoiceAmount &&
-      invoiceData.invoiceDate
-    );
+    return documents.length > 0;
   };
 
-  // Handlers for Step 3: Review
-  const handleCreateCampaign = async () => {
+  const handleSubmitRequest = async () => {
     setIsSubmitting(true);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Create campaign object
-    const campaign = {
-      id: `camp_${Date.now()}`,
-      providerId: currentUser?.id || "",
-      title: formData.title,
-      description: formData.description,
-      targetAmount: parseFloat(formData.targetAmount) * 250000, // Convert to satoshis
-      raisedAmount: 0,
-      lockedFunds: 0,
-      unlockedFunds: 0,
-      category: formData.category,
-      status: "active" as const,
-      location: formData.location,
-      beneficiaryId: "",
-      invoiceHash: `0x${Math.random().toString(16).slice(2)}`,
-      dualConfirmationRequired: true,
-      confirmedByProvider: true,
-      confirmedByBeneficiary: false,
-      createdAt: new Date().toISOString(),
-      deadline: formData.fundraisingDeadline,
-      beneficiaryName: "",
-      invoiceAmount: parseFloat(invoiceData.invoiceAmount) * 250000,
-      invoiceDate: invoiceData.invoiceDate,
-    };
-
-    setNewCampaign(campaign);
+    const campaignId = `camp_${Date.now()}`;
+    setNewCampaignId(campaignId);
+    
     setCurrentStep("success");
     setIsSubmitting(false);
   };
 
   const handleBackToDashboard = () => {
     navigate("/beneficiary");
+  };
+
+  const handleStartOver = () => {
+    setCurrentStep("details");
+    setFormData({
+      title: "",
+      description: "",
+      targetAmount: "",
+      category: "medical",
+      location: "",
+      preferredProvider: "",
+      providerLocation: "",
+    });
+    setDocuments([]);
+    setNewCampaignId(null);
   };
 
   return (
