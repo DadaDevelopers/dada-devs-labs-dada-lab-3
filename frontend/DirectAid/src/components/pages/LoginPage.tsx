@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import FormInput from "../ui/FormInput";
-import Button from "../ui/Button";
+import {Button} from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface LoginFormData {
@@ -17,6 +17,7 @@ interface FormErrors {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
@@ -87,16 +88,18 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      // Login successful - navigate based on role
-      // The user is now set in the auth context
-      const role = user?.role || "donor";
+      // Login successful - decide where to go next
+      const finalRole = result?.user?.role || user?.role;
 
-      // navigate based on role
-      if (role === "provider" || role === "Provider")
-        navigate("/providerdashboard");
-      else if (role === "beneficiary" || role === "Beneficiary")
-        navigate("/userdashboard");
-      else navigate("/donordashboard");
+      if (finalRole === "UNASSIGNED") {
+        navigate("/onboarding");
+      } else if (finalRole === "PROVIDER") {
+        navigate("/provider");
+      } else if (finalRole === "BENEFICIARY") {
+        navigate("/beneficiary");
+      } else {
+        navigate("/donor");
+      }
     } catch {
       setErrors({
         general: "Invalid email or password. Please try again.",
@@ -166,11 +169,10 @@ const LoginPage: React.FC = () => {
 
             <Button
               type="submit"
-              variant="primary"
-              size="md"
+              variant="secondary"
+              size="sm"
               disabled={isSubmitting}
-              className="w-full"
-            >
+              className="w-full btn-cta">
               {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>
           </form>

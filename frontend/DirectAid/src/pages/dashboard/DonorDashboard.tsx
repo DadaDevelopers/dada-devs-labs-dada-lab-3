@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { mockDataService } from "../../services/mockData";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
@@ -10,7 +11,6 @@ import {
   LayoutDashboard,
   Heart,
   Receipt,
-  Settings,
   DollarSign,
   TrendingUp,
   Calendar,
@@ -18,11 +18,13 @@ import {
   ExternalLink,
   Zap,
   Bookmark,
-  Star,
+  User,
+  CreditCard,
+  Bell,
+  Lock,
+  FolderKanban,
 } from "lucide-react";
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
   BarChart,
@@ -41,6 +43,7 @@ import {
 const DonorDashboard = () => {
   const navigate = useNavigate();
   const { campaigns, donations } = useApp();
+  const { logout } = useAuth();
   const donor = mockDataService.getDonorUser();
   const metrics = mockDataService.getDonorMetrics();
 
@@ -88,6 +91,11 @@ const DonorDashboard = () => {
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
+      label: "Campaigns",
+      href: "/donor/campaigns",
+      icon: <FolderKanban className="w-5 h-5" />,
+    },
+    {
       label: "My Donations",
       href: "/donor/donations",
       icon: <Heart className="w-5 h-5" />,
@@ -97,11 +105,13 @@ const DonorDashboard = () => {
       href: "/donor/receipts",
       icon: <Receipt className="w-5 h-5" />,
     },
-    {
-      label: "Settings",
-      href: "/donor/settings",
-      icon: <Settings className="w-5 h-5" />,
-    },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/donor/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "payment", label: "Payment Methods", href: "/donor/settings/payment", icon: <CreditCard className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/donor/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/donor/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
   const handleQuickDonate = () => {
@@ -113,7 +123,16 @@ const DonorDashboard = () => {
   };
 
   return (
-    <DashboardLayout navItems={navItems} userName={donor.name} userRole="Donor">
+    <DashboardLayout 
+      navItems={navItems} 
+      userName={donor.name} 
+      userRole="Donor"
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
+    >
       <div className="space-y-6 sm:space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -187,6 +206,7 @@ const DonorDashboard = () => {
                 amountRaised={campaign.amountRaised / 100}
                 targetAmount={campaign.targetAmount / 100}
                 donorCount={campaign.donorCount}
+                onClick={() => navigate(`/campaigns/${campaign.id}`)}
               />
             ))}
           </div>
@@ -200,7 +220,7 @@ const DonorDashboard = () => {
               variant="outline"
               size="sm"
               className="rounded-full w-full sm:w-auto btn-cta"
-              onClick={() => navigate("/campaigns")}
+              onClick={() => navigate("/donor/donations")}
             >
               View All
             </Button>
@@ -491,21 +511,12 @@ const DonorDashboard = () => {
                 </p>
                 <p className="font-semibold text-sm sm:text-base">USD ($)</p>
               </div>
-
-              <Button
-                variant="outline"
-                className="w-full rounded-full  btn-cta gap-2"
-                onClick={() => navigate("/donor/settings")}
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Update Settings
-              </Button>
             </div>
           </Card>
         </div>
 
         {/* Tax Information */}
-        <Card className="p-4 sm:p-6 card-elevated">
+        {/* <Card className="p-4 sm:p-6 card-elevated">
           <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">
             Tax Information
           </h2>
@@ -532,7 +543,7 @@ const DonorDashboard = () => {
               details.
             </p>
           </div>
-        </Card>
+        </Card> */}
       </div>
     </DashboardLayout>
   );

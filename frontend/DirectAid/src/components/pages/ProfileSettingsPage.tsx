@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import FormInput from '../ui/FormInput';
-import Button from '../ui/Button';
+import {Button} from '../ui/Button';
 
 interface ProfileData {
   name: string;
@@ -271,8 +271,8 @@ const ProfileSettingsPage: React.FC = () => {
               {!isEditing ? (
                 <Button
                   type="button"
-                  variant="primary"
-                  size="md"
+                  variant="secondary"
+                  size="sm"
                   onClick={handleEdit}
                   className="w-full sm:w-auto"
                 >
@@ -282,8 +282,8 @@ const ProfileSettingsPage: React.FC = () => {
                 <>
                   <Button
                     type="submit"
-                    variant="primary"
-                    size="md"
+                    variant="secondary"
+                    size="sm"
                     disabled={isSubmitting}
                     className="w-full sm:w-auto"
                   >
@@ -292,7 +292,7 @@ const ProfileSettingsPage: React.FC = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    size="md"
+                    size="sm"
                     onClick={handleCancel}
                     disabled={isSubmitting}
                     className="w-full sm:w-auto"

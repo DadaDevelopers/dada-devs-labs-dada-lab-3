@@ -26,7 +26,7 @@ export const mockProviderUser: Provider = {
   name: "Sarah Chen",
   role: "provider",
   organizationName: "Global Relief Foundation",
-  organizationType: "ngo",
+  organizationType: "other",
   registrationNumber: "NGO-2019-45678",
   kycStatus: "verified",
   verificationDate: "2023-06-15",

@@ -1,5 +1,5 @@
 // components/admin/campaignManagement/AdminCampaignList.tsx
-import { Button } from "../../ui/button";
+import { Button } from "../../ui/Button";
 import { useApp } from "../../../contexts/AppContext";
 
 type FilterType = "all" | "pending" | "approved" | "rejected" | "flagged";
