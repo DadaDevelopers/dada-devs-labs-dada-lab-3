@@ -1,3 +1,5 @@
+// src/controllers/campaignControllers.js
+
 import mongoose from "mongoose";
 import Campaign from "../models/Campaign.js";
 import { logActivity } from "../utils/activityLogger.js";

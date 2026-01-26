@@ -120,7 +120,7 @@ export type ConfirmationStatus =
   | "disputed";
 
 export interface Campaign {
-  id: string;
+  _id: string;
   providerId: string;
   provider: Partial<Provider>;
   beneficiaryId: string;

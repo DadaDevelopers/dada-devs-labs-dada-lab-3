@@ -1,5 +1,5 @@
 // API client with axios-like interface for frontend
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_BASE_URL;
 
 // Create an axios-like API instance
 interface ApiInstance {
