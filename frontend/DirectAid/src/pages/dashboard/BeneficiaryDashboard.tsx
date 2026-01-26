@@ -20,7 +20,6 @@ import {
   DollarSign,
   FileText,
   ShieldCheck,
-  Settings,
   TrendingUp,
   Calendar,
   Upload,
@@ -34,6 +33,10 @@ import {
   PlusCircle,
   FolderKanban,
   Heart,
+  User,
+  MapPin,
+  Bell,
+  Lock,
 } from "lucide-react";
 import {
   AreaChart,
@@ -155,18 +158,13 @@ const BeneficiaryDashboard = () => {
       href: "/beneficiary/reporting",
       icon: <FileText className="w-5 h-5" />,
     },
-    {
-      label: "Settings",
-      href: "/beneficiary/settings?tab=profile",
-      icon: <Settings className="w-5 h-5" />,
-    },
   ];
 
   const settingsNavItems = [
-    { id: "profile", label: "Profile", href: "/beneficiary/settings?tab=profile" },
-    { id: "address", label: "Address", href: "/beneficiary/settings?tab=address" },
-    { id: "notifications", label: "Notifications", href: "/beneficiary/settings?tab=notifications" },
-    { id: "change-password", label: "Change Password", href: "/beneficiary/settings?tab=change-password" },
+    { id: "profile", label: "Profile", href: "/beneficiary/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "address", label: "Address", href: "/beneficiary/settings/address", icon: <MapPin className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/beneficiary/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
   const handleConfirmServiceAccess = () => {

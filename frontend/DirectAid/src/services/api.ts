@@ -1,6 +1,6 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
-export const API_BASE = "https://direct-aid-staging.onrender.com/api";
+export const API_BASE = "https://directaid-backend.onrender.com/api";
 
 // Create an axios-like API instance
 interface ApiInstance {

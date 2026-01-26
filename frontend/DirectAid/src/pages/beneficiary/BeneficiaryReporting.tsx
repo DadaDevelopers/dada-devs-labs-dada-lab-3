@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { mockDataService } from "../../services/mockData";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
@@ -10,7 +11,6 @@ import {
   LayoutDashboard,
   DollarSign,
   FileText,
-  Settings,
   ArrowLeft,
   Upload,
   CheckCircle2,
@@ -18,6 +18,10 @@ import {
   AlertCircle,
   Calendar,
   Trash2,
+  User,
+  MapPin,
+  Bell,
+  Lock,
 } from "lucide-react";
 
 type Step = "select-campaign" | "upload-report" | "review" | "success";
@@ -25,6 +29,7 @@ type Step = "select-campaign" | "upload-report" | "review" | "success";
 const BeneficiaryReporting = () => {
   const navigate = useNavigate();
   const { campaigns } = useApp();
+  const { logout } = useAuth();
   const beneficiary = mockDataService.getBeneficiaryUser();
   
   const [currentStep, setCurrentStep] = useState<Step>("select-campaign");
@@ -55,11 +60,13 @@ const BeneficiaryReporting = () => {
       href: "/beneficiary/reporting",
       icon: <FileText className="w-5 h-5" />,
     },
-    {
-      label: "Settings",
-      href: "/beneficiary/settings",
-      icon: <Settings className="w-5 h-5" />,
-    },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/beneficiary/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "address", label: "Address", href: "/beneficiary/settings/address", icon: <MapPin className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/beneficiary/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,6 +102,11 @@ const BeneficiaryReporting = () => {
       navItems={navItems}
       userName={beneficiary.name}
       userRole="Aid Beneficiary"
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
     >
       <div className="space-y-6">
         {/* Header */}
