@@ -67,7 +67,7 @@ const UserSchema = new Schema(
     },
     publicProfileFields: [{ type: String }], // e.g. ["displayName","shortStory","country"]
 
-    isEmailVerified: { type: Boolean, default: false },
+    isEmailVerified: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
 
     /* KYC metadata and audit trail - applies only to PROVIDER & some BENEFICIARY cases */
