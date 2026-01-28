@@ -103,6 +103,8 @@ export interface AidRequest {
 // CAMPAIGN TYPES
 // ============================================================================
 
+// src/types/index.ts — FINAL CLEAN VERSION
+
 export type CampaignStatus =
   | "draft"
   | "pending_approval"
@@ -111,6 +113,7 @@ export type CampaignStatus =
   | "cancelled"
   | "in_progress"
   | "paused";
+
 export type ConfirmationStatus =
   | "pending"
   | "provider_confirmed"
@@ -134,7 +137,10 @@ export interface Campaign {
   donorCount: number;
   status: CampaignStatus;
 
-  // Confirmation Model
+  // ADMIN APPROVAL FLOW — NEW
+  adminStatus: "pending" | "approved" | "rejected" | "flagged";
+
+  // CONFIRMATION FLOW (Provider + Beneficiary) — KEEP ONLY ONE
   confirmationStatus: ConfirmationStatus;
   providerConfirmedAt?: string;
   beneficiaryConfirmedAt?: string;
