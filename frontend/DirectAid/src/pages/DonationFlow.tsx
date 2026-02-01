@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, CheckCircle2, Heart, Zap, DollarSign, Lock, AlertCircle, Download, Phone, Smartphone, Copy, Check } from "lucide-react";
+import {LayoutDashboard,Receipt,TrendingUp,ExternalLink, Calendar, Bookmark,FolderKanban, User,CreditCard,Bell,ArrowLeft, CheckCircle2, Heart, Zap, DollarSign, Lock, AlertCircle, Download, Phone, Smartphone, Copy, Check } from "lucide-react";
+import { DashboardLayout } from "../components/layout/DashboardLayout";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 // Mock context and services
 const mockUser = {
@@ -23,8 +26,11 @@ type PaymentMethod = "mpesa" | "lightning" | "onchain";
 type PaymentStatus = "idle" | "sending" | "waiting" | "confirmed" | "failed" | "cancelled";
 
 const DonationFlow = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>("campaign");
   const [currentUser] = useState(mockUser);
+  const donor = currentUser;
   const [selectedCampaign] = useState(mockCampaign);
 
   // Donation form state
@@ -73,6 +79,37 @@ const DonationFlow = () => {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
+
+  const navItems = [
+      {
+        label: "Discover",
+        href: "/donor",
+        icon: <LayoutDashboard className="w-5 h-5" />,
+      },
+      {
+        label: "Campaigns",
+        href: "/donor/campaigns",
+        icon: <FolderKanban className="w-5 h-5" />,
+      },
+      {
+        label: "My Donations",
+        href: "/donor/donations",
+        icon: <Heart className="w-5 h-5" />,
+      },
+      {
+        label: "Receipts",
+        href: "/donor/receipts",
+        icon: <Receipt className="w-5 h-5" />,
+      },
+    ];
+  
+    const settingsNavItems = [
+      { id: "profile", label: "Profile", href: "/donor/settings/profile", icon: <User className="w-5 h-5" /> },
+      { id: "payment", label: "Payment Methods", href: "/donor/settings/payment", icon: <CreditCard className="w-5 h-5" /> },
+      { id: "notifications", label: "Notifications", href: "/donor/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+      { id: "change-password", label: "Change Password", href: "/donor/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+    ];
+  
 
   const formatPhoneNumber = (value: string) => {
     // Remove all non-numeric characters
@@ -235,7 +272,7 @@ FUND STATUS
 Status:             Purpose-Locked
 Next Steps:         
   1. Provider reviews and confirms campaign details
-  2. Beneficiary confirms they received the funds
+  2. Beneficiary confirms the would work with the provider
   3. Funds are released and dual confirmation complete
   4. You receive impact report
 
@@ -290,6 +327,18 @@ support@directaid.example.com
   );
 
   return (
+    <DashboardLayout
+      navItems={navItems} 
+      userName={donor.name} 
+      userRole="Donor"
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
+    >
+
+    
     <div className="min-h-screen p-4 sm:p-6" style={{ backgroundColor: "#0a0e1a" }}>
       {/* Header */}
       <div className="max-w-3xl mx-auto mb-8">
@@ -1173,7 +1222,7 @@ support@directaid.example.com
                     2
                   </span>
                   <span style={{ color: "#e0e0e0" }}>
-                    Beneficiary confirms they received the funds
+                    Beneficiary approves the provider
                   </span>
                 </li>
                 <li className="flex gap-3">
@@ -1222,6 +1271,8 @@ support@directaid.example.com
         )}
       </div>
     </div>
+
+    </DashboardLayout>
   );
 };
 
