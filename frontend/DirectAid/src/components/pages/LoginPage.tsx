@@ -88,15 +88,31 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      // Login successful - decide where to go next
-      const finalRole = result?.user?.role || user?.role;
+      // Login successful - use role from login result (context state may not have updated yet)
+      const roleFromApi = result?.user?.role ?? user?.role;
+      const finalRole = (roleFromApi ?? "").toString().trim().toUpperCase() || "UNASSIGNED";
 
+      const destination =
+        finalRole === "UNASSIGNED"
+          ? "/onboarding"
+          : finalRole === "PROVIDER"
+            ? "/provider"
+            : finalRole === "BENEFICIARY"
+              ? "/beneficiary"
+              : finalRole === "ADMIN"
+                ? "/admin"
+                : "/donor";
+      console.log("[auth] login redirect — result.user:", result?.user, "roleFromApi:", roleFromApi, "finalRole:", finalRole, "navigating to:", destination);
+
+      // New users and anyone without a set role go to onboarding to select role; only explicit roles go to dashboards
       if (finalRole === "UNASSIGNED") {
         navigate("/onboarding");
       } else if (finalRole === "PROVIDER") {
         navigate("/provider");
       } else if (finalRole === "BENEFICIARY") {
         navigate("/beneficiary");
+      } else if (finalRole === "ADMIN") {
+        navigate("/admin");
       } else {
         navigate("/donor");
       }

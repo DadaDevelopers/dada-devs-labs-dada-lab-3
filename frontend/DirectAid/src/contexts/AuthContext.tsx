@@ -27,7 +27,7 @@ interface AuthContextType {
   error: string | null;
   isAuthenticated: boolean;
 
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: any }>;
+  login: (email: string, password: string) => Promise<{ ok: boolean; user?: User; error?: any }>;
   signup: (payload: any) => Promise<{ ok: boolean; error?: any }>;
   updateProfile: (updates: Partial<User>) => Promise<{ ok: boolean; user?: User; error?: any }>;
   selectRoleAndOnboard: (payload: any) => Promise<{ ok: boolean; user?: User; error?: any }>;
@@ -96,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const res = await api.post("/auth/login", { email, password });
+      console.log("[auth] login received res.data:", res.data, "user.role:", (res.data as any)?.user?.role);
+
       const { user: u, accessToken } = res.data as {
         user: User;
         accessToken: string;
@@ -110,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       saveToStorage(u, tokenToStore);
 
       setLoading(false);
-      return { ok: true };
+      return { ok: true, user: u };
     } catch (err: any) {
       const message = err?.response?.data?.message || "Login failed";
       setError(message);
@@ -148,13 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Update Profile
+  // Update Profile — backend returns { user: ... }
   const updateProfile = async (updates: Partial<User>) => {
     setLoading(true);
     setError(null);
     try {
       const res = await api.put("/users/me", updates);
-      const updatedUser = res.data as User;
+      const updatedUser = (res.data as { user?: User }).user ?? (res.data as User);
 
       setUser(updatedUser);
       saveToStorage(updatedUser, token);
@@ -175,11 +177,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const res = await api.post("/auth/select-role", payload);
-      const { user: updatedUser } = res.data as { user: User };
+      console.log("[auth] selectRole received res.data:", res.data, "res.data.user:", (res.data as any)?.user, "res.data.user.role:", (res.data as any)?.user?.role);
+
+      const { user: updatedUser, accessToken: newAccessToken } = res.data as { user: User; accessToken?: string };
 
       setUser(updatedUser);
       setRole(updatedUser.role || null);
-      saveToStorage(updatedUser, token);
+      const tokenToStore = newAccessToken ?? token;
+      setToken(tokenToStore);
+      saveToStorage(updatedUser, tokenToStore);
 
       setLoading(false);
       return { ok: true, user: updatedUser };

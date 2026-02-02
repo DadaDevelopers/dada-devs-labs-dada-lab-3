@@ -2,6 +2,7 @@ import express from "express";
 import {
   createCampaign,
   getAllCampaigns,
+  getMyCampaigns,
   getCampaignById,
   updateCampaign,
   adminUpdateCampaignStatus,
@@ -14,8 +15,11 @@ const router = express.Router();
 // Create a campaign — only BENEFICIARY users
 router.post("/", protect, authorize("BENEFICIARY"), createCampaign);
 
-// List campaigns — public
+// List campaigns — public (supports ?beneficiaryId=, ?confirmationStatus=)
 router.get("/", getAllCampaigns);
+
+// My campaigns — authenticated BENEFICIARY only (must be before /:id)
+router.get("/me", protect, authorize("BENEFICIARY"), getMyCampaigns);
 
 // Admin campaign endpoints (keep before dynamic /:id if needed)
 router.patch("/:id/status", protect, authorize("ADMIN"), adminUpdateCampaignStatus);

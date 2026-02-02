@@ -70,12 +70,16 @@ const CampaignCreationWizard = () => {
   const userName = user?.name || user?.email || "User";
   const userRole = role || "Guest";
 
-  // Form state
+  // Form state (backend: title, description, targetAmount, currency, category?, providerId?)
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     targetAmount: "",
     category: "medical",
+    location: "",
+    preferredProvider: "",
+    providerLocation: "",
+    fundraisingDeadline: "",
   });
 
   const [invoiceData, setInvoiceData] = useState({
@@ -162,20 +166,48 @@ const CampaignCreationWizard = () => {
   };
 
   const canProceedToReview = () => {
-    return documents.length > 0;
+    return supportingDocs.length > 0;
   };
 
-  const handleSubmitRequest = async () => {
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleCreateCampaign = async () => {
+    setSubmitError(null);
     setIsSubmitting(true);
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    const campaignId = `camp_${Date.now()}`;
-    setNewCampaignId(campaignId);
-    
-    setCurrentStep("success");
-    setIsSubmitting(false);
+    try {
+      const payload: {
+        title: string;
+        description: string;
+        targetAmount: number | string;
+        currency: string;
+        category?: string;
+        providerId?: string;
+      } = {
+        title: formData.title.trim(),
+        description: formData.description?.trim() || "",
+        targetAmount: Number(formData.targetAmount) || 0,
+        currency: "USD",
+        category: formData.category || undefined,
+      };
+      if (providerSelection === "platform" && selectedProviderId) {
+        payload.providerId = selectedProviderId;
+      }
+      const res = await api.post("/campaigns", payload);
+      const campaign = (res.data as { campaign?: { _id?: string; id?: string; publicId?: string } }).campaign;
+      if (campaign) {
+        setNewCampaign({ id: campaign._id || campaign.id || campaign.publicId, ...campaign });
+        setCurrentStep("success");
+      } else {
+        setSubmitError("Campaign was created but we couldn’t load the details. Check your dashboard.");
+        setCurrentStep("success");
+      }
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message || "We couldn’t create your campaign. Please try again.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBackToDashboard = () => {
@@ -183,7 +215,7 @@ const CampaignCreationWizard = () => {
   };
 
   const handleStartOver = () => {
-    setCurrentStep("details");
+    setCurrentStep("info");
     setFormData({
       title: "",
       description: "",
@@ -192,9 +224,11 @@ const CampaignCreationWizard = () => {
       location: "",
       preferredProvider: "",
       providerLocation: "",
+      fundraisingDeadline: "",
     });
-    setDocuments([]);
-    setNewCampaignId(null);
+    setSupportingDocs([]);
+    setNewCampaign(null);
+    setSubmitError(null);
   };
 
   return (
@@ -223,32 +257,65 @@ const CampaignCreationWizard = () => {
             {currentStep === "info" ? "Back to Dashboard" : "Start Over"}
           </button>
 
-          {/* Progress Indicator */}
+          {/* Stepper */}
           <div className="mb-8">
-            <h1 className="text-3xl sm:text-4xl font-bold mb-4">
-              Create Campaign
+            <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-[var(--color-text-light)]">
+              Create campaign
             </h1>
-            <div className="flex gap-2 sm:gap-4">
-              {["info", "invoice", "review", "success"].map((step, idx) => {
-                const isActive = ["info", "invoice", "review", "success"].indexOf(currentStep) >= idx;
+            <div className="flex items-start w-full max-w-2xl">
+              {[
+                { key: "info", label: "Details", short: "1" },
+                { key: "invoice", label: "Documents", short: "2" },
+                { key: "review", label: "Review", short: "3" },
+                { key: "success", label: "Done", short: "4" },
+              ].map((step, idx) => {
+                const steps = ["info", "invoice", "review", "success"];
+                const currentIdx = steps.indexOf(currentStep);
+                const isCompleted = currentIdx > idx;
+                const isCurrent = currentStep === step.key;
+                const isPast = currentIdx > idx;
                 return (
-                  <div key={step} className="flex items-center">
-                    <div
-                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm transition border ${
-                        isActive
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-card text-foreground border-border"
-                      }`}
-                    >
-                      {idx + 1}
+                  <div key={step.key} className="flex items-center flex-1 min-w-0 first:flex-initial last:flex-initial">
+                    {/* Left connector: filled when we've reached this step or passed it */}
+                    {idx > 0 && (
+                      <div
+                        className={`flex-1 h-1 rounded-full transition-colors duration-300 mx-0.5 ${
+                          currentIdx >= idx ? "bg-[var(--color-accent)]" : "bg-white/10"
+                        }`}
+                        style={{ minWidth: "12px" }}
+                      />
+                    )}
+                    <div className="flex flex-col items-center flex-shrink-0">
+                      <div
+                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 border-2 ${
+                          isCurrent
+                            ? "bg-[var(--color-accent)] text-[var(--color-primary-bg)] border-[var(--color-accent)] shadow-[0_0_16px_rgba(0,255,255,0.4)]"
+                            : isCompleted
+                              ? "bg-[var(--color-accent)] text-[var(--color-primary-bg)] border-[var(--color-accent)]"
+                              : "bg-[var(--color-secondary-bg)] text-[var(--color-text-light)]/50 border-white/20"
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-[var(--color-primary-bg)]" />
+                        ) : (
+                          step.short
+                        )}
+                      </div>
+                      <span
+                        className={`mt-2 text-xs sm:text-sm font-medium truncate max-w-[80px] sm:max-w-none text-center ${
+                          isCurrent ? "text-[var(--color-accent)]" : isCompleted ? "text-[var(--color-text-light)]/80" : "text-[var(--color-text-light)]/50"
+                        }`}
+                      >
+                        {step.label}
+                      </span>
                     </div>
+                    {/* Right connector: filled when we've passed this step */}
                     {idx < 3 && (
                       <div
-                        className={`w-4 sm:w-8 h-1 mx-2 transition ${
-                          ["info", "invoice", "review", "success"].indexOf(currentStep) > idx
-                            ? "bg-primary"
-                            : "bg-muted"
+                        className={`flex-1 h-1 rounded-full transition-colors duration-300 mx-0.5 ${
+                          currentIdx > idx ? "bg-[var(--color-accent)]" : "bg-white/10"
                         }`}
+                        style={{ minWidth: "12px" }}
                       />
                     )}
                   </div>
@@ -516,10 +583,10 @@ const CampaignCreationWizard = () => {
                     type="button"
                     variant="outline"
                     onClick={() => supportingDocsRef.current?.click()}
-                    className="mb-3"
+                    className="mb-3 rounded-xl border-[var(--color-accent)]/50 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10"
                   >
                     <UploadCloud className="w-4 h-4 mr-2" />
-                    Choose Files
+                    Choose files
                   </Button>
                   {supportingDocs.length > 0 && (
                     <div className="space-y-2 mt-3">
@@ -557,9 +624,9 @@ const CampaignCreationWizard = () => {
                   <Button
                     onClick={() => setCurrentStep("invoice")}
                     disabled={!canProceedToInvoice()}
-                    className="w-full rounded-full"
+                    className="w-full rounded-2xl btn-cta font-semibold py-3"
                   >
-                    Next: Upload Invoice
+                    Next: Upload documents
                   </Button>
                 </div>
               </div>
@@ -660,16 +727,16 @@ const CampaignCreationWizard = () => {
                   <Button
                     onClick={() => setCurrentStep("info")}
                     variant="outline"
-                    className="flex-1 rounded-full"
+                    className="flex-1 rounded-2xl border-[var(--color-accent)]/50 text-[var(--color-text-light)] hover:bg-[var(--color-accent)]/10 font-medium py-3"
                   >
                     Back
                   </Button>
                   <Button
                     onClick={() => setCurrentStep("review")}
                     disabled={!canProceedToReview()}
-                    className="flex-1 rounded-full"
+                    className="flex-1 rounded-2xl btn-cta font-semibold py-3"
                   >
-                    Review
+                    Review campaign
                   </Button>
                 </div>
               </div>
@@ -687,11 +754,9 @@ const CampaignCreationWizard = () => {
               </div>
 
               <div className="space-y-5">
-                <div className="p-4 rounded-lg border border-primary bg-primary/10">
-                  <p className="text-sm text-primary">
-                    Please review your campaign details. Once submitted, the
-                    beneficiary must confirm the campaign details for funds to be
-                    unlocked after donations.
+                <div className="p-4 rounded-lg border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10">
+                  <p className="text-sm text-[var(--color-text-light)]">
+                    Review your campaign details below. After you submit, the campaign goes <strong>in review</strong> and the provider you selected will verify and confirm that they will deliver the service. Once they confirm, your campaign goes live and donors can give.
                   </p>
                 </div>
 
@@ -798,20 +863,25 @@ const CampaignCreationWizard = () => {
                   </div>
                 </div>
 
+                {submitError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {submitError}
+                  </p>
+                )}
                 <div className="flex gap-3 pt-4">
                   <Button
                     onClick={() => setCurrentStep("invoice")}
                     variant="outline"
-                    className="flex-1 rounded-full"
+                    className="flex-1 rounded-2xl border-[var(--color-accent)]/50 text-[var(--color-text-light)] hover:bg-[var(--color-accent)]/10 font-medium py-3"
                   >
                     Back
                   </Button>
                   <Button
                     onClick={handleCreateCampaign}
                     disabled={isSubmitting}
-                    className="flex-1 rounded-full"
+                    className="flex-1 rounded-2xl btn-cta font-semibold py-3"
                   >
-                    {isSubmitting ? "Creating..." : "Create Campaign"}
+                    {isSubmitting ? "Submitting…" : "Submit for review"}
                   </Button>
                 </div>
               </div>
@@ -821,21 +891,24 @@ const CampaignCreationWizard = () => {
           {/* Step 4: Success */}
           {currentStep === "success" && (
             <Card className="p-6 sm:p-8 text-center">
-              <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-primary" />
-              <h2 className="text-2xl sm:text-3xl font-bold mb-2">
-                Campaign Created!
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[var(--color-accent)]/20 border-2 border-[var(--color-accent)] mb-6">
+                <CheckCircle2 className="w-12 h-12 text-[var(--color-accent)]" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-[var(--color-text-light)]">
+                Campaign submitted for review
               </h2>
-              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                Your campaign has been successfully created. The beneficiary will
-                need to confirm the campaign details for funds to be unlocked
-                after donations are received.
+              <p className="text-[var(--color-text-light)]/80 mb-4 max-w-md mx-auto text-base leading-relaxed">
+                Your campaign has been created and is now <strong>in review</strong>. The provider you selected will verify the campaign and confirm that they will deliver the service.
+              </p>
+              <p className="text-sm text-[var(--color-text-light)]/70 mb-6 max-w-md mx-auto">
+                Once the provider confirms, your campaign will go live and donors can start giving. We’ll keep you updated; you can also check status from your dashboard.
               </p>
 
-              <div className="p-4 rounded-lg mb-6 text-left border border-border bg-muted">
-                <p className="text-sm text-muted-foreground">
-                  Campaign ID
+              <div className="p-4 rounded-xl mb-6 text-left border border-[var(--color-accent)]/30 bg-[var(--color-secondary-bg)]">
+                <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-light)]/60 mb-1">
+                  Campaign reference
                 </p>
-                <p className="font-mono text-sm break-all text-primary">
+                <p className="font-mono text-sm break-all text-[var(--color-accent)]">
                   {newCampaign?.id}
                 </p>
               </div>
@@ -843,7 +916,7 @@ const CampaignCreationWizard = () => {
               <div className="space-y-3">
                 <Button
                   onClick={handleBackToDashboard}
-                  className="w-full rounded-full"
+                  className="w-full rounded-2xl btn-cta font-semibold py-3"
                 >
                   Back to Dashboard
                 </Button>
@@ -865,9 +938,9 @@ const CampaignCreationWizard = () => {
                       invoiceDate: "",
                     });
                   }}
-                  className="w-full rounded-full"
+                  className="w-full rounded-2xl border-[var(--color-accent)]/50 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 font-medium py-3"
                 >
-                  Create Another Campaign
+                  Create another campaign
                 </Button>
               </div>
             </Card>
