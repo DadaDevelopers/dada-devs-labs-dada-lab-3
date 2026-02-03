@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import FormInput from "../ui/FormInput";
-import { Button } from "../ui/Button";
+import {Button} from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface LoginFormData {
@@ -87,16 +87,22 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      // Login successful - navigate based on role
-      // The user is now set in the auth context
-      const role = user?.role || "donor";
+      // Login successful - decide where to go next
+      // Login successful - decide where to go next
+      // We check currentUser from the context since result doesn't have it
+      const finalRole = user?.role;
 
-      // navigate based on role
-      if (role === "provider" || role === "Provider")
-        navigate("/providerdashboard");
-      else if (role === "beneficiary" || role === "Beneficiary")
-        navigate("/userdashboard");
-      else navigate("/donordashboard");
+      if (finalRole === "UNASSIGNED") {
+        navigate("/onboarding");
+      } else if (finalRole === "ADMIN") {
+        navigate("/admin");
+      } else if (finalRole === "PROVIDER") {
+        navigate("/provider");
+      } else if (finalRole === "BENEFICIARY") {
+        navigate("/beneficiary");
+      } else {
+        navigate("/donor");
+      }
     } catch {
       setErrors({
         general: "Invalid email or password. Please try again.",
@@ -166,11 +172,11 @@ const LoginPage: React.FC = () => {
 
             <Button
               type="submit"
-              variant="default" 
-              size="default"  
+
+              variant="secondary"
+              size="sm"
               disabled={isSubmitting}
-              className="w-full"
-            >
+              className="w-full btn-cta">
               {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>
           </form>

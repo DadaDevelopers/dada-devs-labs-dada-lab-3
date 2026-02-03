@@ -1,8 +1,11 @@
 import { Routes, Route } from "react-router-dom";
 import LandingPage from "../pages/LandingPage";
-// import Login from "../pages/auth/Login";
-// import Signup from "../pages/auth/Signup";
 import AdminDashboard from "../pages/dashboard/AdminDashboardPage";
+import LoginPage from "../components/pages/LoginPage";
+import SignUpPage from "../components/pages/SignUpPage";
+import ForgotPasswordPage from "../components/pages/ForgotPasswordPage";
+import OnboardingWizard from "../pages/OnboardingWizard";
+import VerifyEmailPage from "../pages/VerifyEmailPage";
 import BeneficiaryDashboard from "../pages/dashboard/BeneficiaryDashboard";
 import ProviderDashboard from "../pages/dashboard/ProviderDashboard";
 import DonorDashboard from "../pages/dashboard/DonorDashboard";
@@ -11,19 +14,29 @@ import CampaignDetail from "../pages/CampaignDetail";
 import CampaignCreationWizard from "../pages/CampaignCreationWizard";
 import DonationFlow from "../pages/DonationFlow";
 import ProviderInvoiceUpload from "../pages/ProviderInvoiceUpload";
-import ProviderConfirmation from "../pages/ProviderConfirmation";
+// import ProviderConfirmation from "../pages/ProviderConfirmation";
+import ProviderWithdrawal from "../pages/ProviderWithdrawal";
+import ProviderProofUpload from "../pages/ProviderProofUpload";
 import BeneficiaryConfirmation from "../pages/BeneficiaryConfirmation";
 import ProviderSettings from "../pages/ProviderSettings";
 import BeneficiarySettings from "../pages/BeneficiarySettings";
 import DonorSettings from "../pages/DonorSettings";
+import DonorDonations from "../pages/donor/DonorDonations";
+import DonorReceipts from "../pages/donor/DonorReceipts";
+import BeneficiaryReporting from "../pages/beneficiary/BeneficiaryReporting";
+import BeneficiaryFunds from "../pages/beneficiary/BeneficiaryFunds";
 
 export default function AppRouter() {
   return (
     <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
-      {/* <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} /> */}
+
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/onboarding" element={<OnboardingWizard />} />
+      <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
 
       {/* Campaign */}
       <Route path="/campaigns" element={<CampaignPage />} />
@@ -32,12 +45,19 @@ export default function AppRouter() {
       <Route path="/donate" element={<DonationFlow />} />
 
       {/* Provider */}
+      <Route path="/provider/campaigns" element={<CampaignPage />} />
       <Route path="/provider/invoices" element={<ProviderInvoiceUpload />} />
-      <Route
+      <Route path="/provider/withdrawals" element={<ProviderWithdrawal />} />
+      <Route path="/provider/proof-upload" element={<ProviderProofUpload />} />
+      {/* <Route
         path="/provider/confirmations"
         element={<ProviderConfirmation />}
-      />
+      /> */}
       <Route path="/provider/settings" element={<ProviderSettings />} />
+      <Route path="/provider/settings/profile" element={<ProviderSettings />} />
+      <Route path="/provider/settings/payouts" element={<ProviderSettings />} />
+      <Route path="/provider/settings/notifications" element={<ProviderSettings />} />
+      <Route path="/provider/settings/change-password" element={<ProviderSettings />} />
 
       {/* Beneficiary */}
       <Route
@@ -45,9 +65,22 @@ export default function AppRouter() {
         element={<BeneficiaryConfirmation />}
       />
       <Route path="/beneficiary/settings" element={<BeneficiarySettings />} />
+      <Route path="/beneficiary/settings/profile" element={<BeneficiarySettings />} />
+      <Route path="/beneficiary/settings/address" element={<BeneficiarySettings />} />
+      <Route path="/beneficiary/settings/notifications" element={<BeneficiarySettings />} />
+      <Route path="/beneficiary/settings/change-password" element={<BeneficiarySettings />} />
+      <Route path="/beneficiary/reporting" element={<BeneficiaryReporting />} />
+      <Route path="/beneficiary/funds" element={<BeneficiaryFunds />} />
 
       {/* Donor */}
       <Route path="/donor/settings" element={<DonorSettings />} />
+      <Route path="/donor/settings/profile" element={<DonorSettings />} />
+      <Route path="/donor/settings/payment" element={<DonorSettings />} />
+      <Route path="/donor/settings/notifications" element={<DonorSettings />} />
+      <Route path="/donor/settings/change-password" element={<DonorSettings />} />
+      <Route path="/donor/campaigns" element={<CampaignPage />} />
+      <Route path="/donor/donations" element={<DonorDonations />} />
+      <Route path="/donor/receipts" element={<DonorReceipts />} />
 
       {/* Dashboards */}
       <Route path="/admin/*" element={<AdminDashboard />} />

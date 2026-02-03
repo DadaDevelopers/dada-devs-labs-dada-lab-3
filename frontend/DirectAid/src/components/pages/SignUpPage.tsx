@@ -1,40 +1,16 @@
-import React, { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import FormInput from "../ui/FormInput";
-import Button from "../ui/Button";
+import { Button } from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
-type UserRole = "provider" | "beneficiary" | "donor" | "ngo";
-
 interface SignUpFormData {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   confirmPassword: string;
-  phone: string;
-  country: string;
-  city: string;
-  address: string;
-  organization: string;
-  role: UserRole;
-  // Provider-specific
-  organizationType?: string;
-  businessRegNumber?: string;
-  contactPerson?: string;
-  bankAccountName?: string;
-  bankAccountNumber?: string;
-  bankName?: string;
-  lightningPubkey?: string;
-  shortDescription?: string;
-  // Beneficiary-specific
-  nationalId?: string;
-  shortStory?: string;
-  category?: string;
-  preferredProvider?: string;
   acceptTerms?: boolean;
-  // File uploads
-  licenseFile?: File | null;
-  supportingDocs?: File | null;
 }
 
 interface FormErrors {
@@ -42,29 +18,20 @@ interface FormErrors {
   email?: string;
   password?: string;
   confirmPassword?: string;
-  phone?: string;
-  address?: string;
-  organization?: string;
-  role?: string;
   general?: string;
+  success?: string;
 }
 
 const SignUpPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState<SignUpFormData>({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
     confirmPassword: "",
-    phone: "",
-    country: "",
-    city: "",
-    address: "",
-    organization: "",
-    role: "beneficiary",
     acceptTerms: false,
-    licenseFile: null,
-    supportingDocs: null,
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,11 +42,6 @@ const SignUpPage: React.FC = () => {
     return emailRegex.test(email);
   };
 
-  const validatePhone = (phone: string): boolean => {
-    const phoneRegex = /^[\d\s\-\+\(\)]+$/;
-    return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 10;
-  };
-
   const validatePassword = (password: string): boolean => {
     return password.length >= 8;
   };
@@ -87,8 +49,12 @@ const SignUpPage: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required";
+    if (!formData.firstName.trim()) {
+      newErrors.name = "First name is required";
+    }
+
+    if (!formData.lastName.trim()) {
+      newErrors.name = "Last name is required";
     }
 
     if (!formData.email.trim()) {
@@ -109,24 +75,6 @@ const SignUpPage: React.FC = () => {
       newErrors.confirmPassword = "Passwords do not match";
     }
 
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    } else if (!validatePhone(formData.phone)) {
-      newErrors.phone = "Please enter a valid phone number";
-    }
-
-    if (!formData.address.trim()) {
-      newErrors.address = "Address is required";
-    }
-
-    if (!formData.country?.trim()) {
-      newErrors.address = "Country is required";
-    }
-
-    if (formData.role === "provider" && !formData.organization.trim()) {
-      newErrors.organization = "Organization name is required for providers";
-    }
-
     if (!formData.acceptTerms) {
       newErrors.general =
         "You must accept the terms and conditions to continue";
@@ -136,9 +84,7 @@ const SignUpPage: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -161,20 +107,6 @@ const SignUpPage: React.FC = () => {
     }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, files } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: files && files.length > 0 ? files[0] : null,
-    }));
-  };
-
-  const licenseInputRef = useRef<HTMLInputElement | null>(null);
-  const supportingInputRef = useRef<HTMLInputElement | null>(null);
-
-  const triggerLicensePicker = () => licenseInputRef.current?.click();
-  const triggerSupportingPicker = () => supportingInputRef.current?.click();
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -186,8 +118,12 @@ const SignUpPage: React.FC = () => {
     setErrors({});
 
     try {
-      // Use auth context to signup
-      const result = await signup({ ...formData });
+      const result = await signup({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+      });
 
       if (!result.ok) {
         setErrors({
@@ -199,11 +135,15 @@ const SignUpPage: React.FC = () => {
         return;
       }
 
-      // Signup successful - navigate to appropriate dashboard based on role
-      const role = formData.role || "donor";
-      if (role === "provider") navigate("/providerdashboard");
-      else if (role === "beneficiary") navigate("/userdashboard");
-      else navigate("/donordashboard");
+      setErrors({
+        success:
+          "Account created. Please check your email to verify your account, then log in.",
+      });
+
+      // Optionally redirect to login after a short delay
+      setTimeout(() => {
+        navigate("/login?justRegistered=true");
+      }, 1500);
     } catch {
       setErrors({
         general: "An error occurred during signup. Please try again.",
@@ -237,60 +177,45 @@ const SignUpPage: React.FC = () => {
 
         <div className="bg-[var(--color-secondary-bg)] rounded-lg shadow-xl p-8 border border-white/10">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {errors.general && (
+            {(errors.general || errors.success) && (
               <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-lg text-sm">
                 {errors.general}
               </div>
             )}
-
-            {/* Role Selection */}
-            <div className="w-full">
-              <label
-                htmlFor="role"
-                className="block text-sm font-medium text-[var(--color-text-light)] mb-2"
-              >
-                I am a <span className="text-[var(--color-accent)]">*</span>
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className={`
-                  w-full px-4 py-3 rounded-lg
-                  bg-[#151D2C] border
-                  text-[var(--color-text-light)]
-                  focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent
-                  transition duration-300
-                  ${errors.role ? "border-red-500" : "border-white/20"}
-                `}
-                aria-invalid={errors.role ? "true" : "false"}
-              >
-                <option value="beneficiary">Beneficiary</option>
-                <option value="provider">Provider</option>
-                <option value="donor">Donor</option>
-              </select>
-              {errors.role && (
-                <p className="mt-2 text-sm text-red-500" role="alert">
-                  {errors.role}
-                </p>
-              )}
-            </div>
+            {errors.success && (
+              <div className="bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 px-4 py-3 rounded-lg text-sm">
+                {errors.success}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormInput
-                label="Full Name"
+                label="First Name"
                 type="text"
-                name="name"
-                value={formData.name}
+                name="firstName"
+                value={formData.firstName}
                 onChange={handleChange}
                 error={errors.name}
                 required
-                placeholder="Enter your full name"
+                placeholder="Enter your first name"
                 autoComplete="name"
               />
 
               <FormInput
+                label="Last Name"
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                error={errors.name}
+                required
+                placeholder="Enter your last name"
+                autoComplete="family-name"
+              />
+            </div>
+
+            <div>
+                <FormInput
                 label="Email"
                 type="email"
                 name="email"
@@ -301,9 +226,10 @@ const SignUpPage: React.FC = () => {
                 placeholder="Enter your email"
                 autoComplete="email"
               />
-            </div>
+              </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
               <div>
                 <FormInput
                   label="Password"
@@ -336,252 +262,6 @@ const SignUpPage: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormInput
-                label="Phone Number"
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                error={errors.phone}
-                required
-                placeholder="Enter your phone number"
-                autoComplete="tel"
-              />
-
-              <div className="space-y-4">
-                <FormInput
-                  label="Country"
-                  type="text"
-                  name="country"
-                  value={formData.country}
-                  onChange={handleChange}
-                  error={errors.address}
-                  required
-                  placeholder="Country"
-                />
-
-                <FormInput
-                  label="City"
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  error={errors.address}
-                  required
-                  placeholder="City"
-                />
-              </div>
-            </div>
-
-            <FormInput
-              label={
-                formData.role === "provider"
-                  ? "Organization Name"
-                  : "Organization (Optional)"
-              }
-              type="text"
-              name="organization"
-              value={formData.organization}
-              onChange={handleChange}
-              error={errors.organization}
-              required={formData.role === "provider"}
-              placeholder="Enter organization name"
-            />
-
-            {/* Provider-specific fields */}
-            {formData.role === "provider" && (
-              <div className="space-y-4 mt-4">
-                <FormInput
-                  label="Organization Type"
-                  type="text"
-                  name="organizationType"
-                  value={formData.organizationType || ""}
-                  onChange={handleChange}
-                  placeholder="Hospital | School | Pharmacy | Vendor | NGO"
-                />
-
-                <FormInput
-                  label="Business Registration Number (optional)"
-                  type="text"
-                  name="businessRegNumber"
-                  value={formData.businessRegNumber || ""}
-                  onChange={handleChange}
-                  placeholder="CAC / Business registration no."
-                />
-
-                <FormInput
-                  label="Primary Contact Person"
-                  type="text"
-                  name="contactPerson"
-                  value={formData.contactPerson || ""}
-                  onChange={handleChange}
-                  placeholder="Contact person's name"
-                />
-
-                <FormInput
-                  label="Bank Account Name"
-                  type="text"
-                  name="bankAccountName"
-                  value={formData.bankAccountName || ""}
-                  onChange={handleChange}
-                  placeholder="Account name"
-                />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormInput
-                    label="Bank Account Number"
-                    type="text"
-                    name="bankAccountNumber"
-                    value={formData.bankAccountNumber || ""}
-                    onChange={handleChange}
-                    placeholder="Account number"
-                  />
-
-                  <FormInput
-                    label="Bank Name"
-                    type="text"
-                    name="bankName"
-                    value={formData.bankName || ""}
-                    onChange={handleChange}
-                    placeholder="Bank name"
-                  />
-                </div>
-
-                <FormInput
-                  label="Lightning Pubkey / Wallet Address (optional)"
-                  type="text"
-                  name="lightningPubkey"
-                  value={formData.lightningPubkey || ""}
-                  onChange={handleChange}
-                  placeholder="Lightning pubkey or wallet address"
-                />
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text-light)] mb-2">
-                    Upload License / Proof of Business (PDF/PNG)
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={triggerLicensePicker}
-                    >
-                      Choose file
-                    </Button>
-                    <input
-                      ref={licenseInputRef}
-                      id="licenseFile"
-                      type="file"
-                      name="licenseFile"
-                      onChange={handleFileChange}
-                      accept=".pdf,image/*"
-                      className="hidden"
-                    />
-                    <span className="text-sm text-white/60">
-                      {formData.licenseFile
-                        ? formData.licenseFile.name
-                        : "No file chosen"}
-                    </span>
-                  </div>
-                </div>
-
-                <FormInput
-                  label="Short Description"
-                  type="text"
-                  name="shortDescription"
-                  value={formData.shortDescription || ""}
-                  onChange={handleChange}
-                  placeholder="A short description about your organization"
-                />
-              </div>
-            )}
-
-            {/* Beneficiary-specific fields */}
-            {formData.role === "beneficiary" && (
-              <div className="space-y-4 mt-4">
-                <FormInput
-                  label="National ID (optional)"
-                  type="text"
-                  name="nationalId"
-                  value={formData.nationalId || ""}
-                  onChange={handleChange}
-                  placeholder="National ID"
-                />
-
-                <FormInput
-                  label="Short Story / Description"
-                  type="text"
-                  name="shortStory"
-                  value={formData.shortStory || ""}
-                  onChange={handleChange}
-                  placeholder="Tell us about your situation"
-                />
-
-                <FormInput
-                  label="Category"
-                  type="text"
-                  name="category"
-                  value={formData.category || ""}
-                  onChange={handleChange}
-                  placeholder="Medical, Education, Business, Emergency"
-                />
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text-light)] mb-2">
-                    Upload Supporting Docs (invoice, doctor letter)
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={triggerSupportingPicker}
-                    >
-                      Choose file
-                    </Button>
-                    <input
-                      ref={supportingInputRef}
-                      id="supportingDocs"
-                      type="file"
-                      name="supportingDocs"
-                      onChange={handleFileChange}
-                      accept=".pdf,image/*"
-                      className="hidden"
-                    />
-                    <span className="text-sm text-white/60">
-                      {formData.supportingDocs
-                        ? formData.supportingDocs.name
-                        : "No file chosen"}
-                    </span>
-                  </div>
-                </div>
-
-                <FormInput
-                  label="Preferred Provider (optional)"
-                  type="text"
-                  name="preferredProvider"
-                  value={formData.preferredProvider || ""}
-                  onChange={handleChange}
-                  placeholder="Provider name or leave blank for 'match me'"
-                />
-
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="consentContact"
-                    name="consentContact"
-                    onChange={handleCheckbox}
-                  />
-                  <label
-                    htmlFor="consentContact"
-                    className="text-sm text-[var(--color-text-light)]"
-                  >
-                    I agree to be contacted regarding my request
-                  </label>
-                </div>
-              </div>
-            )}
-
             <div className="flex items-center space-x-3 mt-4">
               <input
                 type="checkbox"
@@ -603,11 +283,10 @@ const SignUpPage: React.FC = () => {
 
             <Button
               type="submit"
-              variant="primary"
-              size="md"
+              variant="secondary"
+              size="sm"
               disabled={isSubmitting}
-              className="w-full"
-            >
+              className="w-full btn-cta">
               {isSubmitting ? "Creating Account..." : "Create Account"}
             </Button>
           </form>

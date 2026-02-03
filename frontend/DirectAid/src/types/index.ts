@@ -8,8 +8,6 @@ export type UserRole =
   | "provider"
   | "beneficiary"
   | "admin"
-  | "verifier"
-  | "ngo";
 
 export interface User {
   id: string;
@@ -29,7 +27,7 @@ export interface AuthResponse {
 // PROVIDER TYPES
 // ============================================================================
 
-export type ProviderType = "hospital" | "school" | "pharmacy" | "ngo" | "other";
+export type ProviderType = "hospital" | "school" | "pharmacy" | "other";
 export type ProviderStatus = "pending" | "verified" | "rejected" | "suspended";
 export type KYCStatus =
   | "pending"
@@ -116,6 +114,7 @@ export type CampaignStatus =
   | "active"
   | "completed"
   | "cancelled"
+  | "in_progress"
   | "paused";
 
 export type ConfirmationStatus =
