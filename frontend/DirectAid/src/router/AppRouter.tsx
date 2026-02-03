@@ -1,12 +1,12 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import LandingPage from "../pages/LandingPage";
+import AdminDashboard from "../pages/dashboard/AdminDashboardPage";
 import LoginPage from "../components/pages/LoginPage";
 import SignUpPage from "../components/pages/SignUpPage";
 import ForgotPasswordPage from "../components/pages/ForgotPasswordPage";
 import OnboardingWizard from "../pages/OnboardingWizard";
 import VerifyEmailPage from "../pages/VerifyEmailPage";
-import AdminDashboard from "../pages/dashboard/AdminDashboard";
 import BeneficiaryDashboard from "../pages/dashboard/BeneficiaryDashboard";
 import ProviderDashboard from "../pages/dashboard/ProviderDashboard";
 import DonorDashboard from "../pages/dashboard/DonorDashboard";
@@ -101,7 +101,7 @@ export default function AppRouter() {
       <Route path="/donor/receipts" element={<DonorReceipts />} />
 
       {/* Dashboards */}
-      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/*" element={<AdminDashboard />} />
       <Route path="/beneficiary" element={<BeneficiaryDashboard />} />
       <Route path="/provider" element={<ProviderDashboard />} />
       <Route path="/donor" element={<DonorDashboard />} />

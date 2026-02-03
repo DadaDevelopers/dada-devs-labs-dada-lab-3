@@ -1,3 +1,4 @@
+// src/contexts/AppContext.tsx
 import React, {
   createContext,
   useContext,
@@ -8,9 +9,6 @@ import type {
   User,
   Campaign,
   Donation,
-  Invoice,
-  Provider,
-  Beneficiary,
   Notification,
 } from "../types";
 import {
@@ -37,6 +35,9 @@ interface AppContextType {
   selectCampaign: (campaignId: string) => void;
   createCampaign: (campaign: Campaign) => void;
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
+
+  // ADD THIS: Admin can approve/reject/flag
+  updateCampaignStatus: (campaignId: string, status: "approved" | "rejected" | "flagged") => void;
 
   // Donations
   donations: Donation[];
@@ -83,9 +84,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>(
     mockDataService.getNotifications()
   );
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(
-    null
-  );
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
   // UI State
   const [isLoading, setIsLoading] = useState(false);
@@ -154,7 +153,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const createCampaign = (campaign: Campaign) => {
-    setCampaigns([campaign, ...campaigns]);
+    // New campaigns start as "pending" for admin approval
+    const newCampaign = { ...campaign, adminStatus: "pending" } as Campaign;
+    setCampaigns([newCampaign, ...campaigns]);
   };
 
   const updateCampaign = (id: string, updates: Partial<Campaign>) => {
@@ -169,9 +170,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // Update selected campaign if it's the one being updated
     if (selectedCampaign?.id === id) {
       setSelectedCampaign((prev) =>
-        prev
-          ? { ...prev, ...updates, updatedAt: new Date().toISOString() }
-          : null
+        prev ? { ...prev, ...updates, updatedAt: new Date().toISOString() } : null
+      );
+    }
+  };
+
+  // NEW FUNCTION: Admin approve/reject/flag
+  const updateCampaignStatus = (campaignId: string, status: "approved" | "rejected" | "flagged") => {
+    setCampaigns(prev =>
+      prev.map(campaign =>
+        campaign.id === campaignId
+          ? { ...campaign, adminStatus: status, updatedAt: new Date().toISOString() }
+          : campaign
+      )
+    );
+
+    // Also update if it's currently selected
+    if (selectedCampaign?.id === campaignId) {
+      setSelectedCampaign(prev =>
+        prev ? { ...prev, adminStatus: status, updatedAt: new Date().toISOString() } : null
       );
     }
   };
@@ -204,11 +221,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // ============================================================================
 
   const markNotificationAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((notif) =>
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    );
+    setNotifications(notifications.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -227,6 +240,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     selectCampaign,
     createCampaign,
     updateCampaign,
+    updateCampaignStatus,   // ← THIS IS NOW AVAILABLE EVERYWHERE
     donations,
     createDonation,
     updateDonation,
