@@ -1,0 +1,128 @@
+import { useState, useEffect, useCallback } from "react";
+import api from "../services/api";
+
+export interface BeneficiaryCampaign {
+  id?: string;
+  _id?: string;
+  publicId?: string;
+  title: string;
+  description?: string;
+  targetAmount: number;
+  amountRaised?: number;
+  currency?: string;
+  status?: string;
+  confirmationStatus?: "pending" | "provider_confirmed" | "both_confirmed" | "disputed";
+  providerConfirmedAt?: string | null;
+  beneficiaryConfirmedAt?: string | null;
+  beneficiaryConfirmationNote?: string | null;
+  beneficiaryId?: string;
+  providerId?: string | null;
+  provider?: { firstName?: string; lastName?: string; organization?: string };
+  category?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  percentRaised?: number;
+  progressPercentage?: number;
+  donorCount?: number;
+}
+
+export interface BeneficiaryMetrics {
+  totalAidReceived: number;
+  totalDisbursements: number;
+  campaignsSupportingYou: number;
+}
+
+export function useBeneficiaryCampaigns() {
+  const [campaigns, setCampaigns] = useState<BeneficiaryCampaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCampaigns = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get("/campaigns/me");
+      const list = (res.data as { campaigns?: BeneficiaryCampaign[] }).campaigns || [];
+      setCampaigns(
+        list.map((c: BeneficiaryCampaign) => ({
+          ...c,
+          id: c._id || c.id || c.publicId,
+          progressPercentage:
+            c.targetAmount && (c.amountRaised ?? 0) > 0
+              ? Math.min(100, ((c.amountRaised ?? 0) / (typeof c.targetAmount === "number" ? c.targetAmount : 0)) * 100)
+              : 0,
+        }))
+      );
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to load campaigns");
+      setCampaigns([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, [fetchCampaigns]);
+
+  return { campaigns, loading, error, refetch: fetchCampaigns };
+}
+
+export function useBeneficiaryMetrics() {
+  const [metrics, setMetrics] = useState<BeneficiaryMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api
+      .get("/users/me/metrics")
+      .then((res) => {
+        if (cancelled) return;
+        const m = (res.data as { metrics?: BeneficiaryMetrics }).metrics;
+        setMetrics(
+          m
+            ? {
+                totalAidReceived: typeof m.totalAidReceived === "number" ? m.totalAidReceived : 0,
+                totalDisbursements: typeof m.totalDisbursements === "number" ? m.totalDisbursements : 0,
+                campaignsSupportingYou:
+                  typeof m.campaignsSupportingYou === "number" ? m.campaignsSupportingYou : 0,
+              }
+            : null
+        );
+      })
+      .catch((err: any) => {
+        if (!cancelled) {
+          setError(err?.response?.data?.message || "Failed to load metrics");
+          setMetrics(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { metrics, loading, error };
+}
+
+export async function confirmBeneficiaryReceipt(
+  campaignId: string,
+  confirmationNote?: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await api.patch(`/campaigns/${campaignId}/confirm-beneficiary`, {
+      confirmationNote: confirmationNote || undefined,
+    });
+    return { ok: true };
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: err?.response?.data?.message || "Failed to confirm receipt",
+    };
+  }
+}

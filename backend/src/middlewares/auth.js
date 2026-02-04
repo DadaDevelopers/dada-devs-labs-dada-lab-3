@@ -1,7 +1,9 @@
 import { verifyAccessToken } from "../utils/token.js";
+import { User } from "../models/User.js";
 
-// Protect middleware: requires a valid access token
-export const protect = (req, res, next) => {
+// Protect middleware: requires a valid access token. Uses current role/isDeleted from DB so
+// after selectRole the backend sees the correct role even if the client hasn't sent a new token yet.
+export const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer "))
     return res.status(401).json({ message: "Unauthorized" });
@@ -10,14 +12,17 @@ export const protect = (req, res, next) => {
 
   try {
     const payload = verifyAccessToken(token);
-    //Block login for deleted accounts. This prevents donations, campaign creations, payouts, login abuse.
-    if (payload.isDeleted) {
+    const current = await User.findById(payload.userId).select("role isDeleted").lean();
+    if (!current) return res.status(401).json({ message: "Unauthorized" });
+
+    // Use current role and isDeleted from DB so post-onboarding requests see the right role
+    req.user = { userId: payload.userId, role: current.role, isDeleted: current.isDeleted };
+
+    if (req.user.isDeleted) {
       return res.status(403).json({
         message: "Account is scheduled for deletion. Restore to continue."
       });
-    } 
-
-    req.user = payload; // { userId, role }
+    }
     next();
   } catch (err) {
     return res.status(401).json({ message: "Invalid token" });

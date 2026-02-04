@@ -1,6 +1,8 @@
 //Here is not about authentication(no logins, tokens or verification, they are in authController.js)
 import crypto from "crypto";
+import mongoose from "mongoose";
 import { User, RefreshToken } from "../models/User.js";
+import Campaign from "../models/Campaign.js";
 import bcrypt from "bcryptjs";
 import { verifyAccessToken } from "../utils/token.js";
 import Upload from "../models/Upload.js";
@@ -28,6 +30,37 @@ export const getMe = async (req, res, next) => {
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json({ user });
   } catch (err) { next(err); }
+};
+
+/**
+ * GET /api/users/me/metrics — beneficiary dashboard metrics
+ */
+export const getBeneficiaryMetrics = async (req, res, next) => {
+  try {
+    if (req.user.role !== "BENEFICIARY") {
+      return res.status(403).json({ message: "Only beneficiaries can access metrics" });
+    }
+    const beneficiaryId = req.user.userId;
+
+    const campaigns = await Campaign.find({ beneficiaryId }).select("amountRaised status");
+    let totalAidReceived = 0;
+    campaigns.forEach((c) => {
+      if (c.amountRaised) totalAidReceived += parseFloat(c.amountRaised.toString());
+    });
+    const campaignsSupportingYou = campaigns.filter((c) => c.status === "ACTIVE").length;
+    // totalDisbursements: stub until Disbursement/Payment flow is implemented
+    const totalDisbursements = 0;
+
+    res.json({
+      metrics: {
+        totalAidReceived,
+        totalDisbursements,
+        campaignsSupportingYou
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 // Update current user's profile
@@ -447,6 +480,7 @@ export const adminVerifyIdentity = async (req, res, next) => {
 
 export default {
   getMe,
+  getBeneficiaryMetrics,
   updateProfile,
   setConsentContact,
   requestEmailChange,

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../contexts/AppContext";
-import { mockDataService } from "../services/mockData";
+import { useBeneficiaryCampaigns, confirmBeneficiaryReceipt } from "../hooks/useBeneficiaryApi";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import {
@@ -20,52 +19,34 @@ import {
 
 const BeneficiaryConfirmation = () => {
   const navigate = useNavigate();
-  const { campaigns, updateCampaign } = useApp();
-  const beneficiary = mockDataService.getBeneficiaryUser();
-
+  const { campaigns, loading: campaignsLoading, error: campaignsError, refetch } = useBeneficiaryCampaigns();
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmationNote, setConfirmationNote] = useState<
-    Record<string, string>
-  >({});
+  const [confirmationNote, setConfirmationNote] = useState<Record<string, string>>({});
 
-  // Get campaigns for this beneficiary that need confirmation
   const campaignsNeedingConfirmation = campaigns.filter(
-    (c) =>
-      c.beneficiaryId === beneficiary.id &&
-      c.confirmationStatus === "provider_confirmed"
+    (c) => c.confirmationStatus === "provider_confirmed"
   );
-
-  // Get already confirmed campaigns
-  const confirmedCampaigns = campaigns.filter(
-    (c) =>
-      c.beneficiaryId === beneficiary.id &&
-      c.confirmationStatus === "both_confirmed"
-  );
+  const confirmedCampaigns = campaigns.filter((c) => c.beneficiaryReceipt);
 
   const handleConfirmReceipt = async (campaignId: string) => {
     setConfirmingId(campaignId);
-    setIsSubmitting(true);
-
-    // Simulate confirmation processing
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    const campaign = campaigns.find((c) => c.id === campaignId);
-    if (campaign) {
-      updateCampaign(campaignId, {
-        confirmationStatus: "both_confirmed",
-        beneficiaryConfirmedAt: new Date().toISOString(),
-      });
-    }
-
+    const note = confirmationNote[campaignId];
+    const result = await confirmBeneficiaryReceipt(campaignId, note);
     setConfirmingId(null);
-    setIsSubmitting(false);
-    setConfirmationNote((prev) => ({ ...prev, [campaignId]: "" }));
+    if (result.ok) {
+      setConfirmationNote((prev) => ({ ...prev, [campaignId]: "" }));
+      refetch();
+    } else {
+      alert(result.error || "Failed to confirm receipt");
+    }
   };
 
   const getProgressPercentage = (campaign: any) => {
-    return Math.min((campaign.amountRaised / campaign.targetAmount) * 100, 100);
+    const target = Number(campaign.targetAmount ?? 0);
+    const raised = Number(campaign.amountRaised ?? 0);
+    if (!target) return 0;
+    return Math.min((raised / target) * 100, 100);
   };
 
   return (
@@ -91,8 +72,16 @@ const BeneficiaryConfirmation = () => {
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {campaignsError && (
+          <p className="text-sm text-red-600 mb-4" role="alert">
+            {campaignsError}
+          </p>
+        )}
+        {campaignsLoading && (
+          <p className="text-gray-600 mb-4">Loading campaigns…</p>
+        )}
         {/* Pending Confirmations */}
-        {campaignsNeedingConfirmation.length > 0 && (
+        {!campaignsLoading && campaignsNeedingConfirmation.length > 0 && (
           <div className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
               Pending Confirmations
@@ -134,13 +123,15 @@ const BeneficiaryConfirmation = () => {
 
                           {/* Quick Info */}
                           <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-4 h-4" />
-                              {campaign.location}
-                            </div>
+                            {(campaign as any).location && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-4 h-4" />
+                                {(campaign as any).location}
+                              </div>
+                            )}
                             <div className="flex items-center gap-1">
                               <DollarSign className="w-4 h-4" />$
-                              {campaign.targetAmount.toLocaleString()}
+                              {Number(campaign.targetAmount ?? 0).toLocaleString()}
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="w-4 h-4" />
@@ -209,13 +200,13 @@ const BeneficiaryConfirmation = () => {
                               <div>
                                 <p className="text-gray-600">Amount Raised</p>
                                 <p className="font-semibold text-indigo-600 text-lg">
-                                  ${campaign.amountRaised.toLocaleString()}
+                                  ${Number(campaign.amountRaised ?? 0).toLocaleString()}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-gray-600">Target Amount</p>
                                 <p className="font-semibold text-gray-900">
-                                  ${campaign.targetAmount.toLocaleString()}
+                                  ${Number(campaign.targetAmount ?? 0).toLocaleString()}
                                 </p>
                               </div>
                               <div>
@@ -363,11 +354,11 @@ const BeneficiaryConfirmation = () => {
                           <Button
                             onClick={() => handleConfirmReceipt(campaign.id)}
                             disabled={
-                              isSubmitting && confirmingId === campaign.id
+                              confirmingId === campaign.id
                             }
                             className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
                           >
-                            {isSubmitting && confirmingId === campaign.id
+                            {confirmingId === campaign.id
                               ? "Confirming Receipt..."
                               : "Confirm Service Receipt"}
                           </Button>
@@ -382,7 +373,7 @@ const BeneficiaryConfirmation = () => {
         )}
 
         {/* Completed Confirmations */}
-        {confirmedCampaigns.length > 0 && (
+        {!campaignsLoading && confirmedCampaigns.length > 0 && (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
               Completed Confirmations
@@ -433,7 +424,7 @@ const BeneficiaryConfirmation = () => {
                             </div>
                             <div className="flex items-center gap-1">
                               <DollarSign className="w-4 h-4" />$
-                              {campaign.amountRaised.toLocaleString()}
+                              {Number(campaign.amountRaised ?? 0).toLocaleString()}
                             </div>
                           </div>
                         </div>
@@ -488,7 +479,7 @@ const BeneficiaryConfirmation = () => {
                               <div>
                                 <p className="text-gray-600">Total Raised</p>
                                 <p className="font-semibold text-green-600 text-lg">
-                                  ${campaign.amountRaised.toLocaleString()}
+                                  ${Number(campaign.amountRaised ?? 0).toLocaleString()}
                                 </p>
                               </div>
                               <div>
@@ -539,7 +530,8 @@ const BeneficiaryConfirmation = () => {
         )}
 
         {/* Empty State */}
-        {campaignsNeedingConfirmation.length === 0 &&
+        {!campaignsLoading &&
+          campaignsNeedingConfirmation.length === 0 &&
           confirmedCampaigns.length === 0 && (
             <Card className="p-12 text-center">
               <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />

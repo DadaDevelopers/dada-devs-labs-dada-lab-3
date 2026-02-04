@@ -1,6 +1,7 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
 export const API_BASE = "https://directaid-backend.onrender.com/api";
+// export const API_BASE = "http://localhost:5000/api";
 
 // Create an axios-like API instance
 interface ApiInstance {
@@ -12,6 +13,7 @@ interface ApiInstance {
   get: (url: string, config?: any) => Promise<any>;
   post: (url: string, data?: any, config?: any) => Promise<any>;
   put: (url: string, data?: any, config?: any) => Promise<any>;
+  patch: (url: string, data?: any, config?: any) => Promise<any>;
   delete: (url: string, config?: any) => Promise<any>;
 }
 
@@ -33,23 +35,21 @@ async function fetchWrapper(
       },
     };
 
-    if (data && (method === "POST" || method === "PUT")) {
+    if (data && (method === "POST" || method === "PUT" || method === "PATCH")) {
       options.body = JSON.stringify(data);
     }
 
     const res = await fetch(fullUrl, options);
+    const responseData = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      // Simulate axios error structure
-      const error: any = new Error("Network error");
-      error.response = {
-        data: { message: `Request failed with status ${res.status}` },
-        status: res.status,
-      };
+      const error: any = new Error(
+        (responseData as { message?: string })?.message || `Request failed with status ${res.status}`
+      );
+      error.response = { data: responseData, status: res.status };
       throw error;
     }
 
-    const responseData = await res.json();
     return { data: responseData };
   } catch (err: any) {
     // If it's already our custom error, rethrow it
@@ -64,16 +64,16 @@ async function fetchWrapper(
 async function handleDemoFallback(url: string, method: string, data?: any) {
   await new Promise((r) => setTimeout(r, 400));
 
-  // Login endpoint
+  // Login endpoint — when backend is unreachable, return UNASSIGNED so user is sent to onboarding, not donor dashboard
   if (url.includes("/auth/login")) {
     return {
       data: {
-        token: "demo-token-" + Date.now(),
+        accessToken: "demo-token-" + Date.now(),
         user: {
           id: "demo-user-" + Date.now(),
           email: data?.email || "demo@example.com",
-          name: "Demo User",
-          role: "donor",
+          firstName: "Demo",
+          role: "UNASSIGNED",
         },
       },
     };
@@ -101,25 +101,34 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
     };
   }
 
-  // User profile endpoint
-  if (url.includes("/user/me")) {
+  // User profile endpoint (both /user/me and /users/me for compatibility)
+  if (url.includes("/user/me") || url.includes("/users/me")) {
     if (method === "PUT") {
       return {
         data: {
-          id: "demo-user",
-          email: "demo@example.com",
-          name: data?.name || "Demo User",
-          role: "donor",
-          ...data,
+          user: {
+            id: "demo-user",
+            _id: "demo-user",
+            email: "demo@example.com",
+            firstName: data?.firstName ?? "Demo",
+            lastName: data?.lastName ?? "User",
+            role: "BENEFICIARY",
+            beneficiaryProfile: data?.beneficiaryProfile ?? {},
+          },
         },
       };
     }
     return {
       data: {
-        id: "demo-user",
-        email: "demo@example.com",
-        name: "Demo User",
-        role: "donor",
+        user: {
+          id: "demo-user",
+          _id: "demo-user",
+          email: "demo@example.com",
+          firstName: "Demo",
+          lastName: "User",
+          role: "BENEFICIARY",
+          beneficiaryProfile: {},
+        },
       },
     };
   }
@@ -179,6 +188,8 @@ const api: ApiInstance = {
     fetchWrapper(url, "POST", data, config?.headers),
   put: (url: string, data?: any, config?: any) =>
     fetchWrapper(url, "PUT", data, config?.headers),
+  patch: (url: string, data?: any, config?: any) =>
+    fetchWrapper(url, "PATCH", data, config?.headers),
   delete: (url: string, config?: any) =>
     fetchWrapper(url, "DELETE", undefined, config?.headers),
 };

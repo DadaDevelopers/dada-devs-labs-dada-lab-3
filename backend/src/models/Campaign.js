@@ -36,6 +36,15 @@ const CampaignSchema = new Schema(
     // optional category or tags for filtering
     category: { type: String, index: true },
 
+    // confirmation flow: provider confirms they will provide the service (campaign is valid)
+    confirmationStatus: {
+      type: String,
+      enum: ["pending", "provider_confirmed", "disputed"],
+      default: "pending",
+      index: true
+    },
+    providerConfirmedAt: { type: Date, default: null },
+
     // optional metadata
     metadata: { type: Schema.Types.Mixed, default: {} }
   },

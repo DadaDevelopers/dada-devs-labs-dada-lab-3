@@ -6,7 +6,7 @@ import { logActivity } from "../utils/activityLogger.js";
 function formatCampaign(c) {
   if (!c) return c;
 
-  const obj = c.toObject({ getters: true, virtuals: true });
+  const obj = c.toObject ? c.toObject({ getters: true, virtuals: true }) : c;
 
   if (obj.targetAmount) obj.targetAmount = parseFloat(obj.targetAmount.toString());
   if (obj.amountRaised) obj.amountRaised = parseFloat(obj.amountRaised.toString());
@@ -57,7 +57,7 @@ export const createCampaign = async (req, res, next) => {
 };
 
 /**
- * Get All Campaigns - add simple filters/pagination
+ * Get All Campaigns - add simple filters/pagination (includes beneficiaryId, confirmationStatus)
  */
 export const getAllCampaigns = async (req, res, next) => {
   try {
@@ -67,7 +67,9 @@ export const getAllCampaigns = async (req, res, next) => {
       search,
       status,
       adminStatus,
-      category
+      category,
+      beneficiaryId,
+      confirmationStatus
     } = req.query;
 
     const filter = {};
@@ -82,6 +84,8 @@ export const getAllCampaigns = async (req, res, next) => {
     if (status) filter.status = status;
     if (adminStatus) filter.adminStatus = adminStatus;
     if (category) filter.category = category;
+    if (beneficiaryId) filter.beneficiaryId = beneficiaryId;
+    if (confirmationStatus) filter.confirmationStatus = confirmationStatus;
 
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -100,6 +104,40 @@ export const getAllCampaigns = async (req, res, next) => {
       limit: Number(limit),
       total,
       campaigns: campaigns.map(formatCampaign)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get authenticated beneficiary's campaigns (GET /api/campaigns/me)
+ */
+export const getMyCampaigns = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status, confirmationStatus } = req.query;
+    const filter = { beneficiaryId: req.user.userId };
+    if (status) filter.status = status;
+    if (confirmationStatus) filter.confirmationStatus = confirmationStatus;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [campaigns, total] = await Promise.all([
+      Campaign.find(filter)
+        .populate("beneficiaryId", "firstName lastName email")
+        .populate("providerId", "firstName lastName organization phoneNumber")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Campaign.countDocuments(filter)
+    ]);
+
+    const formatted = campaigns.map((c) => formatCampaign(c));
+
+    res.json({
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      campaigns: formatted
     });
   } catch (err) {
     next(err);

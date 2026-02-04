@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { mockDataService } from "../../services/mockData";
+import { useBeneficiaryCampaigns, useBeneficiaryMetrics } from "../../hooks/useBeneficiaryApi";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
@@ -19,7 +18,6 @@ import {
   Eye,
   CheckCircle,
   Clock,
-  Filter,
   User,
   MapPin,
   Bell,
@@ -28,45 +26,30 @@ import {
 
 const BeneficiaryFunds = () => {
   const navigate = useNavigate();
-  const { campaigns } = useApp();
-  const { logout } = useAuth();
-  const beneficiary = mockDataService.getBeneficiaryUser();
-  const metrics = mockDataService.getBeneficiaryMetrics();
-  
+  const { user, logout } = useAuth();
+  const { campaigns: userCampaigns, loading: campaignsLoading, error: campaignsError } = useBeneficiaryCampaigns();
+  const { metrics, loading: metricsLoading, error: metricsError } = useBeneficiaryMetrics();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  // Get campaigns for this beneficiary
-  const userCampaigns = campaigns.filter(
-    (c) => c.beneficiaryId === beneficiary.id
-  );
+  const beneficiaryName = user?.firstName || user?.name || user?.email || "User";
 
-  // Mock disbursement data
-  const disbursements = [
-    {
-      id: "disb_001",
-      campaignId: userCampaigns[0]?.id,
-      amount: 250000, // in cents
-      status: "completed",
-      disbursedAt: "2024-11-15T10:30:00Z",
-      description: "Initial emergency relief disbursement",
-      transactionRef: "TXN-2024-001",
-    },
-    {
-      id: "disb_002", 
-      campaignId: userCampaigns[0]?.id,
-      amount: 150000,
-      status: "pending",
-      disbursedAt: "2024-11-20T14:15:00Z",
-      description: "Medical supplies procurement",
-      transactionRef: "TXN-2024-002",
-    },
-  ];
+  // Disbursements: backend endpoint not yet implemented — show empty until GET /api/beneficiaries/me/disbursements exists
+  const disbursements: Array<{
+    id: string;
+    campaignId?: string;
+    amount: number;
+    status: string;
+    disbursedAt: string;
+    description: string;
+    transactionRef: string;
+  }> = [];
 
-  const filteredDisbursements = disbursements.filter((disbursement) => {
-    const campaign = campaigns.find((c) => c.id === disbursement.campaignId);
-    const matchesSearch = campaign?.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === "all" || disbursement.status === filterStatus;
+  const filteredDisbursements = disbursements.filter((d) => {
+    const campaign = userCampaigns.find((c) => c.id === d.campaignId);
+    const matchesSearch = campaign?.title?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus === "all" || d.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
 
@@ -98,7 +81,7 @@ const BeneficiaryFunds = () => {
   return (
     <DashboardLayout
       navItems={navItems}
-      userName={beneficiary.name}
+      userName={beneficiaryName}
       userRole="Aid Beneficiary"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -127,6 +110,11 @@ const BeneficiaryFunds = () => {
           </Button>
         </div>
 
+        {(campaignsError || metricsError) && (
+          <p className="text-sm text-destructive" role="alert">
+            {campaignsError || metricsError}
+          </p>
+        )}
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Card className="p-4 sm:p-6 card-elevated">
@@ -137,7 +125,7 @@ const BeneficiaryFunds = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Total Received</p>
                 <p className="text-2xl font-bold">
-                  ${(metrics.totalAidReceived / 100).toFixed(0)}
+                  {metricsLoading ? "…" : `$${Number(metrics?.totalAidReceived ?? 0).toFixed(0)}`}
                 </p>
               </div>
             </div>
@@ -149,9 +137,9 @@ const BeneficiaryFunds = () => {
                 <TrendingUp className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Last Disbursement</p>
+                <p className="text-sm text-muted-foreground">Disbursements</p>
                 <p className="text-2xl font-bold">
-                  ${(metrics.totalDisbursements / 100).toFixed(0)}
+                  {metricsLoading ? "…" : `$${Number(metrics?.totalDisbursements ?? 0).toFixed(0)}`}
                 </p>
               </div>
             </div>
@@ -164,7 +152,7 @@ const BeneficiaryFunds = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Active Campaigns</p>
-                <p className="text-2xl font-bold">{userCampaigns.length}</p>
+                <p className="text-2xl font-bold">{campaignsLoading ? "…" : userCampaigns.length}</p>
               </div>
             </div>
           </Card>
@@ -199,7 +187,7 @@ const BeneficiaryFunds = () => {
         <div className="space-y-4">
           {filteredDisbursements.length > 0 ? (
             filteredDisbursements.map((disbursement) => {
-              const campaign = campaigns.find((c) => c.id === disbursement.campaignId);
+              const campaign = userCampaigns.find((c) => c.id === disbursement.campaignId);
               return (
                 <Card key={disbursement.id} className="p-4 sm:p-6 card-elevated">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -276,9 +264,9 @@ const BeneficiaryFunds = () => {
               <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="font-semibold text-lg mb-2">No disbursements found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || filterStatus !== "all" 
+                {searchTerm || filterStatus !== "all"
                   ? "Try adjusting your search or filters"
-                  : "No fund disbursements have been made yet"
+                  : "No disbursements yet. Disbursements will appear here once funds are released from your campaigns."
                 }
               </p>
               <Button
@@ -291,26 +279,35 @@ const BeneficiaryFunds = () => {
           )}
         </div>
 
-        {/* Monthly Breakdown */}
+        {/* Monthly Breakdown — driven by GET /api/beneficiaries/me/disbursements (see BACKEND_HANDOFF_BENEFICIARY.md) */}
         <Card className="p-4 sm:p-6 card-elevated">
-          <h2 className="text-xl font-bold mb-4">Monthly Breakdown</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-secondary/30">
-              <p className="text-sm text-muted-foreground mb-1">November 2024</p>
-              <p className="text-xl font-bold">$4,000</p>
-              <p className="text-xs text-green-600">2 disbursements</p>
+          <h2 className="text-xl font-bold mb-4">Monthly breakdown</h2>
+          {filteredDisbursements.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {(() => {
+                const byMonth = new Map<string, { amount: number; count: number }>();
+                filteredDisbursements.forEach((d) => {
+                  const month = new Date(d.disbursedAt).toLocaleString("default", { month: "long", year: "numeric" });
+                  const prev = byMonth.get(month) ?? { amount: 0, count: 0 };
+                  const amt = typeof d.amount === "number" ? d.amount : Number(d.amount) || 0;
+                  byMonth.set(month, { amount: prev.amount + amt, count: prev.count + 1 });
+                });
+                return Array.from(byMonth.entries())
+                  .slice(0, 6)
+                  .map(([month, { amount, count }]) => (
+                    <div key={month} className="p-4 rounded-xl bg-[var(--color-secondary-bg)] border border-white/10">
+                      <p className="text-sm text-[var(--color-text-light)]/70 mb-1">{month}</p>
+                      <p className="text-xl font-bold text-[var(--color-text-light)]">${Number(amount).toFixed(0)}</p>
+                      <p className="text-xs text-[var(--color-accent)]">{count} disbursement{count !== 1 ? "s" : ""}</p>
+                    </div>
+                  ));
+              })()}
             </div>
-            <div className="p-4 rounded-lg bg-secondary/30">
-              <p className="text-sm text-muted-foreground mb-1">October 2024</p>
-              <p className="text-xl font-bold">$2,500</p>
-              <p className="text-xs text-green-600">1 disbursement</p>
-            </div>
-            <div className="p-4 rounded-lg bg-secondary/30">
-              <p className="text-sm text-muted-foreground mb-1">September 2024</p>
-              <p className="text-xl font-bold">$1,800</p>
-              <p className="text-xs text-green-600">1 disbursement</p>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4">
+              Monthly breakdown will appear here once disbursements are available. It is derived from the disbursements list when the backend implements <code className="text-xs bg-muted px-1 rounded">GET /api/beneficiaries/me/disbursements</code>.
+            </p>
+          )}
         </Card>
       </div>
     </DashboardLayout>
