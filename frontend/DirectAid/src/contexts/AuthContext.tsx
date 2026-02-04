@@ -97,6 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.post("/auth/login", { email, password });
       const { user: u, token: t } = res.data as { user: User; token: string };
 
+      api.setAuthToken(t);
+
       setUser(u);
       setRole(u.role || null);
       setToken(t);
@@ -120,6 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.post("/auth/signup", payload);
       const { user: u, token: t } = res.data as { user: User; token: string };
 
+      api.setAuthToken(t)
+
       setUser(u);
       setRole(u.role || null);
       setToken(t);
@@ -134,6 +138,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: message };
     }
   };
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem("t");
+    if (storedToken) {
+      api.setAuthToken(storedToken);
+    }
+  }, []);
 
   // Update Profile
   const updateProfile = async (updates: Partial<User>) => {
@@ -161,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setRole(null);
     setToken(null);
+    api.setAuthToken(null);
     saveToStorage(null, null);
   };
 

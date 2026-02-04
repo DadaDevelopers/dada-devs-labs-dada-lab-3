@@ -8,9 +8,6 @@ import type {
   User,
   Campaign,
   Donation,
-  Invoice,
-  Provider,
-  Beneficiary,
   Notification,
 } from "../types";
 import {
@@ -160,14 +157,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const updateCampaign = (id: string, updates: Partial<Campaign>) => {
     setCampaigns(
       campaigns.map((campaign) =>
-        campaign.id === id
+        campaign._id === id
           ? { ...campaign, ...updates, updatedAt: new Date().toISOString() }
           : campaign
       )
     );
 
     // Update selected campaign if it's the one being updated
-    if (selectedCampaign?.id === id) {
+    if (selectedCampaign?._id === id) {
       setSelectedCampaign((prev) =>
         prev
           ? { ...prev, ...updates, updatedAt: new Date().toISOString() }
@@ -186,7 +183,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // Update campaign amount raised
     updateCampaign(donation.campaignId, {
       amountRaised:
-        (campaigns.find((c) => c.id === donation.campaignId)?.amountRaised ||
+        (campaigns.find((c) => c._id === donation.campaignId)?.amountRaised ||
           0) + donation.amount,
     });
   };

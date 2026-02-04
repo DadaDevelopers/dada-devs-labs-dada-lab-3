@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
-import { mockDataService } from "../services/mockData";
+import api from "../services/api";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -21,7 +21,6 @@ type Step = "info" | "invoice" | "review" | "success";
 
 const CampaignCreationWizard = () => {
   const navigate = useNavigate();
-  const { currentUser, campaigns } = useApp();
   const [currentStep, setCurrentStep] = useState<Step>("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -77,41 +76,34 @@ const CampaignCreationWizard = () => {
     );
   };
 
-  // Handlers for Step 3: Review
   const handleCreateCampaign = async () => {
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // 1. Prepare the data for the backend
+      const campaignPayload = {
+        title: formData.title,
+        description: formData.description,
+        targetAmount: parseFloat(formData.targetAmount),
+        category: formData.category,
+        location: formData.location,
+        fundraisingDeadline: formData.fundraisingDeadline,
+        // Note: For files (invoices), usually you'd use FormData, 
+        // but let's start with the basic text data first.
+      };
 
-    // Create campaign object
-    const campaign = {
-      id: `camp_${Date.now()}`,
-      providerId: currentUser?.id || "",
-      title: formData.title,
-      description: formData.description,
-      targetAmount: parseFloat(formData.targetAmount) * 250000, // Convert to satoshis
-      raisedAmount: 0,
-      lockedFunds: 0,
-      unlockedFunds: 0,
-      category: formData.category,
-      status: "active" as const,
-      location: formData.location,
-      beneficiaryId: "",
-      invoiceHash: `0x${Math.random().toString(16).slice(2)}`,
-      dualConfirmationRequired: true,
-      confirmedByProvider: true,
-      confirmedByBeneficiary: false,
-      createdAt: new Date().toISOString(),
-      deadline: formData.fundraisingDeadline,
-      beneficiaryName: "",
-      invoiceAmount: parseFloat(invoiceData.invoiceAmount) * 250000,
-      invoiceDate: invoiceData.invoiceDate,
-    };
+      // 2. The REAL API Call
+      const response = await api.post("/campaigns", campaignPayload);
 
-    setNewCampaign(campaign);
-    setCurrentStep("success");
-    setIsSubmitting(false);
+      // 3. Use the response from the server
+      setNewCampaign(response.data);
+      setCurrentStep("success");
+    } catch (error: any) {
+      console.error("Failed to create campaign:", error);
+      alert(error?.response?.data?.message || "Error creating campaign");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBackToDashboard = () => {

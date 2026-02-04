@@ -127,6 +127,8 @@ export interface Campaign {
   beneficiary: Partial<Beneficiary>;
   invoiceId: string;
   invoice: Invoice;
+  providerConfirmed: boolean;
+  invoices: Invoice[];
   title: string;
   description: string;
   category: "medical" | "education" | "emergency" | "business" | "other";
