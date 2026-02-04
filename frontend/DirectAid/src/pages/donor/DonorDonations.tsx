@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { mockDataService } from "../../services/mockData";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
@@ -10,7 +11,6 @@ import {
   LayoutDashboard,
   Heart,
   Receipt,
-  Settings,
   ArrowLeft,
   Search,
   Filter,
@@ -18,11 +18,17 @@ import {
   Calendar,
   DollarSign,
   ExternalLink,
+  User,
+  CreditCard,
+  Bell,
+  Lock,
+  FolderKanban,
 } from "lucide-react";
 
 const DonorDonations = () => {
   const navigate = useNavigate();
   const { campaigns, donations } = useApp();
+  const { logout } = useAuth();
   const donor = mockDataService.getDonorUser();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -45,6 +51,11 @@ const DonorDonations = () => {
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
+      label: "Campaigns",
+      href: "/donor/campaigns",
+      icon: <FolderKanban className="w-5 h-5" />,
+    },
+    {
       label: "My Donations",
       href: "/donor/donations",
       icon: <Heart className="w-5 h-5" />,
@@ -54,15 +65,26 @@ const DonorDonations = () => {
       href: "/donor/receipts",
       icon: <Receipt className="w-5 h-5" />,
     },
-    {
-      label: "Settings",
-      href: "/donor/settings",
-      icon: <Settings className="w-5 h-5" />,
-    },
+  ];
+
+  const settingsNavItems = [
+    { id: "profile", label: "Profile", href: "/donor/settings/profile", icon: <User className="w-5 h-5" /> },
+    { id: "payment", label: "Payment Methods", href: "/donor/settings/payment", icon: <CreditCard className="w-5 h-5" /> },
+    { id: "notifications", label: "Notifications", href: "/donor/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+    { id: "change-password", label: "Change Password", href: "/donor/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
   return (
-    <DashboardLayout navItems={navItems} userName={donor.name} userRole="Donor">
+    <DashboardLayout 
+      navItems={navItems} 
+      userName={donor.name} 
+      userRole="Donor"
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
+    >
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

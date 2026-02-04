@@ -7,8 +7,6 @@ export type UserRole =
   | "provider"
   | "beneficiary"
   | "admin"
-  | "verifier"
-  | "ngo";
 
 export interface User {
   id: string;
@@ -28,7 +26,7 @@ export interface AuthResponse {
 // PROVIDER TYPES
 // ============================================================================
 
-export type ProviderType = "hospital" | "school" | "pharmacy" | "ngo" | "other";
+export type ProviderType = "hospital" | "school" | "pharmacy" | "other";
 export type ProviderStatus = "pending" | "verified" | "rejected" | "suspended";
 export type KYCStatus =
   | "pending"
@@ -105,6 +103,8 @@ export interface AidRequest {
 // CAMPAIGN TYPES
 // ============================================================================
 
+// src/types/index.ts — FINAL CLEAN VERSION
+
 export type CampaignStatus =
   | "draft"
   | "pending_approval"
@@ -113,6 +113,7 @@ export type CampaignStatus =
   | "cancelled"
   | "in_progress"
   | "paused";
+
 export type ConfirmationStatus =
   | "pending"
   | "provider_confirmed"
@@ -138,7 +139,10 @@ export interface Campaign {
   donorCount: number;
   status: CampaignStatus;
 
-  // Confirmation Model
+  // ADMIN APPROVAL FLOW — NEW
+  adminStatus: "pending" | "approved" | "rejected" | "flagged";
+
+  // CONFIRMATION FLOW (Provider + Beneficiary) — KEEP ONLY ONE
   confirmationStatus: ConfirmationStatus;
   providerConfirmedAt?: string;
   beneficiaryConfirmedAt?: string;

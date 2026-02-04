@@ -5,9 +5,16 @@ import { Button } from "../../components/ui/Button";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Input } from "../../components/ui/input";
 import { Sheet, SheetContent } from "../../components/ui/sheet";
-import { Search, Bell, Menu } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 
 interface NavItem {
+  label: string;
+  href: string;
+  icon: ReactNode;
+}
+
+interface SettingsNavItem {
+  id: string;
   label: string;
   href: string;
   icon: ReactNode;
@@ -18,6 +25,8 @@ interface DashboardLayoutProps {
   navItems: NavItem[];
   userName: string;
   userRole: string;
+  settingsNavItems?: SettingsNavItem[];
+  onLogout?: () => void;
 }
 
 export const DashboardLayout = ({
@@ -25,38 +34,99 @@ export const DashboardLayout = ({
   navItems,
   userName,
   userRole,
+  settingsNavItems,
+  onLogout,
 }: DashboardLayoutProps) => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const NavContent = () => (
-    <nav className="p-4 space-y-2">
-      {navItems.map((item) => {
-        const isActive = location.pathname === item.href;
-        return (
-          <Link
-            key={item.href}
-            to={item.href}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <button
-              className={`
-              flex w-full items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-300
-              ${
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-md btn-cta"
-                  : "bg-card text-card-foreground hover:text-[var(--color-accent)] hover:shadow-lg hover:bg-card/80"
-              }
-            `}
+  const NavContent = () => {
+    return (
+      <nav className="p-4 space-y-1">
+        {/* Main Navigation Items */}
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              to={item.href}
+              onClick={() => setMobileMenuOpen(false)}
             >
-              {item.icon}
-              {item.label}
-            </button>
-          </Link>
-        );
-      })}
-    </nav>
-  );
+              <button
+                className={`
+                  flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
+                  transition-colors duration-200
+                  ${
+                    isActive
+                      ? "bg-white/5 text-[var(--color-text-light)]"
+                      : "bg-transparent text-white/70 hover:bg-white/5 hover:text-white/90"
+                  }
+                `}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            </Link>
+          );
+        })}
+        
+        {/* Settings Navigation - Always Visible */}
+        {settingsNavItems && settingsNavItems.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-white/10">
+            {/* Settings Heading - Non-clickable */}
+            <div className="px-3 py-2 mb-1">
+              <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider">
+                Settings
+              </h3>
+            </div>
+            {settingsNavItems.map((item) => {
+              const isActive = location.pathname === item.href;
+              return (
+                <Link
+                  key={item.id}
+                  to={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <button
+                    className={`
+                      flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
+                      transition-colors duration-200
+                      ${
+                        isActive
+                          ? "bg-white/5 text-[var(--color-text-light)]"
+                          : "bg-transparent text-white/70 hover:bg-white/5 hover:text-white/90"
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                </Link>
+              );
+            })}
+            
+            {/* Logout Button */}
+            {onLogout && (
+              <button
+                onClick={() => {
+                  onLogout();
+                  setMobileMenuOpen(false);
+                }}
+                className="
+                  flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
+                  transition-colors duration-200
+                  bg-transparent text-white/70 hover:bg-white/5 hover:text-white/90
+                  mt-1
+                "
+              >
+                Logout
+              </button>
+            )}
+          </div>
+        )}
+      </nav>
+    );
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -65,9 +135,9 @@ export const DashboardLayout = ({
         className="hidden lg:flex lg:flex-col w-64 h-screen border-r border-border  flex-shrink-0 sticky top-0 overflow-y-auto"
         style={{ backgroundColor: "var(--color-secondary-bg)" }}
       >
-        <div className="p-6 border-b border-border">
+        <div className="h-16 flex items-center px-6 border-b border-border">
           <Link to="/">
-            <h1 className="text-3xl font-bold text-[var(--color-accent)]">
+            <h1 className="text-2xl font-bold text-[var(--color-accent)]">
               DirectAid
             </h1>
           </Link>
@@ -91,7 +161,7 @@ export const DashboardLayout = ({
       <div className="flex-1 flex flex-col min-w-0 overflow-auto">
         {/* Top Bar */}
         <header
-          className="border-b border-border bg-card px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4"
+          className="h-16 border-b border-border bg-card px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4"
           style={{ backgroundColor: "var(--color-secondary-bg)" }}
         >
           {/* Mobile Menu Toggle */}
@@ -104,26 +174,8 @@ export const DashboardLayout = ({
             <Menu className="w-5 h-5" />
           </Button>
 
-          {/* Search - Hidden on mobile */}
-          <div className="hidden sm:block flex-1 max-w-xl relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search campaigns..."
-              className="pl-10 rounded-full bg-[#0B1221]"
-            />
-          </div>
-
           {/* Right Side Icons */}
           <div className="flex items-center gap-2 sm:gap-4 ml-auto">
-            {/* Mobile Search Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full sm:hidden"
-            >
-              <Search className="w-5 h-5" />
-            </Button>
-
             <Button variant="ghost" size="icon" className="rounded-full">
               <Bell className="w-5 h-5" />
             </Button>

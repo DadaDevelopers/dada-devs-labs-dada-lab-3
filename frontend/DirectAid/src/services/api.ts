@@ -1,5 +1,4 @@
 const API_BASE = import.meta.env.VITE_BASE_URL;
-
 interface ApiInstance {
   defaults: {
     headers: {
@@ -77,6 +76,88 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
     };
   }
 
+  // Register endpoint
+  if (url.includes("/auth/register")) {
+    return {
+      data: {
+        accessToken: "demo-access-token-" + Date.now(),
+        user: {
+          id: "demo-user-" + Date.now(),
+          email: data?.email || "demo@example.com",
+          firstName: data?.firstName || "Demo",
+          role: data?.role || "UNASSIGNED",
+        },
+      },
+    };
+  }
+
+  // Forgot password endpoint
+  if (url.includes("/auth/forgot-password")) {
+    return {
+      data: { success: true, message: "Password reset email sent" },
+    };
+  }
+
+  // User profile endpoint
+  if (url.includes("/user/me")) {
+    if (method === "PUT") {
+      return {
+        data: {
+          id: "demo-user",
+          email: "demo@example.com",
+          name: data?.name || "Demo User",
+          role: "donor",
+          ...data,
+        },
+      };
+    }
+    return {
+      data: {
+        id: "demo-user",
+        email: "demo@example.com",
+        name: "Demo User",
+        role: "donor",
+      },
+    };
+  }
+
+  // Donate guest endpoint
+  if (url.includes("/donate/guest")) {
+    return {
+      data: { success: true, receiptId: "demo-receipt-1234" },
+    };
+  }
+
+  // Public providers list endpoint
+  if (url.includes("/providers/public")) {
+    return {
+      data: {
+        providers: [
+          {
+            id: "provider_001",
+            organizationName: "Global Relief Foundation",
+            organizationType: "other",
+            city: "Lagos",
+            country: "Nigeria",
+          },
+          {
+            id: "provider_002",
+            organizationName: "City General Hospital",
+            organizationType: "hospital",
+            city: "Nairobi",
+            country: "Kenya",
+          },
+          {
+            id: "provider_003",
+            organizationName: "Hope Education Center",
+            organizationType: "school",
+            city: "Accra",
+            country: "Ghana",
+          },
+        ],
+      },
+    };
+  }
   return { data: { success: true } };
 }
 

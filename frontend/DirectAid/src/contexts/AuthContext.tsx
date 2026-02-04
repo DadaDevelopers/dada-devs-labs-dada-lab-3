@@ -15,7 +15,7 @@ interface User {
   id: string | number;
   name?: string;
   email?: string;
-  role?: Role;
+  role?: Role | string;
   [key: string]: any;
 }
 
@@ -30,6 +30,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: any }>;
   signup: (payload: any) => Promise<{ ok: boolean; error?: any }>;
   updateProfile: (updates: Partial<User>) => Promise<{ ok: boolean; user?: User; error?: any }>;
+  selectRoleAndOnboard: (payload: any) => Promise<{ ok: boolean; user?: User; error?: any }>;
   logout: () => void;
   hasRole: (r: Role) => boolean;
 }
@@ -47,62 +48,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAuthenticated = !!user;
 
-  // Save and clear localStorage
   const saveToStorage = useCallback((u: User | null, t: string | null) => {
-    try {
-      if (u && t) {
-        localStorage.setItem("auth_user", JSON.stringify(u));
-        localStorage.setItem("auth_token", t);
-      } else {
-        localStorage.removeItem("auth_user");
-        localStorage.removeItem("auth_token");
-      }
-    } catch (e) {
-      console.warn("Storage error", e);
+    if (u && t) {
+      localStorage.setItem("auth_user", JSON.stringify(u));
+      localStorage.setItem("auth_token", t);
+    } else {
+      localStorage.removeItem("auth_user");
+      localStorage.removeItem("auth_token");
     }
   }, []);
 
-  // Load from localStorage on mount
+  // Initialization: Load from storage AND set initial API token
   useEffect(() => {
     const storedUser = localStorage.getItem("auth_user");
     const storedToken = localStorage.getItem("auth_token");
 
-    if (storedUser) {
+    if (storedUser && storedToken) {
       try {
-        const parsed = JSON.parse(storedUser) as User;
+        const parsed = JSON.parse(storedUser);
         setUser(parsed);
         setRole(parsed.role || null);
+        setToken(storedToken);
+        api.setAuthToken(storedToken); // Link the API header on load
       } catch (e) {
-        console.warn("Failed parsing stored user", e);
+        console.warn("Auth initialization failed", e);
       }
     }
-    if (storedToken) setToken(storedToken);
     setLoading(false);
   }, []);
 
-  // ───── Automatically attach token to Axios ─────
-  useEffect(() => {
-    if (token) {
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    } else {
-      delete api.defaults.headers.common["Authorization"];
-    }
-  }, [token]);
-
-  // Login
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     try {
       const res = await api.post("/auth/login", { email, password });
-      const { user: u, token: t } = res.data as { user: User; token: string };
+      const { user: u, accessToken } = res.data;
 
-      api.setAuthToken(t);
-
+      api.setAuthToken(accessToken); // Our bearer token logic
       setUser(u);
       setRole(u.role || null);
-      setToken(t);
-      saveToStorage(u, t);
+      setToken(accessToken);
+      saveToStorage(u, accessToken);
 
       setLoading(false);
       return { ok: true };
@@ -114,20 +100,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Signup
   const signup = async (payload: any) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post("/auth/signup", payload);
-      const { user: u, token: t } = res.data as { user: User; token: string };
+      // Backend now uses /auth/register (from dev branch)
+      const res = await api.post("/auth/register", payload);
+      const { user: u, accessToken } = res.data;
 
-      api.setAuthToken(t)
-
+      api.setAuthToken(accessToken);
       setUser(u);
       setRole(u.role || null);
-      setToken(t);
-      saveToStorage(u, t);
+      setToken(accessToken);
+      saveToStorage(u, accessToken);
 
       setLoading(false);
       return { ok: true };
@@ -139,19 +124,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem("t");
-    if (storedToken) {
-      api.setAuthToken(storedToken);
+  const selectRoleAndOnboard = async (payload: any) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post("/auth/select-role", payload);
+      const { user: updatedUser } = res.data;
+
+      setUser(updatedUser);
+      setRole(updatedUser.role || null);
+      saveToStorage(updatedUser, token);
+
+      setLoading(false);
+      return { ok: true, user: updatedUser };
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Onboarding failed";
+      setError(message);
+      setLoading(false);
+      return { ok: false, error: message };
     }
-  }, []);
+  };
 
   // Update Profile
   const updateProfile = async (updates: Partial<User>) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.put("/user/me", updates);
+      const res = await api.put("/users/me", updates);
       const updatedUser = res.data as User;
 
       setUser(updatedUser);
@@ -168,12 +167,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Logout
-  const logout = () => {
-    setUser(null);
-    setRole(null);
-    setToken(null);
-    api.setAuthToken(null);
-    saveToStorage(null, null);
+const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (err) {
+      console.warn("Logout API failed", err);
+    } finally {
+      setUser(null);
+      setRole(null);
+      setToken(null);
+      api.setAuthToken(null); // Clear header
+      saveToStorage(null, null);
+    }
   };
 
   // Role checker
@@ -193,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     signup,
     updateProfile,
+    selectRoleAndOnboard,
     logout,
     hasRole,
   };
