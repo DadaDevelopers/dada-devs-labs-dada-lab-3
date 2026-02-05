@@ -5,7 +5,7 @@ import Campaign from "../models/Campaign.js";
 import Payment from "../models/Payment.js";
 import { User } from "../models/User.js";
 import { initiateStkPush } from "../services/mpesa.js";
-import { createPaymentIntent, constructEvent } from "../services/stripe.js";
+//import { createPaymentIntent, constructEvent } from "../services/stripe.js";
 import config from "../config/config.js";
 
 /**

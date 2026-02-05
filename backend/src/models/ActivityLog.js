@@ -1,3 +1,4 @@
+//ActivityLog.js
 import mongoose from "mongoose";
 
 const activityLogSchema = new mongoose.Schema(
