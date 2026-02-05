@@ -1,3 +1,4 @@
+//userControllers
 //Here is not about authentication(no logins, tokens or verification, they are in authController.js)
 import crypto from "crypto";
 import mongoose from "mongoose";
@@ -8,6 +9,8 @@ import { verifyAccessToken } from "../utils/token.js";
 import Upload from "../models/Upload.js";
 import { logActivity } from "../utils/activityLogger.js";
 import ActivityLog from "../models/ActivityLog.js"; // optional if you need it here
+
+import { beneficiaryProfileCompleteness } from "../utils/profileCompleteness.js";
 
 // helpers
 function hashValue(value, salt = process.env.SECRET_SALT || "default_salt") {
@@ -28,7 +31,13 @@ export const getMe = async (req, res, next) => {
       //.populate("beneficiaryProfile.profilePicture beneficiaryProfile.supportingDocs providerProfile.licenseDocs pendingEmail.pendingUpload")
       //.select("-passwordHash");
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json({ user });
+
+    //dashboard will know when to block campaign creation and when to show "Complete your profile (80%)"
+    const profileProgress = user.role === "BENEFICIARY"
+      ? beneficiaryProfileCompleteness(user)
+      : null;
+
+    res.json({ user, profileProgress });
   } catch (err) { next(err); }
 };
 

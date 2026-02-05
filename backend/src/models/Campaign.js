@@ -1,3 +1,4 @@
+//Campaign.js
 import mongoose from "mongoose";
 import crypto from "crypto";
 const { Schema } = mongoose;
@@ -46,7 +47,30 @@ const CampaignSchema = new Schema(
     providerConfirmedAt: { type: Date, default: null },
 
     // optional metadata
-    metadata: { type: Schema.Types.Mixed, default: {} }
+    /*metadata: { 
+      type: Schema.Types.Mixed, 
+      default: {} 
+    }*/
+
+    metadata: {
+      location: String,
+      fundraisingDeadline: Date,
+      manualProvider: {
+        name: String,
+        phone: String,
+        email: String
+      },
+      supportingDocUploadIds: [{ type: Schema.Types.ObjectId, ref: "Upload" }]
+    },
+
+    // Campaign.js
+    disbursementStatus: {
+      type: String,
+      enum: ["none", "pending", "completed"],
+      default: "none"
+    },
+    disbursedAt: Date
+
   },
   { timestamps: true } // createdAt, updatedAt auto
 );
