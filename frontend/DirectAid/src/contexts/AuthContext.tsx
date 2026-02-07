@@ -106,13 +106,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const tokenToStore = accessToken;
 
-      setUser(u);
-      setRole(u.role || null);
+      // Normalize user object - combine firstName and lastName into name
+      const normalizedUser = {
+        ...u,
+        name: u.name || `${(u as any).firstName || ''} ${(u as any).lastName || ''}`.trim() || u.email
+      };
+
+      setUser(normalizedUser);
+      setRole(normalizedUser.role || null);
       setToken(tokenToStore);
-      saveToStorage(u, tokenToStore);
+      saveToStorage(normalizedUser, tokenToStore);
 
       setLoading(false);
-      return { ok: true, user: u };
+      return { ok: true, user: normalizedUser };
     } catch (err: any) {
       const message = err?.response?.data?.message || "Login failed";
       setError(message);
@@ -135,10 +141,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const tokenToStore = accessToken;
 
-      setUser(u);
-      setRole(u.role || null);
+      // Normalize user object - combine firstName and lastName into name
+      const normalizedUser = {
+        ...u,
+        name: u.name || `${(u as any).firstName || ''} ${(u as any).lastName || ''}`.trim() || u.email
+      };
+
+      setUser(normalizedUser);
+      setRole(normalizedUser.role || null);
       setToken(tokenToStore);
-      saveToStorage(u, tokenToStore);
+      saveToStorage(normalizedUser, tokenToStore);
 
       setLoading(false);
       return { ok: true };
@@ -158,11 +170,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.put("/users/me", updates);
       const updatedUser = (res.data as { user?: User }).user ?? (res.data as User);
 
-      setUser(updatedUser);
-      saveToStorage(updatedUser, token);
+      // Normalize user object
+      const normalizedUser = {
+        ...updatedUser,
+        name: updatedUser.name || `${(updatedUser as any).firstName || ''} ${(updatedUser as any).lastName || ''}`.trim() || updatedUser.email
+      };
+
+      setUser(normalizedUser);
+      saveToStorage(normalizedUser, token);
 
       setLoading(false);
-      return { ok: true, user: updatedUser };
+      return { ok: true, user: normalizedUser };
     } catch (err: any) {
       const message = err?.response?.data?.message || "Update failed";
       setError(message);
@@ -181,11 +199,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { user: updatedUser, accessToken: newAccessToken } = res.data as { user: User; accessToken?: string };
 
-      setUser(updatedUser);
-      setRole(updatedUser.role || null);
+      // Normalize user object
+      const normalizedUser = {
+        ...updatedUser,
+        name: updatedUser.name || `${(updatedUser as any).firstName || ''} ${(updatedUser as any).lastName || ''}`.trim() || updatedUser.email
+      };
+
+      setUser(normalizedUser);
+      setRole(normalizedUser.role || null);
       const tokenToStore = newAccessToken ?? token;
       setToken(tokenToStore);
-      saveToStorage(updatedUser, tokenToStore);
+      saveToStorage(normalizedUser, tokenToStore);
 
       setLoading(false);
       return { ok: true, user: updatedUser };

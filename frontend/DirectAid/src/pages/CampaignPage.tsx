@@ -42,116 +42,69 @@ export default function CampaignPage() {
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("all");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Get role-based navigation items
-  const getNavItems = () => {
-    const baseNavItems = [
-      {
-        label: "Campaigns",
-        href: "/campaigns",
-        icon: <FolderKanban className="w-5 h-5" />,
-      },
-    ];
-
-    if (role?.toLowerCase() === "provider") {
-      return [
-        {
-          label: "Dashboard",
-          href: "/provider",
-          icon: <LayoutDashboard className="w-5 h-5" />,
-        },
-        {
-          label: "Campaigns",
-          href: "/provider/campaigns",
-          icon: <FolderKanban className="w-5 h-5" />,
-        },
-        {
-          label: "Upload Invoices",
-          href: "/provider/invoices",
-          icon: <Upload className="w-5 h-5" />,
-        },
-        {
-          label: "Withdrawals",
-          href: "/provider/withdrawals",
-          icon: <Wallet className="w-5 h-5" />,
-        },
-        {
-          label: "Proof Upload",
-          href: "/provider/proof-upload",
-          icon: <FileText className="w-5 h-5" />,
-        },
-      ];
-    } else if (role?.toLowerCase() === "beneficiary") {
-      return [
-        {
-          label: "Dashboard",
-          href: "/beneficiary",
-          icon: <LayoutDashboard className="w-5 h-5" />,
-        },
-        ...baseNavItems,
-        {
-          label: "Funds Received",
-          href: "/beneficiary/funds",
-          icon: <DollarSign className="w-5 h-5" />,
-        },
-        {
-          label: "Reporting",
-          href: "/beneficiary/reporting",
-          icon: <FileText className="w-5 h-5" />,
-        },
-      ];
-    } else if (role?.toLowerCase() === "donor") {
-      return [
-        {
-          label: "Discover",
-          href: "/donor",
-          icon: <LayoutDashboard className="w-5 h-5" />,
-        },
-        {
-          label: "Campaigns",
-          href: "/donor/campaigns",
-          icon: <FolderKanban className="w-5 h-5" />,
-        },
-        {
-          label: "My Donations",
-          href: "/donor/donations",
-          icon: <Heart className="w-5 h-5" />,
-        },
-        {
-          label: "Receipts",
-          href: "/donor/receipts",
-          icon: <Receipt className="w-5 h-5" />,
-        },
-      ];
+  // Dynamic navigation items based on role
+  const navItems = useMemo(() => {
+    switch (role) {
+      case "DONOR":
+        return [
+          { label: "Discover", href: "/donor", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Campaigns", href: "/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+          { label: "My Donations", href: "/donor/donations", icon: <Heart className="w-5 h-5" /> },
+          { label: "Receipts", href: "/donor/receipts", icon: <Receipt className="w-5 h-5" /> },
+        ];
+      case "BENEFICIARY":
+        return [
+          { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
+        ];
+      case "PROVIDER":
+        return [
+          { label: "Dashboard", href: "/provider", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Campaigns", href: "/provider/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+          { label: "Upload Invoices", href: "/provider/invoices", icon: <Upload className="w-5 h-5" />, },
+          { label: "Withdrawals", href: "/provider/withdrawals", icon: <Wallet className="w-5 h-5" />, },
+          { label: "Proof Upload", href: "/provider/proof-upload", icon: <FileText className="w-5 h-5" />, },
+        ];
+      default:
+        return [
+          { label: "Discover", href: "/", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Campaigns", href: "/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+        ];
     }
-    // Default navigation for unauthenticated or unknown roles
-    return baseNavItems;
-  };
+  }, [role]);
 
-  const getSettingsNavItems = () => {
-    if (role?.toLowerCase() === "provider") {
-      return [
-        { id: "profile", label: "Profile", href: "/provider/settings/profile", icon: <User className="w-5 h-5" /> },
-        { id: "payouts", label: "Payouts", href: "/provider/settings/payouts", icon: <Wallet className="w-5 h-5" /> },
-        { id: "notifications", label: "Notifications", href: "/provider/settings/notifications", icon: <Bell className="w-5 h-5" /> },
-        { id: "change-password", label: "Change Password", href: "/provider/settings/change-password", icon: <Lock className="w-5 h-5" /> },
-      ];
-    } else if (role?.toLowerCase() === "beneficiary") {
-      return [
-        { id: "profile", label: "Profile", href: "/beneficiary/settings/profile", icon: <User className="w-5 h-5" /> },
-        { id: "address", label: "Address", href: "/beneficiary/settings/address", icon: <MapPin className="w-5 h-5" /> },
-        { id: "notifications", label: "Notifications", href: "/beneficiary/settings/notifications", icon: <Bell className="w-5 h-5" /> },
-        { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
-      ];
-    } else if (role?.toLowerCase() === "donor") {
-      return [
-        { id: "profile", label: "Profile", href: "/donor/settings/profile", icon: <User className="w-5 h-5" /> },
-        { id: "payment", label: "Payment Methods", href: "/donor/settings/payment", icon: <CreditCard className="w-5 h-5" /> },
-        { id: "notifications", label: "Notifications", href: "/donor/settings/notifications", icon: <Bell className="w-5 h-5" /> },
-        { id: "change-password", label: "Change Password", href: "/donor/settings/change-password", icon: <Lock className="w-5 h-5" /> },
-      ];
+  const settingsNavItems = useMemo(() => {
+    if (!user) {
+      return [{ id: "login", label: "Sign In", href: "/login", icon: <User className="w-5 h-5" /> }];
     }
-    return [];
-  };
+
+    switch (role) {
+      case "DONOR":
+        return [
+          { id: "profile", label: "Profile", href: "/donor/settings/profile", icon: <User className="w-5 h-5" /> },
+          { id: "payment", label: "Payment Methods", href: "/donor/settings/payment", icon: <CreditCard className="w-5 h-5" /> },
+          { id: "notifications", label: "Notifications", href: "/donor/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+          { id: "change-password", label: "Change Password", href: "/donor/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+        ];
+      case "BENEFICIARY":
+        return [
+          { id: "profile", label: "Profile", href: "/beneficiary/settings/profile", icon: <User className="w-5 h-5" /> },
+          { id: "address", label: "Address", href: "/beneficiary/settings/address", icon: <MapPin className="w-5 h-5" /> },
+          { id: "notifications", label: "Notifications", href: "/beneficiary/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+          { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+        ];
+      case "PROVIDER":
+        return [
+          { id: "profile", label: "Profile", href: "/provider/settings/profile", icon: <User className="w-5 h-5" /> },
+          { id: "payouts", label: "Payouts", href: "/provider/settings/payouts", icon: <Wallet className="w-5 h-5" /> },
+          { id: "notifications", label: "Notifications", href: "/provider/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+          { id: "change-password", label: "Change Password", href: "/provider/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+        ];
+      default:
+        return [{ id: "profile", label: "Profile Settings", href: "/settings", icon: <User className="w-5 h-5" /> }];
+    }
+  }, [user, role]);
 
   const categories: { id: FilterCategory; label: string }[] = [
     { id: "all", label: "All Categories" },
@@ -206,10 +159,10 @@ export default function CampaignPage() {
 
   return (
     <DashboardLayout
-      navItems={getNavItems()}
+      navItems={navItems}
       userName={userName}
       userRole={userRole}
-      settingsNavItems={getSettingsNavItems()}
+      settingsNavItems={settingsNavItems}
       onLogout={async () => {
         await logout();
         navigate("/");
@@ -263,11 +216,10 @@ export default function CampaignPage() {
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition border ${
-                        selectedCategory === cat.id
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition border ${selectedCategory === cat.id
                           ? "bg-primary text-primary-foreground"
                           : "bg-card text-foreground border-border hover:bg-accent"
-                      }`}
+                        }`}
                     >
                       {cat.label}
                     </button>
@@ -285,11 +237,10 @@ export default function CampaignPage() {
                     <button
                       key={status.id}
                       onClick={() => setSelectedStatus(status.id)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition border ${
-                        selectedStatus === status.id
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition border ${selectedStatus === status.id
                           ? "bg-primary text-primary-foreground"
                           : "bg-card text-foreground border-border hover:bg-accent"
-                      }`}
+                        }`}
                     >
                       {status.label}
                     </button>

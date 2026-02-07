@@ -133,12 +133,48 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
     };
   }
 
-  // Donate guest endpoint
+  // Donate guest endpoint - REMOVE DEMO FALLBACK TO USE REAL BACKEND
+  /*
   if (url.includes("/donate/guest")) {
+    // Simulate creating a donation and returning payment details
+    const method = (data?.method || data?.paymentMethod || "lightning").toString().toLowerCase();
+    const donationId = `don_demo_${Date.now()}`;
+
+    if (method === "lightning") {
+      return {
+        data: {
+          donation: {
+            id: donationId,
+            status: "PENDING",
+            amount: data?.amount || 0,
+            paymentMethod: "LIGHTNING",
+            paymentDetails: {
+              lightningInvoice:
+                "lnbc1pvjluezpp5qqqsyqcyq5rqwzqfppq9zq9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q", // demo BOLT11
+            },
+            receiptUrl: `https://directaid.example.com/receipts/${donationId}`,
+          },
+        },
+      };
+    }
+
+    // default to on-chain bitcoin
     return {
-      data: { success: true, receiptId: "demo-receipt-1234" },
+      data: {
+        donation: {
+          id: donationId,
+          status: "PENDING",
+          amount: data?.amount || 0,
+          paymentMethod: "BITCOIN",
+          paymentDetails: {
+            onchainAddress: "tb1qexampleaddressxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", // demo testnet address
+          },
+          receiptUrl: `https://directaid.example.com/receipts/${donationId}`,
+        },
+      },
     };
   }
+  */
 
   // Public providers list endpoint
   if (url.includes("/providers/public")) {

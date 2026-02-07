@@ -5,14 +5,10 @@ import type {
   Campaign,
   Donation,
   Invoice,
-  AidRequest,
-  PayoutMethod,
-  WalletBalance,
   ProviderMetrics,
   BeneficiaryMetrics,
   DonorMetrics,
   Notification,
-  DonationReceipt,
   Payout,
 } from "../types";
 
@@ -167,6 +163,7 @@ export const mockCampaigns: Campaign[] = [
     amountRaised: 4500000, // $45,000
     donorCount: 342,
     status: "active",
+    adminStatus: "approved",
     confirmationStatus: "both_confirmed",
     providerConfirmedAt: "2024-11-20",
     beneficiaryConfirmedAt: "2024-11-21",
@@ -239,6 +236,7 @@ export const mockCampaigns: Campaign[] = [
     amountRaised: 7800000, // $78,000
     donorCount: 589,
     status: "active",
+    adminStatus: "approved",
     confirmationStatus: "provider_confirmed",
     providerConfirmedAt: "2024-11-22",
     proofDocuments: [
@@ -310,6 +308,7 @@ export const mockCampaigns: Campaign[] = [
     amountRaised: 2300000, // $23,000
     donorCount: 156,
     status: "active",
+    adminStatus: "approved",
     confirmationStatus: "pending",
     proofDocuments: [
       {

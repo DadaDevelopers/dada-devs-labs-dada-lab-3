@@ -12,11 +12,14 @@ import type {
   Notification,
 } from "../types";
 import {
-  mockDataService,
   mockProviderUser,
   mockBeneficiaryUser,
   mockDonorUser,
+  mockDataService,
 } from "../services/mockData";
+import { donationService } from "../services/donationService";
+import { campaignService } from "../services/campaignService";
+import { useEffect } from "react";
 
 // ============================================================================
 // CONTEXT TYPE DEFINITION
@@ -41,7 +44,7 @@ interface AppContextType {
 
   // Donations
   donations: Donation[];
-  createDonation: (donation: Donation) => void;
+  createDonation: (donation: Partial<Donation>) => Promise<Donation | undefined>;
   updateDonation: (id: string, updates: Partial<Donation>) => void;
 
   // Notifications
@@ -75,11 +78,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Data State
-  const [campaigns, setCampaigns] = useState<Campaign[]>(
-    mockDataService.getCampaigns()
-  );
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [donations, setDonations] = useState<Donation[]>(
-    mockDataService.getDonations()
+    [] // Start empty, fetch on load
   );
   const [notifications, setNotifications] = useState<Notification[]>(
     mockDataService.getNotifications()
@@ -101,6 +102,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       // Simulate API call delay
       await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // TODO: Replace with real auth service call eventually, keeping mock for login simulation for now
+      // but we will fetch DATA for the logged in user really.
 
       // Mock authentication based on role
       let user: User;
@@ -145,10 +149,19 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // CAMPAIGN FUNCTIONS
   // ============================================================================
 
-  const selectCampaign = (campaignId: string) => {
-    const campaign = mockDataService.getCampaignById(campaignId);
+  const selectCampaign = async (campaignId: string) => {
+    // Try to find in current list first
+    const campaign = campaigns.find(c => c.id === campaignId);
     if (campaign) {
       setSelectedCampaign(campaign);
+    } else {
+      // If not found (e.g. direct link), fetch it
+      try {
+        const fetchedCampaign = await campaignService.getCampaignById(campaignId);
+        setSelectedCampaign(fetchedCampaign);
+      } catch (err) {
+        console.error("Failed to fetch selected campaign", err);
+      }
     }
   };
 
@@ -197,15 +210,27 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // DONATION FUNCTIONS
   // ============================================================================
 
-  const createDonation = (donation: Donation) => {
-    setDonations([donation, ...donations]);
+  const createDonation = async (donation: Partial<Donation>) => {
+    try {
+      // Use real service
+      const newDonation = await donationService.createDonation(donation);
+      setDonations([newDonation, ...donations]);
 
-    // Update campaign amount raised
-    updateCampaign(donation.campaignId, {
-      amountRaised:
-        (campaigns.find((c) => c.id === donation.campaignId)?.amountRaised ||
-          0) + donation.amount,
-    });
+      // Update campaign amount raised (optimistically or refetch)
+      // Real backend handles this, but we update UI state locally for now
+      if (donation.campaignId) {
+        updateCampaign(donation.campaignId, {
+          amountRaised:
+            (campaigns.find((c) => c.id === donation.campaignId)?.amountRaised ||
+              0) + (donation.amount || 0),
+        });
+      }
+      return newDonation;
+    } catch (err) {
+      console.error("Failed to create donation", err);
+      setError("Failed to process donation");
+      return undefined;
+    }
   };
 
   const updateDonation = (id: string, updates: Partial<Donation>) => {
@@ -251,6 +276,60 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     error,
     setError,
   };
+
+  // Fetch campaigns on mount
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      setIsLoading(true);
+      try {
+        const data = await campaignService.getAllCampaigns();
+        // Normalize campaigns: status to lowercase, provider name formatting
+        const normalizedCampaigns = data.map((c: any) => ({
+          ...c,
+          status: c.status?.toLowerCase() || "active",
+          adminStatus: c.adminStatus?.toLowerCase() || "pending",
+          provider: {
+            ...c.provider,
+            name: c.providerId?.organization ||
+              (c.providerId?.firstName ? `${c.providerId.firstName} ${c.providerId.lastName || ""}`.trim() : "DirectAid Provider")
+          }
+        }));
+        setCampaigns(normalizedCampaigns);
+      } catch (err) {
+        console.error("Failed to fetch campaigns", err);
+        setError("Failed to load campaigns");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCampaigns();
+  }, []);
+
+  // Fetch donations when user logs in (or anonymously if public)
+  useEffect(() => {
+    const fetchDonations = async () => {
+      try {
+        if (isAuthenticated) {
+          const res = await donationService.getMyDonations();
+          const rawDonations = res.donations || [];
+          // Normalize donations: status to lowercase, ensure campaign object exists for UI
+          const normalizedDonations = rawDonations.map((d: any) => ({
+            ...d,
+            status: d.status?.toLowerCase() || "pending",
+            campaign: d.campaignId ? {
+              ...d.campaignId,
+              title: d.campaignId.title || "Campaign",
+              status: d.campaignId.status?.toLowerCase() || "active"
+            } : d.campaign
+          }));
+          setDonations(normalizedDonations);
+        }
+      } catch (err) {
+        console.error("Failed to fetch donations", err);
+      }
+    };
+    fetchDonations();
+  }, [isAuthenticated]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
