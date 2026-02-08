@@ -181,6 +181,11 @@ const BeneficiaryDashboard = () => {
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
+      label: "Campaigns",
+      href: "/beneficiary/campaigns",
+      icon: <FolderKanban className="w-5 h-5" />,
+    },
+    {
       label: "Funds Received",
       href: "/beneficiary/funds",
       icon: <DollarSign className="w-5 h-5" />,
@@ -320,7 +325,7 @@ const BeneficiaryDashboard = () => {
                   Complete your profile
                 </p>
                 <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
-                  Add your national ID and preferred provider in Settings so we can verify your account and match you with providers.
+                  Add your national ID in Settings so we can verify your account and help you get the most from your campaigns.
                 </p>
               </div>
             </div>
@@ -598,8 +603,28 @@ const BeneficiaryDashboard = () => {
             </h2>
 
             <div className="space-y-4">
-              {primaryCampaign &&
-              primaryCampaign.confirmationStatus === "provider_confirmed" ? (
+              {(!primaryCampaign || userCampaigns.length === 0) ? (
+                <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-secondary-bg)] border border-white/10">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-[var(--color-text-light)] text-sm sm:text-base mb-1">
+                        No campaigns yet
+                      </h3>
+                      <p className="text-xs sm:text-sm text-[var(--color-text-light)]/70 mb-3">
+                        You don't have any campaigns yet. Create one to see service status and confirmations here.
+                      </p>
+                      <Button
+                        size="sm"
+                        className="gap-2 rounded-full btn-cta w-full sm:w-auto"
+                        onClick={() => navigate("/campaigns/create")}
+                      >
+                        <PlusCircle className="w-4 h-4" />
+                        Create campaign
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : primaryCampaign.confirmationStatus === "provider_confirmed" ? (
                 <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-[var(--color-accent)] mt-0.5 flex-shrink-0" />
@@ -651,21 +676,23 @@ const BeneficiaryDashboard = () => {
                 </div>
               )}
 
-              <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-secondary-bg)] border border-white/10">
-                <p className="text-xs sm:text-sm text-[var(--color-text-light)]/60 mb-1 sm:mb-2">
-                  Last confirmation
-                </p>
-                <p className="font-semibold text-sm sm:text-base text-[var(--color-text-light)]">
-                  {primaryCampaign?.beneficiaryReceipt?.confirmedAt
-                    ? new Date(primaryCampaign.beneficiaryReceipt.confirmedAt).toLocaleDateString()
-                    : "Not yet confirmed"}
-                </p>
-                {primaryCampaign?.beneficiaryReceipt && (
-                  <p className="text-xs text-[var(--color-text-light)]/60 mt-1">
-                    {primaryCampaign.title}
+              {primaryCampaign && (
+                <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-secondary-bg)] border border-white/10">
+                  <p className="text-xs sm:text-sm text-[var(--color-text-light)]/60 mb-1 sm:mb-2">
+                    Last confirmation
                   </p>
-                )}
-              </div>
+                  <p className="font-semibold text-sm sm:text-base text-[var(--color-text-light)]">
+                    {primaryCampaign?.beneficiaryReceipt?.confirmedAt
+                      ? new Date(primaryCampaign.beneficiaryReceipt.confirmedAt).toLocaleDateString()
+                      : "Not yet confirmed"}
+                  </p>
+                  {primaryCampaign?.beneficiaryReceipt && (
+                    <p className="text-xs text-[var(--color-text-light)]/60 mt-1">
+                      {primaryCampaign.title}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </Card>
         </div> 

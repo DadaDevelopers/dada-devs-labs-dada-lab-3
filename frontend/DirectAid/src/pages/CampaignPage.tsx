@@ -1,8 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDataService } from "../services/mockData";
+import api from "../services/api";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
@@ -32,15 +31,67 @@ import {
 type FilterCategory = "all" | "medical" | "education" | "food" | "shelter";
 type FilterStatus = "all" | "active" | "completed" | "draft";
 
+function normalizeCampaign(c: any) {
+  const id = c._id ?? c.id;
+  const location = c.metadata?.location ?? c.location ?? "";
+  const fundraisingDeadline = c.metadata?.fundraisingDeadline ?? c.fundraisingDeadline;
+  return {
+    ...c,
+    id,
+    _id: id,
+    location,
+    fundraisingDeadline: fundraisingDeadline ? new Date(fundraisingDeadline).toISOString?.() ?? fundraisingDeadline : undefined,
+    amountRaised: c.amountRaised ?? 0,
+    targetAmount: c.targetAmount ?? 0,
+  };
+}
+
 export default function CampaignPage() {
   const navigate = useNavigate();
-  const { campaigns } = useApp();
   const { user, role, logout } = useAuth();
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [myCampaigns, setMyCampaigns] = useState<any[]>([]);
+  const [campaignsView, setCampaignsView] = useState<"discover" | "my">("discover");
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] =
     useState<FilterCategory>("all");
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("all");
   const [showFilters, setShowFilters] = useState(false);
+
+  const isBeneficiary = role?.toLowerCase() === "beneficiary";
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const params: Record<string, string> = { page: "1", limit: "50" };
+    if (selectedStatus !== "all") params.status = selectedStatus === "active" ? "ACTIVE" : selectedStatus === "completed" ? "COMPLETED" : "CANCELLED";
+    if (selectedCategory !== "all") params.category = selectedCategory;
+    const query = new URLSearchParams(params).toString();
+    api.get(query ? `/campaigns?${query}` : "/campaigns").then((res) => {
+      if (cancelled) return;
+      const list = (res.data?.campaigns ?? []).map(normalizeCampaign);
+      setCampaigns(list);
+    }).catch(() => {
+      if (!cancelled) setCampaigns([]);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [selectedCategory, selectedStatus]);
+
+  useEffect(() => {
+    if (!isBeneficiary) return;
+    let cancelled = false;
+    api.get("/campaigns/me?page=1&limit=50").then((res) => {
+      if (cancelled) return;
+      const list = (res.data?.campaigns ?? []).map(normalizeCampaign);
+      setMyCampaigns(list);
+    }).catch(() => {
+      if (!cancelled) setMyCampaigns([]);
+    });
+    return () => { cancelled = true; };
+  }, [isBeneficiary]);
 
   // Get role-based navigation items
   const getNavItems = () => {
@@ -82,22 +133,10 @@ export default function CampaignPage() {
       ];
     } else if (role?.toLowerCase() === "beneficiary") {
       return [
-        {
-          label: "Dashboard",
-          href: "/beneficiary",
-          icon: <LayoutDashboard className="w-5 h-5" />,
-        },
-        ...baseNavItems,
-        {
-          label: "Funds Received",
-          href: "/beneficiary/funds",
-          icon: <DollarSign className="w-5 h-5" />,
-        },
-        {
-          label: "Reporting",
-          href: "/beneficiary/reporting",
-          icon: <FileText className="w-5 h-5" />,
-        },
+        { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+        { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+        { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+        { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
       ];
     } else if (role?.toLowerCase() === "donor") {
       return [
@@ -168,25 +207,30 @@ export default function CampaignPage() {
     { id: "draft", label: "Draft" },
   ];
 
+  const sourceCampaigns = isBeneficiary && campaignsView === "my" ? myCampaigns : campaigns;
+
   // Filter and search campaigns
   const filteredCampaigns = useMemo(() => {
-    return campaigns.filter((campaign) => {
+    return sourceCampaigns.filter((campaign) => {
+      const title = (campaign.title ?? "").toLowerCase();
+      const desc = (campaign.description ?? "").toLowerCase();
+      const loc = (campaign.location ?? "").toLowerCase();
       const matchesSearch =
-        campaign.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        campaign.description
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        campaign.location.toLowerCase().includes(searchQuery.toLowerCase());
+        !searchQuery.trim() ||
+        title.includes(searchQuery.toLowerCase()) ||
+        desc.includes(searchQuery.toLowerCase()) ||
+        loc.includes(searchQuery.toLowerCase());
 
       const matchesCategory =
         selectedCategory === "all" || campaign.category === selectedCategory;
 
       const matchesStatus =
-        selectedStatus === "all" || campaign.status === selectedStatus;
+        selectedStatus === "all" ||
+        (campaign.status ?? "").toLowerCase() === selectedStatus.toLowerCase();
 
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [campaigns, searchQuery, selectedCategory, selectedStatus]);
+  }, [sourceCampaigns, searchQuery, selectedCategory, selectedStatus]);
 
   const getProgressPercentage = (campaign: any) => {
     return Math.min((campaign.amountRaised / campaign.targetAmount) * 100, 100);
@@ -201,7 +245,10 @@ export default function CampaignPage() {
     return diff > 0 ? diff : 0;
   };
 
-  const userName = user?.name || user?.email || "User";
+  const userName =
+    role?.toLowerCase() === "beneficiary"
+      ? (user?.firstName || user?.name || user?.email || "User")
+      : (user?.name || user?.email || "User");
   const userRole = role || "Guest";
 
   return (
@@ -219,11 +266,39 @@ export default function CampaignPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold mb-2">
-            Browse Campaigns
+            {isBeneficiary && campaignsView === "my" ? "My Campaigns" : "Browse Campaigns"}
           </h1>
           <p className="text-muted-foreground">
-            Find and support campaigns making a real impact
+            {isBeneficiary && campaignsView === "my"
+              ? "Campaigns you created and their status"
+              : "Find and support campaigns making a real impact"}
           </p>
+          {isBeneficiary && (
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setCampaignsView("discover")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  campaignsView === "discover"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                Discover
+              </button>
+              <button
+                type="button"
+                onClick={() => setCampaignsView("my")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  campaignsView === "my"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                My campaigns
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Search Bar */}
@@ -309,7 +384,11 @@ export default function CampaignPage() {
 
         {/* Results */}
         <div>
-          {filteredCampaigns.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              Loading campaigns…
+            </div>
+          ) : filteredCampaigns.length === 0 ? (
             <div className="text-center py-12">
               <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-lg">No campaigns found matching your filters.</p>
@@ -364,15 +443,17 @@ export default function CampaignPage() {
                       </p>
 
                       {/* Location & Timeline */}
-                      <div className="flex gap-4 text-sm mb-4 text-muted-foreground">
+                        <div className="flex gap-4 text-sm mb-4 text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <MapPin className="w-4 h-4" />
-                          <span>{campaign.location}</span>
+                          <span>{campaign.location || "—"}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
                           <span>
-                            {daysLeft(campaign.fundraisingDeadline)} days left
+                            {campaign.fundraisingDeadline
+                              ? `${daysLeft(campaign.fundraisingDeadline)} days left`
+                              : "—"}
                           </span>
                         </div>
                       </div>
@@ -381,10 +462,10 @@ export default function CampaignPage() {
                       <div className="mb-4">
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-sm font-semibold">
-                            ${campaign.amountRaised.toLocaleString()}
+                            ${Number(campaign.amountRaised ?? 0).toLocaleString()}
                           </span>
                           <span className="text-sm text-muted-foreground">
-                            of ${campaign.targetAmount.toLocaleString()}
+                            of ${Number(campaign.targetAmount ?? 0).toLocaleString()}
                           </span>
                         </div>
                         <div className="w-full rounded-full h-2 bg-muted">
@@ -415,11 +496,15 @@ export default function CampaignPage() {
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/donate?campaignId=${campaign.id}`);
+                          if (isBeneficiary && campaignsView === "my") {
+                            navigate(`/campaigns/${campaign.id ?? campaign._id}`);
+                          } else {
+                            navigate(`/donate?campaignId=${campaign.id ?? campaign._id}`);
+                          }
                         }}
                         className="w-full"
                       >
-                        Donate Now
+                        {isBeneficiary && campaignsView === "my" ? "View details" : "Donate Now"}
                       </Button>
                     </div>
                   </Card>

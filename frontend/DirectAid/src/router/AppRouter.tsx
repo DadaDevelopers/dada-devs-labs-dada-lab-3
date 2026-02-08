@@ -26,6 +26,7 @@ import DonorDonations from "../pages/donor/DonorDonations";
 import DonorReceipts from "../pages/donor/DonorReceipts";
 import BeneficiaryReporting from "../pages/beneficiary/BeneficiaryReporting";
 import BeneficiaryFunds from "../pages/beneficiary/BeneficiaryFunds";
+import BeneficiaryCampaignDetail from "../pages/beneficiary/BeneficiaryCampaignDetail";
 
 /** If user is logged in but has no role / UNASSIGNED, send them to onboarding when they hit a role-specific path. */
 function useOnboardingRedirect() {
@@ -78,6 +79,8 @@ export default function AppRouter() {
       <Route path="/provider/settings/change-password" element={<ProviderSettings />} />
 
       {/* Beneficiary */}
+      <Route path="/beneficiary/campaigns" element={<CampaignPage />} />
+      <Route path="/beneficiary/campaigns/:id" element={<BeneficiaryCampaignDetail />} />
       <Route
         path="/beneficiary/confirmations"
         element={<BeneficiaryConfirmation />}

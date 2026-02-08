@@ -1,8 +1,9 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/ui/Button";
-import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { Input } from "../../components/ui/input";
 import { Sheet, SheetContent } from "../../components/ui/sheet";
 import { Bell, Menu } from "lucide-react";
@@ -38,7 +39,10 @@ export const DashboardLayout = ({
   onLogout,
 }: DashboardLayoutProps) => {
   const location = useLocation();
+  const { user: authUser } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const profilePictureUrl = (authUser as any)?.beneficiaryProfile?.profilePicture?.url;
 
   const NavContent = () => {
     return (
@@ -161,7 +165,7 @@ export const DashboardLayout = ({
       <div className="flex-1 flex flex-col min-w-0 overflow-auto">
         {/* Top Bar */}
         <header
-          className="h-16 border-b border-border bg-card px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4"
+          className="min-h-[4.5rem] py-3 border-b border-border bg-card px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4"
           style={{ backgroundColor: "var(--color-secondary-bg)" }}
         >
           {/* Mobile Menu Toggle */}
@@ -180,13 +184,16 @@ export const DashboardLayout = ({
               <Bell className="w-5 h-5" />
             </Button>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-3 sm:gap-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold">{userName}</p>
                 <p className="text-xs text-muted-foreground">{userRole}</p>
               </div>
               <Avatar className="w-8 h-8 sm:w-10 sm:h-10">
-                <AvatarFallback className=" text-black text-xs sm:text-sm bg-[var(--color-accent)]">
+                {profilePictureUrl ? (
+                  <AvatarImage src={profilePictureUrl} alt={userName} className="object-cover" />
+                ) : null}
+                <AvatarFallback className="text-black text-xs sm:text-sm bg-[var(--color-accent)]">
                   {userName
                     .split(" ")
                     .map((n) => n[0])

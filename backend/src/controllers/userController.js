@@ -4,6 +4,7 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import { User, RefreshToken } from "../models/User.js";
 import Campaign from "../models/Campaign.js";
+import Disbursement from "../models/Disbursement.js";
 import bcrypt from "bcryptjs";
 import { verifyAccessToken } from "../utils/token.js";
 import Upload from "../models/Upload.js";
@@ -28,8 +29,9 @@ function generateToken() {
 export const getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.userId)
-      //.populate("beneficiaryProfile.profilePicture beneficiaryProfile.supportingDocs providerProfile.licenseDocs pendingEmail.pendingUpload")
-      //.select("-passwordHash");
+      .populate("beneficiaryProfile.profilePicture", "url name mimeType")
+      .populate("beneficiaryProfile.nationalIdUpload", "url name mimeType")
+      .populate("beneficiaryProfile.supportingDocs", "url name mimeType");
     if (!user) return res.status(404).json({ message: "User not found" });
 
     //dashboard will know when to block campaign creation and when to show "Complete your profile (80%)"
@@ -67,6 +69,42 @@ export const getBeneficiaryMetrics = async (req, res, next) => {
         campaignsSupportingYou
       }
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/users/me/disbursements — beneficiary list of disbursements (paginated)
+ */
+export const getBeneficiaryDisbursements = async (req, res, next) => {
+  try {
+    if (req.user.role !== "BENEFICIARY") {
+      return res.status(403).json({ message: "Only beneficiaries can access disbursements" });
+    }
+    const { page = 1, limit = 20, status, campaignId } = req.query;
+    const filter = { beneficiaryId: req.user.userId };
+    if (status) filter.status = status;
+    if (campaignId) filter.campaignId = campaignId;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [disbursements, total] = await Promise.all([
+      Disbursement.find(filter).sort({ disbursedAt: -1, createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      Disbursement.countDocuments(filter)
+    ]);
+
+    const list = disbursements.map((d) => ({
+      id: d._id,
+      campaignId: d.campaignId,
+      amount: d.amount,
+      currency: d.currency,
+      status: d.status,
+      disbursedAt: d.disbursedAt || d.createdAt,
+      description: d.notes || null,
+      transactionRef: d.transactionRef || null
+    }));
+
+    res.json({ page: Number(page), limit: Number(limit), total, disbursements: list });
   } catch (err) {
     next(err);
   }
@@ -230,7 +268,7 @@ export const updateProfile = async (req, res, next) => {
         if (uploads.length !== ids.length) return res.status(400).json({ message: "Invalid licenseDocs" });
         user.providerProfile.licenseDocs = uploads.map(u => u._id);
 
-        if (["NOT_REQUIRED","REJECTED"].includes(user.kyc.status)) {
+        if (["NOT_REQUIRED", "REJECTED"].includes(user.kyc.status)) {
           user.kyc.status = "PENDING";
           user.kyc.submittedAt = new Date();
         }

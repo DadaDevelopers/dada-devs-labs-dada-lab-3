@@ -21,6 +21,7 @@ import {
   User,
   UploadCloud,
   X,
+  FolderKanban,
 } from "lucide-react";
 
 type ProfileTab = "profile" | "address" | "notifications" | "change-password";
@@ -34,7 +35,6 @@ interface BeneficiaryProfileForm {
   displayName: string;
   shortStory: string;
   category: string;
-  preferredProvider: string;
   nationalId: string;
   consentContact: boolean;
   consentVersion: string;
@@ -58,11 +58,33 @@ const emptyProfile: BeneficiaryProfileForm = {
   displayName: "",
   shortStory: "",
   category: "",
-  preferredProvider: "",
   nationalId: "",
   consentContact: false,
   consentVersion: "v1.1",
 };
+
+/** Upload a file via backend metadata endpoint (stores as data URL). Returns upload id. */
+async function uploadBeneficiaryDoc(
+  file: File,
+  purpose: string = "beneficiary_doc"
+): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(new Error("Failed to read file"));
+    r.readAsDataURL(file);
+  });
+  const res = await api.post("/uploads/metadata", {
+    url: dataUrl,
+    name: file.name,
+    mimeType: file.type || "application/octet-stream",
+    purpose,
+    size: file.size,
+  });
+  const id = (res.data as { id?: string }).id;
+  if (!id) throw new Error("Upload did not return an id");
+  return id;
+}
 
 const BeneficiarySettings = () => {
   const navigate = useNavigate();
@@ -81,8 +103,14 @@ const BeneficiarySettings = () => {
   const [activeTab, setActiveTab] = useState<ProfileTab>(getActiveTabFromPath());
   const [profileData, setProfileData] = useState<BeneficiaryProfileForm>(emptyProfile);
   const [profilePictureId, setProfilePictureId] = useState<string | null>(null);
+  const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
   const [nationalIdUploadId, setNationalIdUploadId] = useState<string | null>(null);
   const [supportingDocIds, setSupportingDocIds] = useState<string[]>([]);
+  const [uploadingField, setUploadingField] = useState<"picture" | "nationalId" | "supporting" | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [profileProgress, setProfileProgress] = useState<{ percent: number; isComplete: boolean } | null>(null);
+  const [identityVerified, setIdentityVerified] = useState<boolean | null>(null);
+  const [verificationNotes, setVerificationNotes] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -130,14 +158,13 @@ const BeneficiarySettings = () => {
         displayName: u.beneficiaryProfile?.displayName ?? "",
         shortStory: u.beneficiaryProfile?.shortStory ?? "",
         category: u.beneficiaryProfile?.category ?? "",
-        preferredProvider: u.beneficiaryProfile?.preferredProvider ?? "",
         nationalId: "", // never load plaintext; user re-enters if changing
         consentContact: !!u.beneficiaryProfile?.consentContact?.agreed,
         consentVersion: u.beneficiaryProfile?.consentContact?.version ?? "v1.1",
       });
-      setProfilePictureId(
-        u.beneficiaryProfile?.profilePicture?._id ?? u.beneficiaryProfile?.profilePicture ?? null
-      );
+      const pic = u.beneficiaryProfile?.profilePicture;
+      setProfilePictureId(pic?._id ?? pic ?? null);
+      setProfilePictureUrl(pic?.url ?? null);
       setNationalIdUploadId(
         u.beneficiaryProfile?.nationalIdUpload?._id ?? u.beneficiaryProfile?.nationalIdUpload ?? null
       );
@@ -146,6 +173,10 @@ const BeneficiarySettings = () => {
           ? u.beneficiaryProfile.supportingDocs.map((d: any) => d._id ?? d)
           : []
       );
+      const progress = (res.data as { profileProgress?: { percent?: number; isComplete?: boolean } }).profileProgress;
+      setProfileProgress(progress ? { percent: progress.percent ?? 0, isComplete: !!progress.isComplete } : null);
+      setIdentityVerified(u.beneficiaryProfile?.identityVerified ?? null);
+      setVerificationNotes(u.beneficiaryProfile?.verificationNotes ?? null);
       if (u.city || u.country) {
         setAddressData((prev) => ({
           ...prev,
@@ -197,6 +228,63 @@ const BeneficiarySettings = () => {
     setAddressData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleProfilePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    setUploadError(null);
+    setUploadingField("picture");
+    try {
+      const id = await uploadBeneficiaryDoc(file, "beneficiary_doc");
+      setProfilePictureId(id);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = () => reject(new Error("Failed to read file"));
+        r.readAsDataURL(file);
+      });
+      setProfilePictureUrl(dataUrl);
+    } catch (err: any) {
+      setUploadError(err?.response?.data?.message || "Failed to upload photo");
+    } finally {
+      setUploadingField(null);
+      e.target.value = "";
+    }
+  };
+
+  const handleNationalIdDocChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setUploadingField("nationalId");
+    try {
+      const id = await uploadBeneficiaryDoc(file, "beneficiary_doc");
+      setNationalIdUploadId(id);
+    } catch (err: any) {
+      setUploadError(err?.response?.data?.message || "Failed to upload document");
+    } finally {
+      setUploadingField(null);
+      e.target.value = "";
+    }
+  };
+
+  const handleSupportingDocsChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setUploadError(null);
+    setUploadingField("supporting");
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const id = await uploadBeneficiaryDoc(files[i], "beneficiary_doc");
+        setSupportingDocIds((prev) => [...prev, id]);
+      }
+    } catch (err: any) {
+      setUploadError(err?.response?.data?.message || "Failed to upload document");
+    } finally {
+      setUploadingField(null);
+      e.target.value = "";
+    }
+  };
+
   const handleSaveProfile = async () => {
     setIsSaving(true);
     setErrors({});
@@ -212,7 +300,6 @@ const BeneficiarySettings = () => {
           displayName: profileData.displayName.trim() || undefined,
           shortStory: profileData.shortStory.trim() || undefined,
           category: profileData.category || undefined,
-          preferredProvider: profileData.preferredProvider.trim() || undefined,
           nationalId: profileData.nationalId.trim() || undefined,
           consentContact: profileData.consentContact
             ? { agreed: true, version: profileData.consentVersion || "v1.1" }
@@ -283,6 +370,7 @@ const BeneficiarySettings = () => {
 
   const navItems = [
     { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
     { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
     { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
@@ -352,6 +440,28 @@ const BeneficiarySettings = () => {
               <p className="text-muted-foreground">Loading profile…</p>
             ) : (
               <div className="space-y-6">
+                {(profileProgress != null || identityVerified != null) && (
+                  <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-2">
+                    {profileProgress != null && (
+                      <p className="text-sm text-foreground">
+                        Profile completeness: <strong>{profileProgress.percent}%</strong>
+                        {profileProgress.isComplete ? " — Complete" : " — Add missing fields to unlock campaign creation."}
+                      </p>
+                    )}
+                    {identityVerified != null && (
+                      <p className="text-sm text-foreground">
+                        Identity: {identityVerified ? (
+                          <span className="text-green-600 dark:text-green-400">Verified</span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-400">Pending verification</span>
+                        )}
+                        {verificationNotes && !identityVerified && (
+                          <span className="block mt-1 text-muted-foreground">{verificationNotes}</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormInput
                     label="First name"
@@ -430,26 +540,125 @@ const BeneficiarySettings = () => {
                     className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                   />
                 </div>
-                <FormInput
-                  label="Preferred provider (optional)"
-                  name="preferredProvider"
-                  value={profileData.preferredProvider}
-                  onChange={handleProfileChange}
-                  placeholder="Provider name or ID"
-                />
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-foreground">
+                    Profile picture
+                  </label>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted/50 text-sm text-foreground">
+                      <UploadCloud className="w-4 h-4" />
+                      {uploadingField === "picture" ? "Uploading…" : profilePictureId ? "Change photo" : "Upload photo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handleProfilePictureChange}
+                        disabled={uploadingField === "picture"}
+                      />
+                    </label>
+                    {profilePictureId && (
+                      <div className="inline-flex items-center gap-2 p-2 rounded-xl border border-border bg-muted/30">
+                        {profilePictureUrl ? (
+                          <img src={profilePictureUrl} alt="Profile" className="w-10 h-10 rounded-lg object-cover border border-border" />
+                        ) : null}
+                        <span className="text-sm text-muted-foreground">Photo set</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 <hr className="border-border" />
 
                 <FormInput
-                  label="National ID"
+                  label="National ID (number)"
                   name="nationalId"
                   value={profileData.nationalId}
                   onChange={handleProfileChange}
                   placeholder="National identification number (stored securely, hashed)"
                 />
-                <p className="text-xs text-muted-foreground">
-                  National ID document can be uploaded when the upload feature is connected. Backend stores a hashed value only.
+                <p className="text-xs text-muted-foreground mb-2">
+                  Stored securely as a hash only. You can also upload a copy of your ID document below.
                 </p>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2 text-foreground">
+                    National ID document (upload)
+                  </label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted/50 text-sm text-foreground">
+                      <UploadCloud className="w-4 h-4" />
+                      {uploadingField === "nationalId" ? "Uploading…" : nationalIdUploadId ? "Replace document" : "Upload ID document"}
+                      <input
+                        type="file"
+                        accept="image/*,.pdf,application/pdf"
+                        className="sr-only"
+                        onChange={handleNationalIdDocChange}
+                        disabled={uploadingField === "nationalId"}
+                      />
+                    </label>
+                    {nationalIdUploadId && (
+                      <div className="inline-flex items-center gap-2 p-2 rounded-xl border border-border bg-muted/30">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">ID document attached</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setNationalIdUploadId(null)}
+                          className="text-muted-foreground ml-1"
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2 text-foreground">
+                    Supporting documents (optional)
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    e.g. proof of need, medical or education documents.
+                  </p>
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted/50 text-sm text-foreground mb-2">
+                    <UploadCloud className="w-4 h-4" />
+                    {uploadingField === "supporting" ? "Uploading…" : "Add documents"}
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf"
+                      className="sr-only"
+                      multiple
+                      onChange={handleSupportingDocsChange}
+                      disabled={uploadingField === "supporting"}
+                    />
+                  </label>
+                  {supportingDocIds.length > 0 && (
+                    <div className="p-3 rounded-xl border border-border bg-muted/30 space-y-2">
+                      {supportingDocIds.map((id, i) => (
+                        <div key={id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-background border border-border">
+                          <span className="text-sm text-muted-foreground flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            Document {i + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSupportingDocIds((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="text-destructive hover:underline text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {uploadError && (
+                  <p className="text-sm text-destructive">{uploadError}</p>
+                )}
 
                 <div className="flex items-start gap-3">
                   <input

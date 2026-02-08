@@ -140,6 +140,61 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
     };
   }
 
+  // Beneficiary metrics — so dashboard shows zeros when backend is unreachable
+  if (url.includes("/users/me/metrics")) {
+    return {
+      data: {
+        metrics: {
+          totalAidReceived: 0,
+          totalDisbursements: 0,
+          campaignsSupportingYou: 0,
+        },
+      },
+    };
+  }
+
+  // Public campaigns list — empty when backend unreachable
+  if (method === "GET" && (url === "/campaigns" || url === "/campaigns/")) {
+    return { data: { page: 1, limit: 20, total: 0, campaigns: [] } };
+  }
+
+  // My campaigns (beneficiary) — empty list when backend unreachable
+  if (url.includes("/campaigns/me")) {
+    return {
+      data: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        campaigns: [],
+      },
+    };
+  }
+
+  // Beneficiary confirm receipt — success so demo flow doesn't break
+  if (method === "PATCH" && /\/campaigns\/[^/]+\/confirm-beneficiary/.test(url)) {
+    return {
+      data: {
+        campaign: { id: "demo", beneficiaryReceipt: { confirmedAt: new Date().toISOString(), note: null } },
+        receipt: { id: "demo-receipt", confirmedAt: new Date().toISOString(), note: null },
+        message: "Service receipt confirmed successfully",
+      },
+    };
+  }
+
+  // Beneficiary disbursements list — empty when backend unreachable
+  if (url.includes("/users/me/disbursements")) {
+    return {
+      data: { page: 1, limit: 20, total: 0, disbursements: [] },
+    };
+  }
+
+  // Upload metadata (beneficiary docs) — return fake id when backend unreachable
+  if (url.includes("/uploads/metadata") && method === "POST") {
+    return {
+      data: { id: "demo-upload-" + Date.now(), url: "", name: data?.name, mimeType: data?.mimeType },
+    };
+  }
+
   // Public providers list endpoint
   if (url.includes("/providers/public")) {
     return {

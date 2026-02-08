@@ -5,6 +5,7 @@ import {
   // self-service
   getMe,
   getBeneficiaryMetrics,
+  getBeneficiaryDisbursements,
   updateProfile,
   requestAccountDeletion,
   restoreAccount,
@@ -37,6 +38,9 @@ router.get("/me", protect, getMe);
 
 // Beneficiary dashboard metrics (BENEFICIARY role only)
 router.get("/me/metrics", protect, getBeneficiaryMetrics);
+
+// Beneficiary list of disbursements (BENEFICIARY role only)
+router.get("/me/disbursements", protect, authorize("BENEFICIARY"), getBeneficiaryDisbursements);
 
 // Update your own profile (beneficiary / donor / provider) -(name, phone, etc.)
 router.put("/me", protect, updateProfile);

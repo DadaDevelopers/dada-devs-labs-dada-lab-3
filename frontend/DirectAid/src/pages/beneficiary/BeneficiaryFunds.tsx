@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { useBeneficiaryCampaigns, useBeneficiaryMetrics } from "../../hooks/useBeneficiaryApi";
+import { useBeneficiaryCampaigns, useBeneficiaryMetrics, useBeneficiaryDisbursements } from "../../hooks/useBeneficiaryApi";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
@@ -22,6 +22,7 @@ import {
   MapPin,
   Bell,
   Lock,
+  FolderKanban,
 } from "lucide-react";
 
 const BeneficiaryFunds = () => {
@@ -29,22 +30,12 @@ const BeneficiaryFunds = () => {
   const { user, logout } = useAuth();
   const { campaigns: userCampaigns, loading: campaignsLoading, error: campaignsError } = useBeneficiaryCampaigns();
   const { metrics, loading: metricsLoading, error: metricsError } = useBeneficiaryMetrics();
+  const { disbursements, loading: disbursementsLoading, error: disbursementsError } = useBeneficiaryDisbursements();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
   const beneficiaryName = user?.firstName || user?.name || user?.email || "User";
-
-  // Disbursements: backend endpoint not yet implemented — show empty until GET /api/beneficiaries/me/disbursements exists
-  const disbursements: Array<{
-    id: string;
-    campaignId?: string;
-    amount: number;
-    status: string;
-    disbursedAt: string;
-    description: string;
-    transactionRef: string;
-  }> = [];
 
   const filteredDisbursements = disbursements.filter((d) => {
     const campaign = userCampaigns.find((c) => c.id === d.campaignId);
@@ -54,21 +45,10 @@ const BeneficiaryFunds = () => {
   });
 
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/beneficiary",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Funds Received",
-      href: "/beneficiary/funds",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      label: "Reporting",
-      href: "/beneficiary/reporting",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+    { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [
@@ -110,9 +90,9 @@ const BeneficiaryFunds = () => {
           </Button>
         </div>
 
-        {(campaignsError || metricsError) && (
+        {(campaignsError || metricsError || disbursementsError) && (
           <p className="text-sm text-destructive" role="alert">
-            {campaignsError || metricsError}
+            {campaignsError || metricsError || disbursementsError}
           </p>
         )}
         {/* Summary Cards */}
@@ -305,7 +285,7 @@ const BeneficiaryFunds = () => {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-4">
-              Monthly breakdown will appear here once disbursements are available. It is derived from the disbursements list when the backend implements <code className="text-xs bg-muted px-1 rounded">GET /api/beneficiaries/me/disbursements</code>.
+              Monthly breakdown will appear here once disbursements are available.
             </p>
           )}
         </Card>
