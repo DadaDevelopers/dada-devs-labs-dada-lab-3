@@ -10,7 +10,6 @@ import {
   Search,
   MapPin,
   Clock,
-  TrendingUp,
   Heart,
   Filter,
   ChevronRight,
@@ -236,6 +235,23 @@ export default function CampaignPage() {
     return Math.min((campaign.amountRaised / campaign.targetAmount) * 100, 100);
   };
 
+  /** Whether this campaign is owned by the current beneficiary (we're on "My campaigns" so it's in myCampaigns). */
+  const isMyCampaign = (campaign: any) =>
+    isBeneficiary && (campaignsView === "my" || myCampaigns.some((m) => (m.id ?? m._id) === (campaign.id ?? campaign._id)));
+
+  /** Human-readable status line + badge style for cards. */
+  const getCampaignStatusLabel = (campaign: any) => {
+    const admin = (campaign.adminStatus ?? "").toLowerCase();
+    const status = (campaign.status ?? "").toLowerCase();
+    if (admin === "pending") return { label: "Pending approval", hint: "Not visible to donors until an admin approves.", badgeClass: "bg-amber-100/90 text-amber-800 border-amber-200/80" };
+    if (admin === "rejected") return { label: "Rejected", hint: "This campaign was not approved. You can edit and resubmit or contact support.", badgeClass: "bg-red-100/90 text-red-800 border-red-200/80" };
+    if (admin === "flagged") return { label: "Under review", hint: "An admin is reviewing this campaign.", badgeClass: "bg-violet-100/90 text-violet-800 border-violet-200/80" };
+    if (admin === "approved" && status === "active") return { label: "Live", hint: "Accepting donations.", badgeClass: "bg-emerald-100/90 text-emerald-800 border-emerald-200/80" };
+    if (status === "completed") return { label: "Funded", hint: "Fundraising goal reached.", badgeClass: "bg-sky-100/90 text-sky-800 border-sky-200/80" };
+    if (status === "cancelled") return { label: "Cancelled", hint: "This campaign is no longer active.", badgeClass: "bg-neutral-100/90 text-neutral-600 border-neutral-200/80" };
+    return { label: (campaign.status ?? "—") || "—", hint: "", badgeClass: "bg-primary/10 text-primary border-primary/20" };
+  };
+
   const daysLeft = (deadline: string) => {
     const end = new Date(deadline);
     const now = new Date();
@@ -270,7 +286,7 @@ export default function CampaignPage() {
           </h1>
           <p className="text-muted-foreground">
             {isBeneficiary && campaignsView === "my"
-              ? "Campaigns you created and their status"
+              ? "Campaigns you created and their status. Initiated means just created; pending approval means waiting for admin to approve so donors can see it."
               : "Find and support campaigns making a real impact"}
           </p>
           {isBeneficiary && (
@@ -405,51 +421,77 @@ export default function CampaignPage() {
                     {filteredCampaigns.length}
                   </span>{" "}
                   {filteredCampaigns.length === 1 ? "campaign" : "campaigns"}
+                  {isBeneficiary && campaignsView === "my" && (
+                    <span className="block mt-1 text-sm font-normal text-muted-foreground">
+                      Each card shows the campaign state: Initiated (just created), Pending approval (waiting for admin), Live (accepting donations), or Funded.
+                    </span>
+                  )}
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredCampaigns.map((campaign) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {filteredCampaigns.map((campaign) => {
+                  const statusInfo = getCampaignStatusLabel(campaign);
+                  const isMine = isMyCampaign(campaign);
+                  const campaignId = campaign.id ?? campaign._id;
+                  const isNotMineBeneficiary = isBeneficiary && !isMine;
+                  const ctaLabel = isMine ? "View details" : isNotMineBeneficiary ? "View details" : "Donate Now";
+                  const goToDetail = () => isMine ? navigate(`/beneficiary/campaigns/${campaignId}`) : navigate(`/campaigns/${campaignId}`);
+                  const onCta = () => {
+                    if (isMine || isNotMineBeneficiary) goToDetail();
+                    else navigate(`/donate?campaignId=${campaignId}`);
+                  };
+                  return (
                   <Card
                     key={campaign.id}
-                    className="overflow-hidden hover:shadow-lg transition cursor-pointer group"
-                    onClick={() => navigate(`/campaigns/${campaign.id}`)}
+                    className="flex flex-col min-h-[460px] w-full overflow-hidden rounded-2xl border border-white/20 bg-white/70 dark:bg-white/5 backdrop-blur-md shadow-lg hover:shadow-2xl hover:scale-[1.02] active:scale-[0.99] transition-all duration-300 cursor-pointer group"
+                    onClick={goToDetail}
                   >
-                    {/* Image or Category Badge */}
-                    <div className="h-40 flex items-center justify-center border-b border-border bg-muted">
-                      <Heart className="w-12 h-12 text-primary opacity-40" />
+                    {/* Image / hero with gradient overlay */}
+                    <div className="h-44 flex-shrink-0 flex items-center justify-center border-b border-white/20 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--primary)/0.08,transparent_70%)]" />
+                      <Heart className="w-14 h-14 text-primary/50 relative z-10 transition-transform duration-300 group-hover:scale-110" />
                     </div>
 
-                    {/* Content */}
-                    <div className="p-5">
-                      {/* Status & Category */}
-                      <div className="flex gap-2 mb-3">
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize border border-primary bg-primary/20 text-primary">
-                          {campaign.status}
-                        </span>
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize border border-primary bg-primary/10 text-primary">
-                          {campaign.category}
-                        </span>
+                    {/* Content — clear hierarchy, generous padding */}
+                    <div className="flex-1 flex flex-col p-6">
+                      {/* Status & category badges — coloured backgrounds */}
+                      <div className="space-y-2 mb-4">
+                        <div className="flex gap-2 flex-wrap">
+                          <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${statusInfo.badgeClass}`}>
+                            {statusInfo.label}
+                          </span>
+                          {campaign.category && (
+                            <span className="text-xs font-medium px-3 py-1.5 rounded-full border bg-muted/80 text-muted-foreground border-border">
+                              {campaign.category}
+                            </span>
+                          )}
+                        </div>
+                        {statusInfo.hint && (
+                          <p className="text-xs text-muted-foreground leading-snug font-normal">
+                            {statusInfo.hint}
+                          </p>
+                        )}
                       </div>
 
-                      {/* Title */}
-                      <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:opacity-80">
+                      {/* Title — primary hierarchy */}
+                      <h3 className="font-bold text-xl text-foreground mb-2 line-clamp-2 tracking-tight leading-snug">
                         {campaign.title}
                       </h3>
 
-                      {/* Description */}
-                      <p className="text-sm mb-4 line-clamp-2 text-muted-foreground">
+                      {/* Description — secondary */}
+                      <p className="text-sm font-normal text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
                         {campaign.description}
                       </p>
 
-                      {/* Location & Timeline */}
-                        <div className="flex gap-4 text-sm mb-4 text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4" />
-                          <span>{campaign.location || "—"}</span>
+                      {/* Location & timeline — tertiary */}
+                      <div className="flex gap-4 text-sm font-normal text-muted-foreground mb-4">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-4 h-4 flex-shrink-0 opacity-70" />
+                          <span className="truncate">{campaign.location || "—"}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 flex-shrink-0 opacity-70" />
                           <span>
                             {campaign.fundraisingDeadline
                               ? `${daysLeft(campaign.fundraisingDeadline)} days left`
@@ -458,57 +500,49 @@ export default function CampaignPage() {
                         </div>
                       </div>
 
-                      {/* Progress Bar */}
+                      {/* Progress — clear typography */}
                       <div className="mb-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-semibold">
+                        <div className="flex justify-between items-baseline mb-2">
+                          <span className="text-base font-semibold text-foreground">
                             ${Number(campaign.amountRaised ?? 0).toLocaleString()}
                           </span>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm font-normal text-muted-foreground">
                             of ${Number(campaign.targetAmount ?? 0).toLocaleString()}
                           </span>
                         </div>
-                        <div className="w-full rounded-full h-2 bg-muted">
+                        <div className="w-full rounded-full h-2.5 bg-muted/80 overflow-hidden">
                           <div
-                            className="h-2 rounded-full transition-all duration-300 bg-primary"
-                            style={{
-                              width: `${getProgressPercentage(campaign)}%`,
-                            }}
-                          ></div>
+                            className="h-full rounded-full bg-primary transition-all duration-500"
+                            style={{ width: `${getProgressPercentage(campaign)}%` }}
+                          />
                         </div>
-                        <p className="text-xs mt-1 text-muted-foreground">
+                        <p className="text-xs font-medium mt-1.5 text-muted-foreground">
                           {getProgressPercentage(campaign).toFixed(0)}% funded
                         </p>
                       </div>
 
-                      {/* Donor Count */}
-                      <div className="flex items-center justify-between pt-3 border-t border-border group-hover:opacity-100 transition">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      {/* Donor count + CTA row */}
+                      <div className="flex items-center justify-between pt-4 mt-auto border-t border-border/80">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                           <Heart className="w-4 h-4 text-primary" />
                           <span>{campaign.donorCount || 0} donors</span>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCta();
+                          }}
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded-md py-1 pr-0.5 transition-all duration-200 group/btn"
+                        >
+                          <span className="group-hover/btn:underline">{ctaLabel}</span>
+                          <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover/btn:translate-x-0.5 group-hover/btn:scale-110" />
+                        </button>
                       </div>
                     </div>
-
-                    {/* CTA Button */}
-                    <div className="px-5 py-3 border-t border-border bg-muted/50">
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isBeneficiary && campaignsView === "my") {
-                            navigate(`/campaigns/${campaign.id ?? campaign._id}`);
-                          } else {
-                            navigate(`/donate?campaignId=${campaign.id ?? campaign._id}`);
-                          }
-                        }}
-                        className="w-full"
-                      >
-                        {isBeneficiary && campaignsView === "my" ? "View details" : "Donate Now"}
-                      </Button>
-                    </div>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}

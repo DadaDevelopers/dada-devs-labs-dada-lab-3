@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useBeneficiaryCampaigns } from "../../hooks/useBeneficiaryApi";
+import api from "../../services/api";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
@@ -21,6 +22,7 @@ import {
   MapPin,
   Bell,
   Lock,
+  FolderKanban,
 } from "lucide-react";
 
 type Step = "select-campaign" | "upload-report" | "review" | "success";
@@ -43,21 +45,10 @@ const BeneficiaryReporting = () => {
   );
 
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/beneficiary",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Funds Received",
-      href: "/beneficiary/funds",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      label: "Reporting",
-      href: "/beneficiary/reporting",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+    { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [
@@ -77,15 +68,23 @@ const BeneficiaryReporting = () => {
   };
 
   const handleUploadReport = async () => {
+    if (!selectedCampaign) return;
+    const campaignId = selectedCampaign.id || selectedCampaign._id;
+    if (!campaignId) {
+      setError("Invalid campaign");
+      return;
+    }
     setIsUploading(true);
     setError(null);
-    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await api.post(`/campaigns/${campaignId}/reports`, {
+        description: reportDescription.trim(),
+        reportType: "interim",
+        uploadIds: [],
+      });
       setCurrentStep("success");
     } catch (err: any) {
-      setError("Failed to upload report. Please try again.");
+      setError(err?.response?.data?.message || "Failed to upload report. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -251,11 +250,11 @@ const BeneficiaryReporting = () => {
 
                 {/* Uploaded Files */}
                 {reportFiles.length > 0 && (
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-4 p-3 rounded-xl border border-border bg-muted/30 space-y-2">
                     {reportFiles.map((file, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg"
+                        className="flex items-center justify-between p-3 bg-background rounded-xl border border-border"
                       >
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-primary" />

@@ -67,7 +67,7 @@ const CampaignCreationWizard = () => {
     { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
-  const userName = user?.name || user?.email || "User";
+  const userName = user?.firstName || user?.name || user?.email || "User";
   const userRole = role || "Guest";
 
   // Form state (backend: title, description, targetAmount, currency, category?, providerId?)
@@ -262,7 +262,7 @@ const CampaignCreationWizard = () => {
             <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-[var(--color-text-light)]">
               Create campaign
             </h1>
-            <div className="flex items-start w-full max-w-2xl">
+            <div className="flex items-start w-full max-w-2xl mx-auto">
               {[
                 { key: "info", label: "Details", short: "1" },
                 { key: "invoice", label: "Documents", short: "2" },
@@ -589,11 +589,11 @@ const CampaignCreationWizard = () => {
                     Choose files
                   </Button>
                   {supportingDocs.length > 0 && (
-                    <div className="space-y-2 mt-3">
+                    <div className="mt-3 p-3 rounded-xl border border-border bg-muted/30 space-y-2">
                       {supportingDocs.map((file, index) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border"
+                          className="flex items-center justify-between p-3 bg-background rounded-xl border border-border"
                         >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -673,9 +673,10 @@ const CampaignCreationWizard = () => {
                       />
                     </label>
                     {invoiceData.invoiceFile && (
-                      <p className="text-sm mt-3 font-medium text-primary">
-                        ✓ {invoiceData.invoiceFile.name}
-                      </p>
+                      <div className="mt-3 inline-flex items-center gap-2 p-2 rounded-xl border border-primary/30 bg-primary/5">
+                        <FileText className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">{invoiceData.invoiceFile.name}</span>
+                      </div>
                     )}
                   </div>
                 </div>
