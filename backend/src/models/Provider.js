@@ -65,9 +65,8 @@ const ProviderSchema = new Schema({
 });
 
 // Auto-update timestamp
-ProviderSchema.pre("save", function (next) {
+ProviderSchema.pre("save", function () {
   this.updatedAt = new Date();
-  next();
 });
 
 // Safe API output

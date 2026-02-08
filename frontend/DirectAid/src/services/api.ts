@@ -1,184 +1,104 @@
-const API_BASE = import.meta.env.VITE_BASE_URL;
+// api.ts - Fixed version with error handling
+export const API_BASE = "http://localhost:5000/api";
+
 interface ApiInstance {
-  defaults: {
-    headers: {
-      common: Record<string, string>;
-    };
-  };
-  // Helper to set the token globally
   setAuthToken: (token: string | null) => void; 
-  get: (url: string, config?: any) => Promise<any>;
-  post: (url: string, data?: any, config?: any) => Promise<any>;
-  put: (url: string, data?: any, config?: any) => Promise<any>;
-  delete: (url: string, config?: any) => Promise<any>;
-}
-
-async function fetchWrapper(url: string, method: string, data?: any, headers?: Record<string, string>) {
-  try {
-    const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
-    const options: RequestInit = {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...api.defaults.headers.common, // This now includes the token if set
-        ...headers,
-      },
-    };
-
-    if (data && (method === "POST" || method === "PUT")) {
-      options.body = JSON.stringify(data);
-    }
-
-    const res = await fetch(fullUrl, options);
-
-    if (!res.ok) {
-      const error: any = new Error("Network error");
-      const errorData = await res.json().catch(() => ({}));
-      error.response = {
-        data: errorData,
-        status: res.status,
-      };
-      throw error;
-    }
-
-    return { data: await res.json() };
-  } catch (err: any) {
-    if (err.response) throw err;
-    return handleDemoFallback(url, method, data);
-  }
-}
-
-async function handleDemoFallback(url: string, method: string, data?: any) {
-  await new Promise((r) => setTimeout(r, 400));
-  console.log(`Fallback active for: ${method} ${url}`);
-
-  if (url.includes("/auth/login") || url.includes("/auth/signup")) {
-    return {
-      data: {
-        token: "demo-token-" + Date.now(),
-        user: { id: "u1", email: data?.email, name: data?.name || "Demo User", role: data?.role || "donor" },
-      },
-    };
-  }
-
-  // NEW: Provider Profile Fallback
-  if (url.includes("/providers")) {
-    return {
-      data: {
-        id: "p1",
-        organizationName: data?.organizationName || "Mock Hospital",
-        organizationType: data?.organizationType || "hospital",
-        kycStatus: "pending",
-        walletBalance: { locked: 0, available: 0, total: 0 },
-        totalCampaigns: 0,
-        ...data
-      }
-    };
-  }
-
-  // Register endpoint
-  if (url.includes("/auth/register")) {
-    return {
-      data: {
-        accessToken: "demo-access-token-" + Date.now(),
-        user: {
-          id: "demo-user-" + Date.now(),
-          email: data?.email || "demo@example.com",
-          firstName: data?.firstName || "Demo",
-          role: data?.role || "UNASSIGNED",
-        },
-      },
-    };
-  }
-
-  // Forgot password endpoint
-  if (url.includes("/auth/forgot-password")) {
-    return {
-      data: { success: true, message: "Password reset email sent" },
-    };
-  }
-
-  // User profile endpoint
-  if (url.includes("/user/me")) {
-    if (method === "PUT") {
-      return {
-        data: {
-          id: "demo-user",
-          email: "demo@example.com",
-          name: data?.name || "Demo User",
-          role: "donor",
-          ...data,
-        },
-      };
-    }
-    return {
-      data: {
-        id: "demo-user",
-        email: "demo@example.com",
-        name: "Demo User",
-        role: "donor",
-      },
-    };
-  }
-
-  // Donate guest endpoint
-  if (url.includes("/donate/guest")) {
-    return {
-      data: { success: true, receiptId: "demo-receipt-1234" },
-    };
-  }
-
-  // Public providers list endpoint
-  if (url.includes("/providers/public")) {
-    return {
-      data: {
-        providers: [
-          {
-            id: "provider_001",
-            organizationName: "Global Relief Foundation",
-            organizationType: "other",
-            city: "Lagos",
-            country: "Nigeria",
-          },
-          {
-            id: "provider_002",
-            organizationName: "City General Hospital",
-            organizationType: "hospital",
-            city: "Nairobi",
-            country: "Kenya",
-          },
-          {
-            id: "provider_003",
-            organizationName: "Hope Education Center",
-            organizationType: "school",
-            city: "Accra",
-            country: "Ghana",
-          },
-        ],
-      },
-    };
-  }
-  return { data: { success: true } };
+  get: (url: string) => Promise<any>;
+  post: (url: string, data?: any) => Promise<any>;
+  put: (url: string, data?: any) => Promise<any>;
+  delete: (url: string) => Promise<any>;
 }
 
 const api: ApiInstance = {
-  defaults: {
-    headers: {
-      common: {},
-    },
-  },
-  // NEW: Logic to add/remove the Authorization header
   setAuthToken: (token: string | null) => {
     if (token) {
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      localStorage.setItem("auth_token", token);
     } else {
-      delete api.defaults.headers.common["Authorization"];
+      localStorage.removeItem("auth_token");
     }
   },
-  get: (url: string, config?: any) => fetchWrapper(url, "GET", undefined, config?.headers),
-  post: (url: string, data?: any, config?: any) => fetchWrapper(url, "POST", data, config?.headers),
-  put: (url: string, data?: any, config?: any) => fetchWrapper(url, "PUT", data, config?.headers),
-  delete: (url: string, config?: any) => fetchWrapper(url, "DELETE", undefined, config?.headers),
+
+  get: async (url: string) => {
+    const token = localStorage.getItem("auth_token");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
+    const res = await fetch(`${API_BASE}${url}`, { headers });
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    return res.json();
+  },
+
+  post: async (url: string, data?: any) => {
+    const token = localStorage.getItem("auth_token");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
+    const res = await fetch(`${API_BASE}${url}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(data)
+    });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    return res.json();
+  },
+
+  put: async (url: string, data?: any) => {
+    const token = localStorage.getItem("auth_token");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
+    const res = await fetch(`${API_BASE}${url}`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(data)
+    });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    return res.json();
+  },
+
+  delete: async (url: string) => {
+    const token = localStorage.getItem("auth_token");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
+    const res = await fetch(`${API_BASE}${url}`, {
+      method: "DELETE",
+      headers
+    });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    return res.json();
+  }
 };
 
 export default api;

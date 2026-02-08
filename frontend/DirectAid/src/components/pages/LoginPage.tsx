@@ -77,7 +77,7 @@ const LoginPage: React.FC = () => {
 
     try {
       // Use auth context to login
-      const result = await login(formData.email, formData.password);
+      const result = await login(formData.email, formData.password) as any;
 
       if (!result.ok) {
         setErrors({
@@ -91,13 +91,17 @@ const LoginPage: React.FC = () => {
       // Login successful - decide where to go next
       const finalRole = result?.user?.role || user?.role;
 
-      if (finalRole === "UNASSIGNED") {
+      if (!finalRole || finalRole === "UNASSIGNED") {
+        console.log("Redirecting to Onboarding ...")
         navigate("/onboarding");
-      } else if (finalRole === "PROVIDER") {
+      } else if (finalRole.toUpperCase() === "PROVIDER") {
         navigate("/provider");
-      } else if (finalRole === "BENEFICIARY") {
+      } else if (finalRole.toUpperCase() === "BENEFICIARY") {
         navigate("/beneficiary");
+      } else if (finalRole.toUpperCase() === "ADMIN") {
+        navigate("/admin");
       } else {
+        console.log("Role not recognized, defaulting to donor")
         navigate("/donor");
       }
     } catch {

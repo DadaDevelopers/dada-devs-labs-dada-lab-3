@@ -19,6 +19,12 @@ interface User {
   [key: string]: any;
 }
 
+interface LoginResponse {
+  ok: boolean;
+  user?: any; // You can change 'any' to your 'User' type later
+  error?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   role: Role | null;
@@ -77,28 +83,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.post("/auth/login", { email, password });
-      const { user: u, accessToken } = res.data;
+  // Add the return type : Promise<LoginResponse>
+const login = async (email: string, password: string): Promise<LoginResponse> => {
+  setLoading(true);
+  setError(null);
+  try {
+    const res = await api.post("/auth/login", { email, password });
+    
+    // REMOVE '.data' here. Access fields directly from res
+    const u = res.user;
+    const accessToken = res.accessToken;
 
-      api.setAuthToken(accessToken); // Our bearer token logic
-      setUser(u);
-      setRole(u.role || null);
-      setToken(accessToken);
-      saveToStorage(u, accessToken);
-
-      setLoading(false);
-      return { ok: true };
-    } catch (err: any) {
-      const message = err?.response?.data?.message || "Login failed";
-      setError(message);
-      setLoading(false);
-      return { ok: false, error: message };
+    if (!u || !accessToken) {
+      throw new Error("Invalid response format from server");
     }
-  };
+
+    api.setAuthToken(accessToken);
+    setUser(u);
+    setRole(u.role || null);
+    setToken(accessToken);
+    saveToStorage(u, accessToken);
+
+    setLoading(false);
+    // RETURN the user object here!
+    return { ok: true, user: u }; 
+  } catch (err: any) {
+    const message = err?.response?.data?.message || "Login failed";
+    setError(message);
+    setLoading(false);
+    return { ok: false, error: message };
+  }
+};
 
   const signup = async (payload: any) => {
     setLoading(true);
@@ -106,13 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Backend now uses /auth/register (from dev branch)
       const res = await api.post("/auth/register", payload);
-      const { user: u, accessToken } = res.data;
+      const u = res.user;
+      const t = res.accessToken;
 
-      api.setAuthToken(accessToken);
+      api.setAuthToken(t);
       setUser(u);
       setRole(u.role || null);
-      setToken(accessToken);
-      saveToStorage(u, accessToken);
+      setToken(t);
+      saveToStorage(u, t);
 
       setLoading(false);
       return { ok: true };
@@ -129,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const res = await api.post("/auth/select-role", payload);
-      const { user: updatedUser } = res.data;
+      const updatedUser = res.user;
 
       setUser(updatedUser);
       setRole(updatedUser.role || null);
@@ -151,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const res = await api.put("/users/me", updates);
-      const updatedUser = res.data as User;
+      const updatedUser = res.user || res;
 
       setUser(updatedUser);
       saveToStorage(updatedUser, token);

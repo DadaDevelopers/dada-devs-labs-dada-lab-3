@@ -10,23 +10,16 @@ const getHeaders = () => ({
 });
 
 export const ProviderService = {
-  // Matches: POST /api/providers
-  createProfile: (data: { businessName: string; phone: string }) => 
-    fetch(`${BASE_URL}/providers`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(data)
-    }).then(res => res.json()),
-
-  // Matches: GET /api/providers/me
-  getProfile: () => 
-    fetch(`${BASE_URL}/providers/me`, { headers: getHeaders() }).then(res => res.json()),
+  getProfile: () => api.get("/providers/me"),
+  updateProfile: (data: any) => api.put("/providers/me", data),
+  getStats: () => api.get("/providers/me/stats"),
+  withdraw: (amount: number) => api.post("/providers/me/withdraw", { amount }),
 };
 
 export const CampaignService = {
-  // Matches: GET /api/campaigns
-  getAll: (filters?: any) => api.get(`/campaigns`, { params: filters }),
-
-  // Matches: POST /api/campaigns
-  create:(campaignData: any) => api.post('/campains', campaignData)
+  getCampaigns: () => api.get("/campaigns"), // Assuming you'll add a list endpoint
+  getById: (id: string) => api.get(`/campaigns/${id}`),
+  create: (data: any) => api.post("/campaigns", data),
+  // THE KEY ENDPOINT FOR YOUR CONFIRMATION PAGE:
+  acceptCampaign: (id: string) => api.post(`/campaigns/${id}/provider-accept`),
 };

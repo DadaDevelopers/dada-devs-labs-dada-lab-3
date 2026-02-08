@@ -12,6 +12,12 @@ const CampaignSchema = new Schema(
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
 
+    providerAccepted: { type: Boolean, default: false },
+    providerAcceptedAt: { type: Date },
+    providerNotes: { type: String },
+    submittedForReview: { type: Boolean, default: false },
+    submittedAt: { type: Date },
+
     // beneficiary/provider point to User model (role-based)
     beneficiaryId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     providerId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },

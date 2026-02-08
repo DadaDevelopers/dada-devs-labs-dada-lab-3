@@ -151,33 +151,55 @@ const CampaignCreationWizard = () => {
     setIsSubmitting(true);
 
     try {
-      // 1. Prepare the payload for the API
-      // We combine your form data and the invoice details
-      const campaignPayload = {
-        title: formData.title,
-        description: formData.description,
-        targetAmount: parseFloat(formData.targetAmount),
-        category: formData.category,
-        location: formData.location,
-        fundraisingDeadline: formData.fundraisingDeadline,
-        // Send the provider selected from the UI
-        providerId: providerSelection === "platform" ? selectedProviderId : null,
-        manualProvider: providerSelection === "manual" ? manualProvider : null,
-        // Sending invoice metadata
-        invoiceDetails: {
-          amount: parseFloat(invoiceData.invoiceAmount),
-          date: invoiceData.invoiceDate,
-        }
-      };
-
-      // 2. THE REAL API CALL
-      // This sends the data to your backend
-      const response = await api.post("/campaigns", campaignPayload);
-
-      // 3. Update local state with the server's response
-      const serverCampaign = response.data;
+      // 1. We use FormData because we are uploading FILES
+      const data = new FormData();
       
-      // If you still use the AppContext to update the global list:
+      // Append basic text fields
+      data.append("title", formData.title);
+      data.append("description", formData.description);
+      data.append("targetAmount", formData.targetAmount);
+      data.append("category", formData.category);
+      data.append("location", formData.location);
+      data.append("fundraisingDeadline", formData.fundraisingDeadline);
+      
+      // Provider Logic
+      if (providerSelection === "platform") {
+        data.append("providerId", selectedProviderId);
+      } else {
+        data.append("manualProvider", JSON.stringify(manualProvider));
+      }
+
+      // 2. Append the Files
+      if (invoiceData.invoiceFile) {
+        data.append("invoiceFile", invoiceData.invoiceFile);
+      }
+      data.append("invoiceAmount", invoiceData.invoiceAmount);
+      data.append("invoiceDate", invoiceData.invoiceDate);
+
+      // Append supporting documents array
+      supportingDocs.forEach((file) => {
+        data.append("supportingDocuments", file);
+      });
+
+      // 3. THE REAL API CALL
+      // Note: We use a raw fetch or a modified axios call because of FormData
+      const response = await fetch(`${import.meta.env.VITE_BASE_URL}/campaigns`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
+          // DO NOT set Content-Type header when sending FormData; 
+          // the browser will set it automatically with the correct "boundary"
+        },
+        body: data,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to create campaign");
+      }
+
+      const serverCampaign = await response.json();
+      
       if (createCampaign) {
         createCampaign(serverCampaign);
       }
@@ -186,7 +208,7 @@ const CampaignCreationWizard = () => {
       setCurrentStep("success");
     } catch (error: any) {
       console.error("Failed to create campaign:", error);
-      alert(error?.response?.data?.message || "Something went wrong. Please try again.");
+      alert(error.message || "Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

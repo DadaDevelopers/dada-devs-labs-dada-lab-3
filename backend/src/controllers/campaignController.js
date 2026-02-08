@@ -17,6 +17,171 @@ function formatCampaign(c) {
 }
 
 /**
+ * Link provider to campaign
+ */
+export const linkProviderToCampaign = async (req, res, next) => {
+  try {
+    const { providerId } = req.body;
+    
+    if (!providerId) {
+      return res.status(400).json({ message: "providerId is required" });
+    }
+
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    // Check permissions
+    const isOwner = campaign.beneficiaryId.toString() === req.user.userId;
+    const isAdmin = req.user.role === "ADMIN";
+    
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: "Not authorized to link provider" });
+    }
+
+    // IMPORTANT: Get the User ID from the Provider
+    // We need to find the user associated with this provider
+    const Provider = mongoose.model('Provider');
+    const provider = await Provider.findById(providerId);
+    
+    if (!provider) {
+      return res.status(404).json({ message: "Provider not found" });
+    }
+
+    // Save the USER ID, not the Provider ID
+    campaign.providerId = provider.userId;  // This is the key fix!
+    await campaign.save();
+
+    // Log activity
+    await logActivity({
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      actionType: "LINK_PROVIDER_TO_CAMPAIGN",
+      entityType: "Campaign",
+      entityId: campaign._id,
+      description: `Provider linked to campaign: ${campaign.title}`,
+      metadata: { providerId, userId: provider.userId },
+      req
+    });
+
+    // Populate for response
+    const populatedCampaign = await Campaign.findById(campaign._id)
+      .populate("beneficiaryId", "firstName lastName email")
+      .populate("providerId", "firstName lastName email");
+
+    res.json({ 
+      message: "Provider linked successfully",
+      campaign: formatCampaign(populatedCampaign)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Provider accepts a campaign
+ */
+export const providerAcceptCampaign = async (req, res, next) => {
+  try {
+    const { notes } = req.body;
+    
+    const campaign = await Campaign.findById(req.params.id);
+    
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    // Check if this USER is the provider linked to the campaign
+    if (!campaign.providerId || campaign.providerId.toString() !== req.user.userId) {
+      return res.status(403).json({ 
+        message: "Not authorized. This campaign is not linked to your provider account." 
+      });
+    }
+
+    // Update provider acceptance
+    campaign.providerAccepted = true;
+    campaign.providerAcceptedAt = new Date();
+    campaign.providerNotes = notes || "";
+    await campaign.save();
+
+    // Log activity
+    await logActivity({
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      actionType: "PROVIDER_ACCEPT_CAMPAIGN",
+      entityType: "Campaign",
+      entityId: campaign._id,
+      description: `Provider accepted campaign: ${campaign.title}`,
+      metadata: { notes },
+      req
+    });
+
+    res.json({ 
+      message: "Campaign accepted successfully",
+      campaign: formatCampaign(campaign)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Submit campaign for review (after provider accepts)
+ */
+export const submitCampaignForReview = async (req, res, next) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    // Check permissions: beneficiary or provider who accepted it
+    const isBeneficiary = campaign.beneficiaryId.toString() === req.user.userId;
+    const isProvider = campaign.providerId && campaign.providerId.toString() === req.user.userId;
+    
+    if (!isBeneficiary && !isProvider) {
+      return res.status(403).json({ 
+        message: "Not authorized to submit this campaign for review" 
+      });
+    }
+
+    // Check if provider has accepted
+    if (!campaign.providerAccepted) {
+      return res.status(400).json({ 
+        message: "Provider must accept the campaign before submission" 
+      });
+    }
+
+    // Submit for admin review
+    campaign.submittedForReview = true;
+    campaign.submittedAt = new Date();
+    campaign.adminStatus = "pending"; // Reset admin status
+    await campaign.save();
+
+    // Log activity
+    await logActivity({
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      actionType: "SUBMIT_CAMPAIGN_FOR_REVIEW",
+      entityType: "Campaign",
+      entityId: campaign._id,
+      description: `Campaign submitted for admin review: ${campaign.title}`,
+      metadata: {},
+      req
+    });
+
+    res.json({ 
+      message: "Campaign submitted for admin review successfully",
+      campaign: formatCampaign(campaign)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Create Campaign (BENEFICIARY only)
  */
 export const createCampaign = async (req, res, next) => {
@@ -90,7 +255,7 @@ export const getAllCampaigns = async (req, res, next) => {
     const [campaigns, total] = await Promise.all([
       Campaign.find(filter)
         .populate("beneficiaryId", "firstName lastName email")
-        .populate("providerId", "firstName lastName organization phoneNumber")
+        .populate("providerId", "businessName email phone")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),

@@ -1,11 +1,14 @@
 import express from "express";
-import {
+import { 
   createCampaign,
   getAllCampaigns,
   getCampaignById,
   updateCampaign,
   adminUpdateCampaignStatus,
-  deleteCampaign
+  deleteCampaign,
+  linkProviderToCampaign,
+  providerAcceptCampaign,
+  submitCampaignForReview 
 } from "../controllers/campaignController.js";
 import { protect, authorize } from "../middlewares/auth.js";
 
@@ -16,6 +19,11 @@ router.post("/", protect, authorize("BENEFICIARY"), createCampaign);
 
 // List campaigns — public
 router.get("/", getAllCampaigns);
+
+// Add this route BEFORE the /:id routes (order matters!)
+router.post("/:id/link-provider", protect, linkProviderToCampaign);
+router.post("/:id/provider-accept", protect, authorize("PROVIDER"), providerAcceptCampaign);
+router.post("/:id/submit", protect, submitCampaignForReview);
 
 // Admin campaign endpoints (keep before dynamic /:id if needed)
 router.patch("/:id/status", protect, authorize("ADMIN"), adminUpdateCampaignStatus);

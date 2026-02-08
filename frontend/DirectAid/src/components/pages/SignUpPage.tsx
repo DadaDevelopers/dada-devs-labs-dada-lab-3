@@ -1,3 +1,4 @@
+// /components/pages/SignUpPage.tsx
 import React, { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import FormInput from "../ui/FormInput";
