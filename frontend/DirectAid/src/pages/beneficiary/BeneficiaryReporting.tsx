@@ -21,6 +21,7 @@ import {
   MapPin,
   Bell,
   Lock,
+  TrendingUp,
 } from "lucide-react";
 
 type Step = "select-campaign" | "upload-report" | "review" | "success";
@@ -43,21 +44,10 @@ const BeneficiaryReporting = () => {
   );
 
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/beneficiary",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Funds Received",
-      href: "/beneficiary/funds",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      label: "Reporting",
-      href: "/beneficiary/reporting",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <TrendingUp className="w-5 h-5" /> },
+    { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+    { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [

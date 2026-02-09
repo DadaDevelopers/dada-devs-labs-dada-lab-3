@@ -157,11 +157,11 @@ export default function CampaignDetail() {
           navigate("/");
         }}
       >
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Card className="p-8 text-center max-w-md">
+        <div className="p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[400px]">
+          <Card className="p-8 sm:p-10 text-center max-w-md rounded-xl border border-border shadow-sm">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
-            <p className="mb-4">Campaign not found.</p>
-            <Button onClick={() => navigate("/campaigns")} className="w-full">
+            <p className="mb-4 text-muted-foreground">Campaign not found.</p>
+            <Button onClick={() => navigate("/campaigns")} className="w-full rounded-lg">
               Back to Campaigns
             </Button>
           </Card>
@@ -174,13 +174,24 @@ export default function CampaignDetail() {
     return Math.min((campaign.amountRaised / campaign.targetAmount) * 100, 100);
   };
 
-  const daysLeft = () => {
-    const end = new Date(campaign.fundraisingDeadline);
+  const getDeadline = () =>
+    campaign.fundraisingDeadline ?? (campaign as any).metadata?.fundraisingDeadline;
+  const daysLeft = (): number | null => {
+    const raw = getDeadline();
+    if (raw == null || raw === "") return null;
+    const end = new Date(raw);
+    if (Number.isNaN(end.getTime())) return null;
     const now = new Date();
     const diff = Math.ceil(
       (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
     );
     return diff > 0 ? diff : 0;
+  };
+  const deadlineDisplay = (): string => {
+    const days = daysLeft();
+    if (days === null) return "No deadline set";
+    if (days === 0) return "Ended";
+    return `${days} days remaining`;
   };
 
   return (
@@ -194,58 +205,55 @@ export default function CampaignDetail() {
         navigate("/");
       }}
     >
-      <div className="space-y-6">
-        <button
-          onClick={() => navigate("/campaigns")}
-          className="flex items-center gap-2 text-sm font-medium text-primary hover:opacity-80 transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Campaigns
-        </button>
+      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+        <div className="space-y-6 sm:space-y-8">
+          <button
+            onClick={() => navigate("/campaigns")}
+            className="flex items-center gap-2 text-sm font-medium text-primary hover:opacity-80 transition"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Campaigns
+          </button>
 
-        {/* Content */}
-        <div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Main Content */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-6">
               {/* Hero Section */}
-              <Card className="mb-6 overflow-hidden">
-                <div className="h-80 flex items-center justify-center border-b border-border bg-muted">
-                  <Heart className="w-24 h-24 text-primary opacity-40" />
+              <Card className="overflow-hidden rounded-xl border border-border shadow-sm">
+                <div className="h-64 sm:h-80 flex items-center justify-center border-b border-border bg-gradient-to-br from-primary/5 via-muted/30 to-primary/10">
+                  <Heart className="w-20 h-20 sm:w-24 sm:h-24 text-primary/50" />
                 </div>
-
-                {/* Title & Meta */}
-                <div className="p-6">
-                  <div className="flex gap-3 mb-4">
-                    <span className="text-xs font-semibold px-3 py-1 rounded-full capitalize border border-primary bg-primary/20 text-primary">
+                <div className="p-6 sm:p-8">
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="text-xs font-semibold px-3 py-1.5 rounded-full border border-primary/40 bg-primary/15 text-primary">
                       {campaign.status}
                     </span>
-                    <span className="text-xs font-semibold px-3 py-1 rounded-full capitalize border border-primary bg-primary/10 text-primary">
+                    <span className="text-xs font-semibold px-3 py-1.5 rounded-full border border-border bg-muted/80 text-muted-foreground capitalize">
                       {campaign.category}
                     </span>
                   </div>
-
-                  <h1 className="text-3xl font-bold mb-2">
+                  <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-foreground leading-tight">
                     {campaign.title}
                   </h1>
-
-                  <div className="flex flex-wrap gap-6 mb-6 text-muted-foreground">
+                  <div className="flex flex-wrap gap-4 sm:gap-6 mb-6 text-sm text-muted-foreground">
+                    {campaign.location && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 shrink-0" />
+                        <span>{campaign.location}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-5 h-5" />
-                      <span>{campaign.location}</span>
+                      <Clock className="w-4 h-4 shrink-0" />
+                      <span>{deadlineDisplay()}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Clock className="w-5 h-5" />
-                      <span>{daysLeft()} days left</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-5 h-5" />
+                      <Users className="w-4 h-4 shrink-0" />
                       <span>{campaign.donorCount || 0} donors</span>
                     </div>
                   </div>
-
-                  <div className="rounded-lg p-4 border border-border bg-muted/50">
-                    <p className="leading-relaxed">
+                  <div className="rounded-xl p-5 border border-border bg-muted/30">
+                    <p className="text-foreground/90 leading-relaxed">
                       {campaign.description}
                     </p>
                   </div>
@@ -253,41 +261,32 @@ export default function CampaignDetail() {
               </Card>
 
               {/* Campaign Details */}
-              <Card className="mb-6">
-                <h2 className="text-xl font-bold mb-4">
+              <Card className="p-6 sm:p-8 rounded-xl border border-border shadow-sm">
+                <h2 className="text-lg font-semibold mb-5 text-foreground">
                   Campaign Details
                 </h2>
-
-                <div className="grid grid-cols-2 gap-6 mb-1">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Beneficiary
-                    </p>
-                    <p className="font-semibold">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="p-4 rounded-lg bg-muted/20">
+                    <p className="text-xs uppercase tracking-wide mb-1.5 text-muted-foreground">Beneficiary</p>
+                    <p className="font-semibold text-foreground">
                       {campaign.beneficiary?.name || "Pending Assignment"}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm mb-1 text-muted-foreground">
-                      Provider
-                    </p>
-                    <p className="font-semibold">
+                  <div className="p-4 rounded-lg bg-muted/20">
+                    <p className="text-xs uppercase tracking-wide mb-1.5 text-muted-foreground">Provider</p>
+                    <p className="font-semibold text-foreground">
                       DirectAid Provider Network
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm mb-1 text-muted-foreground">
-                      Created
-                    </p>
-                    <p className="font-semibold">
-                      {new Date(campaign.createdAt).toLocaleDateString()}
+                  <div className="p-4 rounded-lg bg-muted/20">
+                    <p className="text-xs uppercase tracking-wide mb-1.5 text-muted-foreground">Created</p>
+                    <p className="font-semibold text-foreground">
+                      {campaign.createdAt ? new Date(campaign.createdAt).toLocaleDateString() : "—"}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm mb-1 text-muted-foreground">
-                      Category
-                    </p>
-                    <p className="font-semibold capitalize">
+                  <div className="p-4 rounded-lg bg-muted/20">
+                    <p className="text-xs uppercase tracking-wide mb-1.5 text-muted-foreground">Category</p>
+                    <p className="font-semibold text-foreground capitalize">
                       {campaign.category}
                     </p>
                   </div>
@@ -295,81 +294,58 @@ export default function CampaignDetail() {
               </Card>
 
               {/* Funding Progress */}
-              <Card>
-                <h2 className="text-xl font-bold mb-4">
+              <Card className="p-6 sm:p-8 rounded-xl border border-border shadow-sm">
+                <h2 className="text-lg font-semibold mb-5 text-foreground">
                   Funding Progress
                 </h2>
-
-                <div className="flex items-end gap-4 mb-6">
+                <div className="flex flex-wrap items-end gap-6 mb-6">
                   <div>
-                    <p className="text-sm mb-1 text-muted-foreground">
-                      Raised
-                    </p>
-                    <p className="text-3xl font-bold text-primary">
-                      ${campaign.amountRaised.toLocaleString()}
+                    <p className="text-sm mb-1 text-muted-foreground">Raised</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-primary">
+                      ${Number(campaign.amountRaised ?? 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm mb-1 text-muted-foreground">
-                      Goal
-                    </p>
-                    <p className="text-2xl font-bold">
-                      ${campaign.targetAmount.toLocaleString()}
+                    <p className="text-sm mb-1 text-muted-foreground">Goal</p>
+                    <p className="text-xl sm:text-2xl font-bold text-foreground">
+                      ${Number(campaign.targetAmount ?? 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
-
-                <div className="w-full rounded-full h-3 bg-muted">
+                <div className="w-full rounded-full h-3 bg-muted overflow-hidden">
                   <div
-                    className="h-3 rounded-full transition-all duration-300 bg-primary"
-                    style={{
-                      width: `${getProgressPercentage()}%`,
-                    }}
-                  ></div>
+                    className="h-full rounded-full transition-all duration-300 bg-primary"
+                    style={{ width: `${getProgressPercentage()}%` }}
+                  />
                 </div>
-                <p className="text-sm mt-3">
+                <p className="text-sm mt-3 text-muted-foreground">
                   {getProgressPercentage().toFixed(0)}% of goal reached
                 </p>
               </Card>
             </div>
 
             {/* Sidebar */}
-            <div className="lg:col-span-1">
-              {/* Donate Button */}
+            <div className="lg:col-span-1 space-y-6">
               <Button
                 onClick={() => navigate(`/donate?campaignId=${campaign.id}`)}
-                className="w-full mb-4 text-lg py-6"
+                className="w-full text-base py-6 rounded-xl shadow-md font-semibold"
               >
                 <Heart className="w-5 h-5 mr-2" />
                 Donate Now
               </Button>
-
-              {/* Quick Info */}
-              <Card>
-                <div className="space-y-4">
+              <Card className="p-6 rounded-xl border border-border shadow-sm">
+                <div className="space-y-5">
                   <div>
-                    <p className="text-xs uppercase tracking-wide mb-1 text-primary">
-                      Status
-                    </p>
-                    <p className="font-semibold capitalize">
-                      {campaign.status}
-                    </p>
+                    <p className="text-xs uppercase tracking-wide mb-1.5 text-muted-foreground">Status</p>
+                    <p className="font-semibold text-foreground capitalize">{campaign.status}</p>
                   </div>
-                  <div className="border-t border-border pt-4">
-                    <p className="text-xs uppercase tracking-wide mb-1 text-primary">
-                      Deadline
-                    </p>
-                    <p className="font-semibold">
-                      {daysLeft()} days remaining
-                    </p>
+                  <div className="border-t border-border pt-5">
+                    <p className="text-xs uppercase tracking-wide mb-1.5 text-muted-foreground">Deadline</p>
+                    <p className="font-semibold text-foreground">{deadlineDisplay()}</p>
                   </div>
-                  <div className="border-t border-border pt-4">
-                    <p className="text-xs uppercase tracking-wide mb-1 text-primary">
-                      Donors
-                    </p>
-                    <p className="font-semibold">
-                      {campaign.donorCount || 0}
-                    </p>
+                  <div className="border-t border-border pt-5">
+                    <p className="text-xs uppercase tracking-wide mb-1.5 text-muted-foreground">Donors</p>
+                    <p className="font-semibold text-foreground">{campaign.donorCount || 0}</p>
                   </div>
                 </div>
               </Card>
