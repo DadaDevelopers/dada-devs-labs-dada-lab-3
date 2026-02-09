@@ -1,7 +1,5 @@
 // components/admin/campaignManagement/AdminCampaignFilters.tsx
-import { Button } from "../../ui/Button";
-
-type FilterType = "all" | "pending" | "approved" | "rejected" | "flagged";
+import type { FilterType } from "./AdminCampaignPage";
 
 interface AdminCampaignFiltersProps {
   filter: FilterType;
@@ -21,16 +19,20 @@ export default function AdminCampaignFilters({
   setFilter,
 }: AdminCampaignFiltersProps) {
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap gap-2">
       {filterOptions.map((option) => (
-        <Button
+        <button
           key={option.id}
-          variant={filter === option.id ? "default" : "outline"}
+          type="button"
           onClick={() => setFilter(option.id)}
-          className="capitalize"
+          className={`px-4 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${
+            filter === option.id
+              ? "bg-amber-500 text-black"
+              : "bg-white/10 text-slate-300 hover:bg-white/15 hover:text-white"
+          }`}
         >
           {option.label}
-        </Button>
+        </button>
       ))}
     </div>
   );
