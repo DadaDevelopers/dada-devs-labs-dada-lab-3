@@ -32,7 +32,7 @@ const UserSchema = new Schema(
       index: true
     },
     passwordHash: { type: String, required: true },
-    
+
     // Terms and conditions acceptance
     acceptedTerms: {
       accepted: { type: Boolean, default: false },
@@ -45,7 +45,7 @@ const UserSchema = new Schema(
       type: String,
       enum: ["UNASSIGNED", "DONOR", "BENEFICIARY", "PROVIDER", "ADMIN"],
       default: "UNASSIGNED",
-      index:true
+      index: true
     },
 
     // Profile data(contact and onboarding) - (can be collected later during onboarding)
@@ -95,14 +95,14 @@ const UserSchema = new Schema(
       displayName: { type: String, default: null, index: true }, // public shown name
       profilePicture: { type: Schema.Types.ObjectId, ref: "Upload", default: null }, // store as upload ref
       shortStory: { type: String, default: null }, // already exist but ensure length validation in API
-      category: { type: String, enum: ["medical","education","business","emergency","other"], default: "other", index: true },
+      category: { type: String, enum: ["medical", "education", "business", "emergency", "other"], default: "other", index: true },
       preferredProvider: { type: String, default: null },
       supportingDocs: UploadRef,
-      
+
       // sensitive ID handling — avoid raw PII strings where possible
       nationalIdHash: { type: String, default: null },         // hashed copy if you must store
       nationalIdUpload: { type: Schema.Types.ObjectId, ref: "Upload", default: null }, // prefer upload
-      
+
       // consent and contact preferences with audit
       consentContact: {
         agreed: { type: Boolean, default: false },
@@ -133,7 +133,7 @@ const UserSchema = new Schema(
 
     donorProfile: {
       displayName: { type: String, default: null },
-      preferredCategories: [{ type: String, enum: ["medical","education","business","emergency","other"] }],
+      preferredCategories: [{ type: String, enum: ["medical", "education", "business", "emergency", "other"] }],
       isAnonymousDefault: { type: Boolean, default: false }
     },
 
@@ -175,7 +175,7 @@ const UserSchema = new Schema(
     isDeleted: { type: Boolean, default: false, index: true }, //login deletion flag
     deletedAt: { type: Date, default: null }, //when deletion was requested
     scheduledDeletionAt: { type: Date, default: null }, //when permanent deletion happens(now+30days)
-    
+
     //Auditing
     lastLoginAt: Date
   },

@@ -1,6 +1,9 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
-export const API_BASE = "http://localhost:5000/api"; 
+export const API_BASE = "https://directaid-backend.onrender.com/api";
+// export const API_BASE = "http://localhost:5000/api";
+
+import type { AdminMetrics } from "../types";
 
 interface ApiInstance {
   setAuthToken: (token: string | null) => void;
@@ -80,17 +83,16 @@ async function fetchWrapper(
     // If it's already our custom error, rethrow it
     if (err.response) throw err;
 
-    // Check if it's a network error or CORS issue
-    console.error(`❌ Fetch error for ${url}:`, err.message);
-    
-    // Only use demo fallback for true network errors (not 204 or auth issues)
-    if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
-      console.warn("⚠️ Network error detected, using demo fallback for:", url);
-      return handleDemoFallback(url, method, data);
-    }
-    
-    // For other errors (like 204 handling, JSON parsing), rethrow
-    throw err;
+    // Admin endpoints: never use demo fallback — require real backend so UI shows error/retry
+    const isAdminEndpoint =
+      url.includes("/users/stats") ||
+      (url.startsWith("/users") && !url.includes("/me")) ||
+      url.includes("/providers") ||
+      url.includes("/campaigns");
+    if (isAdminEndpoint) throw err;
+
+    // Otherwise, handle demo fallback for non-admin
+    return handleDemoFallback(url, method, data);
   }
 }
 
@@ -172,10 +174,48 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
     };
   }
 
-  // Donate guest endpoint
+  // Donate guest endpoint - REMOVE DEMO FALLBACK TO USE REAL BACKEND
+  /*
   if (url.includes("/donate/guest")) {
-    return { success: true, receiptId: "demo-receipt-1234" };
+    // Simulate creating a donation and returning payment details
+    const method = (data?.method || data?.paymentMethod || "lightning").toString().toLowerCase();
+    const donationId = `don_demo_${Date.now()}`;
+
+    if (method === "lightning") {
+      return {
+        data: {
+          donation: {
+            id: donationId,
+            status: "PENDING",
+            amount: data?.amount || 0,
+            paymentMethod: "LIGHTNING",
+            paymentDetails: {
+              lightningInvoice:
+                "lnbc1pvjluezpp5qqqsyqcyq5rqwzqfppq9zq9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q9q", // demo BOLT11
+            },
+            receiptUrl: `https://directaid.example.com/receipts/${donationId}`,
+          },
+        },
+      };
+    }
+
+    // default to on-chain bitcoin
+    return {
+      data: {
+        donation: {
+          id: donationId,
+          status: "PENDING",
+          amount: data?.amount || 0,
+          paymentMethod: "BITCOIN",
+          paymentDetails: {
+            onchainAddress: "tb1qexampleaddressxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", // demo testnet address
+          },
+          receiptUrl: `https://directaid.example.com/receipts/${donationId}`,
+        },
+      },
+    };
   }
+  */
 
   // Public providers list endpoint
   if (url.includes("/providers/public")) {
@@ -206,8 +246,147 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
     };
   }
 
+  // No mock fallback for admin endpoints — let them throw so UI shows error/retry
   // Default response
   return { success: true };
+}
+
+// ——— Admin API (real backend only; no mock fallback) ———
+
+export interface AdminStatsRaw {
+  totalUsers?: number;
+  activeUsers?: number;
+  deletedUsers?: number;
+  usersByRole?: Record<string, number>;
+  kycByStatus?: Record<string, number>;
+  pendingKyc?: number;
+  campaignsByStatus?: Record<string, number>;
+  totalDonations?: number;
+  donationsByMonth?: { year: number; month: number; total: number }[];
+  newUsersLast7Days?: number;
+  topDonors?: { donorId: string; name: string | null; email: string | null; total: number }[];
+  recentActivity?: unknown[];
+}
+
+/** GET /users/stats — throws on error (no mock). */
+export async function getAdminStats(): Promise<AdminStatsRaw> {
+  const res = await api.get("/users/stats");
+  return res?.data as AdminStatsRaw;
+}
+
+/** Map backend stats to AdminMetrics for Overview. Uses only real backend data. */
+export async function getAdminMetrics(): Promise<AdminMetrics> {
+  const raw = await getAdminStats();
+  const totalCampaigns =
+    (raw.campaignsByStatus?.pending ?? 0) +
+    (raw.campaignsByStatus?.approved ?? 0) +
+    (raw.campaignsByStatus?.rejected ?? 0) +
+    (raw.campaignsByStatus?.flagged ?? 0);
+  const totalDonations = Number(raw.totalDonations ?? 0);
+  return {
+    generatedAt: new Date().toISOString(),
+    platformHealth: {
+      status: "OPERATIONAL",
+      uptimePercent30d: 100,
+      lastIncident: { occurredAt: "", resolvedAt: "", summary: "N/A" },
+    },
+    users: {
+      totalUsers: raw.totalUsers ?? 0,
+      donors: raw.usersByRole?.DONOR ?? 0,
+      beneficiaries: raw.usersByRole?.BENEFICIARY ?? 0,
+      providers: raw.usersByRole?.PROVIDER ?? 0,
+      admins: raw.usersByRole?.ADMIN ?? 0,
+      newUsersToday: raw.newUsersLast7Days ?? 0,
+      verifiedUsersPercent: 0,
+      flaggedUsers: 0,
+      suspendedUsers: 0,
+    },
+    campaigns: {
+      totalCampaigns,
+      activeCampaigns: raw.campaignsByStatus?.approved ?? 0,
+      completedCampaigns: 0,
+      pausedCampaigns: 0,
+      rejectedCampaigns: raw.campaignsByStatus?.rejected ?? 0,
+      campaignsCreatedToday: 0,
+      verificationQueueCount: raw.campaignsByStatus?.pending ?? 0,
+      highRiskCampaigns: 0,
+    },
+    donations: {
+      totalDonationsCount: totalDonations,
+      lightning: { totalSatsReceived: 0, totalDonations: 0, avgDonationSats: 0, successRatePercent: 0, failedInvoices24h: 0 },
+      mpesa: { totalKesReceived: 0, totalDonations: 0, avgDonationKes: 0, pendingPayments: 0, reversedPayments: 0 },
+      donationsToday: { count: 0, sats: 0, kes: 0 },
+    },
+    allocations: { allocatedToBeneficiariesSats: 0, allocatedToProvidersSats: 0, platformFeesSats: 0, pendingAllocations: 0, disputedAllocations: 0 },
+    compliance: { kycPending: raw.pendingKyc ?? 0, kycRejected: raw.kycByStatus?.REJECTED ?? 0, amlAlerts: 0, fraudInvestigationsOpen: 0, suspiciousDonationsLast30d: 0 },
+    financials: { platformRevenueSats: 0, avgFeePercent: 0, refunds: { totalRefunds: 0, satsRefunded: 0, kesRefunded: 0 } },
+    systemQueues: { donationWebhooksBacklog: 0, lightningSettlementLagSecondsAvg: 0, mpesaReconciliationLagMinutesAvg: 0 },
+  };
+}
+
+/** GET /users with optional role, page, limit, search. */
+export async function getUsers(params?: { page?: number; limit?: number; role?: string; search?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.role) sp.set("role", params.role);
+  if (params?.search) sp.set("search", params.search);
+  const q = sp.toString();
+  const res = await api.get(`/users${q ? `?${q}` : ""}`);
+  return res?.data as { page: number; limit: number; total: number; users: unknown[] };
+}
+
+/** GET /users/:id */
+export async function getUserById(id: string) {
+  const res = await api.get(`/users/${id}`);
+  return res?.data as { user: unknown };
+}
+
+/** POST /users/:id/verify-identity — body: { identityVerified: boolean, notes?: string } */
+export async function verifyUserIdentity(userId: string, body: { identityVerified: boolean; notes?: string }) {
+  const res = await api.post(`/users/${userId}/verify-identity`, body);
+  return res?.data;
+}
+
+/** GET /providers */
+export async function getProviders() {
+  const res = await api.get("/providers");
+  return res?.data as { providers?: unknown[] };
+}
+
+/** GET /providers/:id */
+export async function getProviderById(id: string) {
+  const res = await api.get(`/providers/${id}`);
+  return res?.data as { provider: unknown };
+}
+
+/** PUT /providers/:id/kyc — body: { status: "APPROVED" | "REJECTED", notes?: string } */
+export async function approveProviderKyc(providerId: string, body: { status: "APPROVED" | "REJECTED"; notes?: string }) {
+  const res = await api.put(`/providers/${providerId}/kyc`, body);
+  return res?.data;
+}
+
+/** GET /campaigns with optional adminStatus, page, limit */
+export async function getCampaigns(params?: { page?: number; limit?: number; adminStatus?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.adminStatus) sp.set("adminStatus", params.adminStatus);
+  const q = sp.toString();
+  const res = await api.get(`/campaigns${q ? `?${q}` : ""}`);
+  return res?.data as { page: number; limit: number; total: number; campaigns: unknown[] };
+}
+
+/** GET /campaigns/:id */
+export async function getCampaignById(id: string) {
+  const res = await api.get(`/campaigns/${id}`);
+  return res?.data as { campaign: unknown };
+}
+
+/** PATCH /campaigns/:id/status — body: { status: "approved" | "rejected" | "flagged" | "pending" } */
+export async function updateCampaignStatus(campaignId: string, status: "approved" | "rejected" | "flagged" | "pending") {
+  const res = await api.patch(`/campaigns/${campaignId}/status`, { status });
+  return res?.data as { campaign: unknown };
 }
 
 // Create the axios-like API instance

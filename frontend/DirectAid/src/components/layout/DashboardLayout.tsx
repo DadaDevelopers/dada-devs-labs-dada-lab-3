@@ -56,10 +56,9 @@ export const DashboardLayout = ({
                 className={`
                   flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
                   transition-colors duration-200
-                  ${
-                    isActive
-                      ? "bg-white/5 text-[var(--color-text-light)]"
-                      : "bg-transparent text-white/70 hover:bg-white/5 hover:text-white/90"
+                  ${isActive
+                    ? "bg-white/5 text-[var(--color-text-light)]"
+                    : "bg-transparent text-white/70 hover:bg-white/5 hover:text-white/90"
                   }
                 `}
               >
@@ -69,7 +68,7 @@ export const DashboardLayout = ({
             </Link>
           );
         })}
-        
+
         {/* Settings Navigation - Always Visible */}
         {settingsNavItems && settingsNavItems.length > 0 && (
           <div className="mt-6 pt-6 border-t border-white/10">
@@ -91,10 +90,9 @@ export const DashboardLayout = ({
                     className={`
                       flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
                       transition-colors duration-200
-                      ${
-                        isActive
-                          ? "bg-white/5 text-[var(--color-text-light)]"
-                          : "bg-transparent text-white/70 hover:bg-white/5 hover:text-white/90"
+                      ${isActive
+                        ? "bg-white/5 text-[var(--color-text-light)]"
+                        : "bg-transparent text-white/70 hover:bg-white/5 hover:text-white/90"
                       }
                     `}
                   >
@@ -104,7 +102,7 @@ export const DashboardLayout = ({
                 </Link>
               );
             })}
-            
+
             {/* Logout Button */}
             {onLogout && (
               <button
@@ -187,10 +185,13 @@ export const DashboardLayout = ({
               </div>
               <Avatar className="w-8 h-8 sm:w-10 sm:h-10">
                 <AvatarFallback className=" text-black text-xs sm:text-sm bg-[var(--color-accent)]">
-                  {userName
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
+                  {userName && userName.trim()
+                    ? userName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                    : "U"}
                 </AvatarFallback>
               </Avatar>
             </div>

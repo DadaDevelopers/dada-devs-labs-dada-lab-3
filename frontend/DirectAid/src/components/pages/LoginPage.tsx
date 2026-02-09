@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import FormInput from "../ui/FormInput";
-import {Button} from "../ui/Button";
+import { Button } from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface LoginFormData {
@@ -17,7 +17,6 @@ interface FormErrors {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
@@ -101,7 +100,7 @@ const LoginPage: React.FC = () => {
               ? "/beneficiary"
               : finalRole === "ADMIN"
                 ? "/admin"
-                : "/donor";
+                : "/campaigns";
       console.log("[auth] login redirect — result.user:", result?.user, "roleFromApi:", roleFromApi, "finalRole:", finalRole, "navigating to:", destination);
 
       // New users and anyone without a set role go to onboarding to select role; only explicit roles go to dashboards
@@ -114,8 +113,7 @@ const LoginPage: React.FC = () => {
       } else if (finalRole === "ADMIN") {
         navigate("/admin");
       } else {
-        console.log("Role not recognized, defaulting to donor")
-        navigate("/donor");
+        navigate("/campaigns");
       }
     } catch {
       setErrors({

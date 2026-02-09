@@ -1,6 +1,7 @@
-import { X, LayoutDashboard, Users, NotebookText, AlertTriangle, Settings, BarChart2 } from "lucide-react";
+import { X, LayoutDashboard, Users, NotebookText, Settings, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 
 // 1. Define props type for Sidebar
 type SidebarProps = {
@@ -16,33 +17,38 @@ type NavItemProps = {
   active?: boolean;
 };
 
-// 3. NavItem component with proper typing
+// 3. NavItem component with proper typing (hover scale + transition)
 const NavItem = ({ icon, label, active = false, to }: NavItemProps) => (
   <Link
     to={to}
-    className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer 
-      hover:bg-white/10 transition
-      ${active ? "bg-white/10 text-[var(--color-accent)]" : "text-gray-300"}
+    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer
+      transition-all duration-200 hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98]
+      ${active ? "bg-white/10 text-amber-400 font-semibold" : "text-gray-300"}
     `}
   >
     {icon}
-    <span>{label}</span>
+    <span className="text-sm tracking-tight">{label}</span>
   </Link>
 );
 
-// Navigation configuration
+// Navigation: Dashboard, User Management, Campaigns, Settings (admin profile)
 const navItems = [
-  { icon: <LayoutDashboard />, label: "Dashboard", to: "/admin/dashboard" },
+  { icon: <LayoutDashboard />, label: "Dashboard", to: "/admin/overview" },
   { icon: <Users />, label: "User Management", to: "/admin/users" },
   { icon: <NotebookText />, label: "Campaigns", to: "/admin/campaigns" },
-  { icon: <BarChart2 />, label: "Analytics", to: "#", placeholder: true },
-  { icon: <AlertTriangle />, label: "Flagged Reports", to: "#", placeholder: true },
-  { icon: <Settings />, label: "Settings", to: "#", placeholder: true },
+  { icon: <Settings />, label: "Settings", to: "/admin/settings" },
 ];
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <>
@@ -56,9 +62,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
 
       <aside
         className={`
-          fixed sm:static top-0 left-0 h-full w-64 z-30 bg-[#111827] 
+          fixed sm:static top-0 left-0 w-64 z-30 bg-[#111827] 
           border-r border-white/10 p-6 flex flex-col gap-6
           transform transition-transform duration-300
+          min-h-screen h-screen flex-shrink-0
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full sm:translate-x-0"}
         `}
       >
@@ -86,6 +93,18 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             />
           ))}
         </nav>
+
+        {/* Logout — beneath Settings */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer
+            transition-all duration-200 hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98]
+            text-gray-300 mt-auto"
+        >
+          <LogOut className="w-5 h-5" />
+          <span className="text-sm tracking-tight">Log out</span>
+        </button>
       </aside>
     </>
   );

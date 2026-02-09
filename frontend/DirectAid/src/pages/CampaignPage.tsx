@@ -26,10 +26,77 @@ export default function CampaignPage() {
   const [selectedCategory, setSelectedCategory] = useState<FilterCategory>("all");
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("all");
   const [showFilters, setShowFilters] = useState(false);
-  
-  // API States (Your Fixes)
+
+  // API state for campaigns
   const [realCampaigns, setRealCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Dynamic navigation items based on role (dev branch)
+  const navItems = useMemo(() => {
+    switch (role) {
+      case "DONOR":
+        return [
+          { label: "Discover", href: "/donor", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Campaigns", href: "/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+          { label: "My Donations", href: "/donor/donations", icon: <Heart className="w-5 h-5" /> },
+          { label: "Receipts", href: "/donor/receipts", icon: <Receipt className="w-5 h-5" /> },
+        ];
+      case "BENEFICIARY":
+        return [
+          { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
+        ];
+      case "PROVIDER":
+        return [
+          { label: "Dashboard", href: "/provider", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Campaigns", href: "/provider/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+          { label: "Upload Invoices", href: "/provider/invoices", icon: <Upload className="w-5 h-5" />, },
+          { label: "Withdrawals", href: "/provider/withdrawals", icon: <Wallet className="w-5 h-5" />, },
+          { label: "Proof Upload", href: "/provider/proof-upload", icon: <FileText className="w-5 h-5" />, },
+        ];
+      default:
+        return [
+          { label: "Discover", href: "/", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Campaigns", href: "/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+        ];
+    }
+  }, [role]);
+
+  const settingsNavItems = useMemo(() => {
+    if (!user) {
+      return [{ id: "login", label: "Sign In", href: "/login", icon: <User className="w-5 h-5" /> }];
+    }
+
+    switch (role) {
+      case "DONOR":
+        return [
+          { id: "profile", label: "Profile", href: "/donor/settings/profile", icon: <User className="w-5 h-5" /> },
+          { id: "payment", label: "Payment Methods", href: "/donor/settings/payment", icon: <CreditCard className="w-5 h-5" /> },
+          { id: "notifications", label: "Notifications", href: "/donor/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+          { id: "change-password", label: "Change Password", href: "/donor/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+        ];
+      case "BENEFICIARY":
+        return [
+          { id: "profile", label: "Profile", href: "/beneficiary/settings/profile", icon: <User className="w-5 h-5" /> },
+          { id: "address", label: "Address", href: "/beneficiary/settings/address", icon: <MapPin className="w-5 h-5" /> },
+          { id: "notifications", label: "Notifications", href: "/beneficiary/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+          { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+        ];
+      case "PROVIDER":
+        return [
+          { id: "profile", label: "Profile", href: "/provider/settings/profile", icon: <User className="w-5 h-5" /> },
+          { id: "payouts", label: "Payouts", href: "/provider/settings/payouts", icon: <Wallet className="w-5 h-5" /> },
+          { id: "notifications", label: "Notifications", href: "/provider/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+          { id: "change-password", label: "Change Password", href: "/provider/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+        ];
+      default:
+        return [{ id: "profile", label: "Profile Settings", href: "/settings", icon: <User className="w-5 h-5" /> }];
+    }
+  }, [user, role]);
+
+  const userName = user?.name || user?.email || "User";
+  const userRole = role || "Guest";
 
   const categories: { id: FilterCategory; label: string }[] = [
     { id: "all", label: "All Categories" },
@@ -88,28 +155,18 @@ export default function CampaignPage() {
     });
   }, [realCampaigns, searchQuery, selectedCategory, selectedStatus]);
 
-  // Dev Branch Nav Logic
-  const getNavItems = () => {
-    const currentRole = role?.toLowerCase();
-    if (currentRole === "provider") {
-      return [
-        { label: "Dashboard", href: "/provider", icon: <LayoutDashboard className="w-5 h-5" /> },
-        { label: "Campaigns", href: "/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
-        { label: "Invoices", href: "/provider/invoices", icon: <Upload className="w-5 h-5" /> },
-      ];
-    }
-    // ... logic for beneficiary/donor as seen in Dev branch
-    return [{ label: "Campaigns", href: "/campaigns", icon: <FolderKanban className="w-5 h-5" /> }];
-  };
-
   if (loading) return <div className="p-20 text-center text-primary">Loading Campaigns...</div>;
 
   return (
     <DashboardLayout
-      navItems={getNavItems()}
-      userName={user?.name || user?.email || "User"}
-      userRole={role || "Guest"}
-      onLogout={async () => { await logout(); navigate("/"); }}
+      navItems={navItems}
+      userName={userName}
+      userRole={userRole}
+      settingsNavItems={settingsNavItems}
+      onLogout={async () => {
+        await logout();
+        navigate("/");
+      }}
     >
       <div className="space-y-6">
         <header>
@@ -133,36 +190,83 @@ export default function CampaignPage() {
           </Button>
         </div>
 
-        {/* Filter Section */}
+        {/* Filter Section (dev branch layout) */}
         {showFilters && (
-          <Card className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="text-sm font-medium block mb-2">Category</label>
-              <div className="flex flex-wrap gap-2">
-                {categories.map(cat => (
-                  <button 
-                    key={cat.id} 
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-1 rounded-full text-xs border transition ${selectedCategory === cat.id ? 'bg-primary text-white' : 'bg-background'}`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
+          <div className="border-t border-border pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-3">Category</label>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition border ${selectedCategory === cat.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card text-foreground border-border hover:bg-accent"
+                        }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-3">Campaign Status</label>
+                <div className="flex flex-wrap gap-2">
+                  {statuses.map((status) => (
+                    <button
+                      key={status.id}
+                      onClick={() => setSelectedStatus(status.id)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition border ${selectedStatus === status.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card text-foreground border-border hover:bg-accent"
+                        }`}
+                    >
+                      {status.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            {/* Status Filter logic here... */}
-          </Card>
+            <button
+              onClick={() => setShowFilters(false)}
+              className="text-sm mt-4 text-primary hover:opacity-80 transition"
+            >
+              Hide Filters
+            </button>
+          </div>
         )}
 
-        {/* Grid Results */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCampaigns.map((campaign) => (
-            <Card 
-              key={campaign._id || (campaign as any).id} 
-              onClick={() => navigate(`/campaigns/${campaign._id || (campaign as any).id}`)}
-              className="overflow-hidden hover:shadow-lg transition cursor-pointer group"
-            >
-              <div className="p-5 space-y-4">
+        {/* Results */}
+        <div>
+          {filteredCampaigns.length === 0 ? (
+            <div className="text-center py-12">
+              <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-lg">No campaigns found matching your filters.</p>
+              <p className="text-sm mt-1 text-muted-foreground">
+                Try adjusting your search or filters
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-6 flex items-center justify-between">
+                <p>
+                  Showing{" "}
+                  <span className="font-semibold">{filteredCampaigns.length}</span>{" "}
+                  {filteredCampaigns.length === 1 ? "campaign" : "campaigns"}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredCampaigns.map((campaign) => {
+                  const campaignId = campaign._id || (campaign as any).id;
+                  return (
+                    <Card
+                      key={campaignId}
+                      className="overflow-hidden hover:shadow-lg transition cursor-pointer group"
+                      onClick={() => navigate(`/campaigns/${campaignId}`)}
+                    >
+                      <div className="p-5 space-y-4">
                 <div className="flex justify-between items-start">
                   <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded bg-primary/10 text-primary">
                     {campaign.category}
@@ -194,9 +298,13 @@ export default function CampaignPage() {
                   </div>
                   <ChevronRight className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-all" />
                 </div>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
-            </Card>
-          ))}
+            </>
+          )}
         </div>
       </div>
     </DashboardLayout>
