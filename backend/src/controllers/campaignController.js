@@ -14,6 +14,11 @@ function formatCampaign(c) {
   if (obj.targetAmount) obj.targetAmount = parseFloat(obj.targetAmount.toString());
   if (obj.amountRaised) obj.amountRaised = parseFloat(obj.amountRaised.toString());
 
+  // Flatten location for frontend convenience
+  if (obj.metadata && obj.metadata.location) {
+    obj.location = obj.metadata.location;
+  }
+
   return obj;
 }
 
