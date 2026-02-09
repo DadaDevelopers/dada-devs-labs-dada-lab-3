@@ -208,7 +208,11 @@ export type DonationStatus =
   | "released"
   | "withdrawn"
   | "refunded"
-  | "disputed";
+  | "disputed"
+  | "completed"
+  | "COMPLETED"
+  | "FAILED"
+  | "PENDING";
 export type PaymentMethod =
   | "lightning"
   | "card"
@@ -236,6 +240,7 @@ export interface Donation {
   // Donor preferences
   isAnonymous: boolean;
   coversPlatformFees: boolean;
+  isRecurring?: boolean;
 
   // Receipt
   receiptUrl?: string;
@@ -355,6 +360,7 @@ export interface DonationFormData {
   paymentMethod: PaymentMethod;
   isAnonymous?: boolean;
   coversPlatformFees?: boolean;
+  isRecurring?: boolean;
   donorName?: string;
   donorEmail?: string;
 }

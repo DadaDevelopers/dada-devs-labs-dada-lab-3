@@ -28,8 +28,8 @@ function generateToken() {
 export const getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.userId)
-      //.populate("beneficiaryProfile.profilePicture beneficiaryProfile.supportingDocs providerProfile.licenseDocs pendingEmail.pendingUpload")
-      //.select("-passwordHash");
+    //.populate("beneficiaryProfile.profilePicture beneficiaryProfile.supportingDocs providerProfile.licenseDocs pendingEmail.pendingUpload")
+    //.select("-passwordHash");
     if (!user) return res.status(404).json({ message: "User not found" });
 
     //dashboard will know when to block campaign creation and when to show "Complete your profile (80%)"
@@ -230,7 +230,7 @@ export const updateProfile = async (req, res, next) => {
         if (uploads.length !== ids.length) return res.status(400).json({ message: "Invalid licenseDocs" });
         user.providerProfile.licenseDocs = uploads.map(u => u._id);
 
-        if (["NOT_REQUIRED","REJECTED"].includes(user.kyc.status)) {
+        if (["NOT_REQUIRED", "REJECTED"].includes(user.kyc.status)) {
           user.kyc.status = "PENDING";
           user.kyc.submittedAt = new Date();
         }
