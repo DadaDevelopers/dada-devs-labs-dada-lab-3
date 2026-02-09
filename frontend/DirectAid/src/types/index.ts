@@ -122,9 +122,9 @@ export type ConfirmationStatus =
 
 export interface Campaign {
   id: string;
-  providerId: string;
+  providerId: string | any;
   provider: Partial<Provider>;
-  beneficiaryId: string;
+  beneficiaryId: string | any;
   beneficiary: Partial<Beneficiary>;
   invoiceId: string;
   invoice: Invoice;

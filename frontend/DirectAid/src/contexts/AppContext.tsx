@@ -35,7 +35,7 @@ interface AppContextType {
   // Campaigns
   campaigns: Campaign[];
   selectedCampaign: Campaign | null;
-  selectCampaign: (campaignId: string) => void;
+  selectCampaign: (campaignId: string) => Promise<void>;
   createCampaign: (campaign: Campaign) => void;
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
 
@@ -286,8 +286,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         // Normalize campaigns: status to lowercase, provider name formatting
         const normalizedCampaigns = data.map((c: any) => ({
           ...c,
+          id: c.id || c._id || c.publicId || "",
           status: c.status?.toLowerCase() || "active",
           adminStatus: c.adminStatus?.toLowerCase() || "pending",
+          beneficiary: {
+            ...c.beneficiary,
+            name: c.beneficiaryId ? `${c.beneficiaryId.firstName} ${c.beneficiaryId.lastName || ""}`.trim() : "Beneficiary"
+          },
           provider: {
             ...c.provider,
             name: c.providerId?.organization ||

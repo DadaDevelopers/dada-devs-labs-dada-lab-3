@@ -188,11 +188,21 @@ export const getAllCampaigns = async (req, res, next) => {
       Campaign.countDocuments(filter)
     ]);
 
+    // Enhance campaigns with donorCount
+    const enhancedCampaigns = await Promise.all(campaigns.map(async (c) => {
+      const donorCount = await mongoose.model("Donation").distinct("donorId", {
+        campaignId: c._id,
+        status: "COMPLETED"
+      }).then(res => res.length);
+      const formatted = formatCampaign(c);
+      return { ...formatted, donorCount };
+    }));
+
     res.json({
       page: Number(page),
       limit: Number(limit),
       total,
-      campaigns: campaigns.map(formatCampaign)
+      campaigns: enhancedCampaigns
     });
   } catch (err) {
     next(err);
@@ -249,7 +259,17 @@ export const getCampaignById = async (req, res, next) => {
 
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
-    res.json({ campaign: formatCampaign(campaign) });
+    const donorCount = await mongoose.model("Donation").distinct("donorId", {
+      campaignId: campaign._id,
+      status: "COMPLETED"
+    }).then(res => res.length);
+
+    res.json({
+      campaign: {
+        ...formatCampaign(campaign),
+        donorCount
+      }
+    });
   } catch (err) {
     next(err);
   }

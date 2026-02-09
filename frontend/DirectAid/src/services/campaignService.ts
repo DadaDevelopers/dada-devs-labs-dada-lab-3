@@ -16,7 +16,7 @@ export const campaignService = {
     getCampaignById: async (id: string): Promise<Campaign> => {
         try {
             const response = await api.get(`/campaigns/${id}`);
-            return response.data;
+            return response.data.campaign || response.data;
         } catch (error) {
             console.error(`Error fetching campaign ${id}:`, error);
             throw error;

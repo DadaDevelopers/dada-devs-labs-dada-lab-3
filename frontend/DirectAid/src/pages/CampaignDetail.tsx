@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -28,10 +29,21 @@ import {
 export default function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { campaigns } = useApp();
+  const { campaigns, isLoading, selectCampaign, selectedCampaign } = useApp();
   const { user, role, logout } = useAuth();
+  const [localLoading, setLocalLoading] = useState(false);
 
-  const campaign = campaigns.find((c) => c.id === id);
+  useEffect(() => {
+    if (id && (!selectedCampaign || selectedCampaign.id !== id)) {
+      setLocalLoading(true);
+      selectCampaign(id).finally(() => setLocalLoading(false));
+    }
+  }, [id, selectedCampaign, selectCampaign]);
+
+  const campaign = selectedCampaign || campaigns.find((c: any) => c.id === id);
+
+  const userName = user?.name || user?.email || "User";
+  const userRole = role || "Guest";
 
   const getNavItems = () => {
     switch (role) {
@@ -68,7 +80,6 @@ export default function CampaignDetail() {
     if (!user) {
       return [{ id: "login", label: "Sign In", href: "/login", icon: <User className="w-5 h-5" /> }];
     }
-
     switch (role) {
       case "DONOR":
         return [
@@ -95,8 +106,30 @@ export default function CampaignDetail() {
     }
   };
 
-  const userName = user?.name || user?.email || "User";
-  const userRole = role || "Guest";
+  if (isLoading || localLoading) {
+    return (
+      <DashboardLayout
+        navItems={getNavItems()}
+        userName={userName}
+        userRole={userRole}
+        settingsNavItems={getSettingsNavItems()}
+        onLogout={async () => {
+          await logout();
+          navigate("/");
+        }}
+      >
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-primary animate-pulse font-bold tracking-widest uppercase text-sm">
+            Synchronizing Audit Rail...
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+
+
+
 
   if (!campaign) {
     return (
@@ -141,12 +174,29 @@ export default function CampaignDetail() {
     const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return diff > 0 ? diff : 0;
   };
-  const deadlineDisplay = (): string => {
-    const days = daysLeft();
-    if (days === null) return "No deadline set";
-    if (days === 0) return "Ended";
-    return `${days} days remaining`;
+  const getStatusLabel = () => {
+    if (campaign.confirmationStatus === "provider_confirmed") return "Awaiting Beneficiary Confirmation";
+    if (campaign.confirmationStatus === "both_confirmed") return "Fully Verified & Locked";
+    if (campaign.confirmationStatus === "disputed") return "Audit in Progress (Disputed)";
+    return campaign.status || "Active";
   };
+
+  const getStatusBadgeColor = () => {
+    if (campaign.confirmationStatus === "both_confirmed") return "bg-green-500 text-white";
+    if (campaign.confirmationStatus === "provider_confirmed") return "bg-blue-500 text-white";
+    if (campaign.confirmationStatus === "disputed") return "bg-red-500 text-white";
+    return "bg-primary text-black";
+  };
+
+  const isOwner = user && campaign.beneficiaryId && (
+    (typeof campaign.beneficiaryId === 'string' && campaign.beneficiaryId === user.id) ||
+    (typeof campaign.beneficiaryId === 'object' && (campaign.beneficiaryId._id === user.id || campaign.beneficiaryId.id === user.id))
+  );
+
+  const isAssignedProvider = user && campaign.providerId && (
+    (typeof campaign.providerId === 'string' && campaign.providerId === user.id) ||
+    (typeof campaign.providerId === 'object' && (campaign.providerId._id === user.id || campaign.providerId.id === user.id))
+  );
 
   return (
     <DashboardLayout
@@ -189,8 +239,8 @@ export default function CampaignDetail() {
                 {/* Hero Overlay */}
                 <div className="absolute inset-x-0 bottom-0 p-8 sm:p-12 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-20">
                   <div className="flex gap-2 mb-4">
-                    <span className="text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest bg-primary text-black">
-                      {campaign.status}
+                    <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${getStatusBadgeColor()}`}>
+                      {getStatusLabel()}
                     </span>
                     <span className="text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest bg-white/10 backdrop-blur-md text-white border border-white/20">
                       {campaign.category}
@@ -307,13 +357,35 @@ export default function CampaignDetail() {
                     </div>
                   </div>
 
-                  <Button
-                    onClick={() => navigate(`/donate?campaignId=${campaign.id}`)}
-                    className="w-full h-16 text-lg rounded-3xl btn-cta flex items-center justify-center gap-3"
-                  >
-                    <Heart className="w-6 h-6" />
-                    <span>Support this Mission</span>
-                  </Button>
+                  {userRole === "DONOR" || userRole === "Guest" ? (
+                    <Button
+                      onClick={() => navigate(`/donate?campaignId=${campaign.id}`)}
+                      className="w-full h-16 text-lg rounded-3xl btn-cta flex items-center justify-center gap-3"
+                    >
+                      <Heart className="w-6 h-6" />
+                      <span>Support this Mission</span>
+                    </Button>
+                  ) : isOwner && campaign.confirmationStatus === "provider_confirmed" ? (
+                    <Button
+                      onClick={() => navigate("/beneficiary/confirm")}
+                      className="w-full h-16 text-lg rounded-3xl bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all"
+                    >
+                      <ShieldCheck className="w-6 h-6" />
+                      <span>Confirm Service Receipt</span>
+                    </Button>
+                  ) : isAssignedProvider && campaign.confirmationStatus === "pending" ? (
+                    <Button
+                      onClick={() => navigate("/provider/confirm")}
+                      className="w-full h-16 text-lg rounded-3xl bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all"
+                    >
+                      <Zap className="w-6 h-6" />
+                      <span>Confirm Service Delivery</span>
+                    </Button>
+                  ) : (
+                    <div className="p-4 text-center rounded-2xl bg-white/5 border border-white/10 text-xs text-muted-foreground italic">
+                      {isOwner ? "Awaiting provider confirmation to unlock receipt." : "You are viewing this campaign as a " + userRole}
+                    </div>
+                  )}
                 </div>
               </Card>
 
