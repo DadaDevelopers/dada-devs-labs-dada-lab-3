@@ -130,11 +130,18 @@ const BeneficiaryDashboard = () => {
             : "Pending",
         },
         {
-          status: primaryCampaign.beneficiaryReceipt ? "Completed" : "Upcoming",
-          label: "Beneficiary confirmation",
+          status:
+            primaryCampaign.confirmationStatus === "both_confirmed" || primaryCampaign.beneficiaryReceipt
+              ? "Completed"
+              : primaryCampaign.confirmationStatus === "provider_confirmed"
+                ? "Current"
+                : "Upcoming",
+          label: "Confirm receipt & release",
           date: primaryCampaign.beneficiaryReceipt?.confirmedAt
             ? primaryCampaign.beneficiaryReceipt.confirmedAt.split("T")[0]
-            : "Awaiting action",
+            : primaryCampaign.confirmationStatus === "provider_confirmed"
+              ? "Awaiting your confirmation"
+              : "Pending",
         },
         { status: "Upcoming", label: "Final Report", date: "Jan 30, 2025" },
       ]
@@ -175,21 +182,10 @@ const BeneficiaryDashboard = () => {
   ];
 
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/beneficiary",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Funds Received",
-      href: "/beneficiary/funds",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      label: "Reporting",
-      href: "/beneficiary/reporting",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+    { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [
@@ -621,7 +617,7 @@ const BeneficiaryDashboard = () => {
                     </div>
                   </div>
                 </div>
-              ) : primaryCampaign?.beneficiaryReceipt ? (
+              ) : primaryCampaign?.beneficiaryReceipt || primaryCampaign?.confirmationStatus === "both_confirmed" ? (
                 <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30">
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-[var(--color-accent)] mt-0.5 flex-shrink-0" />
@@ -630,7 +626,7 @@ const BeneficiaryDashboard = () => {
                         Service receipt confirmed
                       </h3>
                       <p className="text-xs sm:text-sm text-[var(--color-text-light)]/80">
-                        You confirmed receipt of the service. Funds have been released to the provider.
+                        You confirmed receipt of the service. Funds will be released per the disbursement process.
                       </p>
                     </div>
                   </div>

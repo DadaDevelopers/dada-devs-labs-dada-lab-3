@@ -63,29 +63,82 @@ export const createCampaign = async (req, res, next) => {
 };
 
 /* PROVIDER CAMPAIGN CONFIRMATION */
-export const confirmProvider = async (req, res) => {
-  const campaign = await Campaign.findById(req.params.id);
-  if (!campaign) return res.status(404).json({ message: "Not found" });
+export const confirmProvider = async (req, res, next) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) return res.status(404).json({ message: "Not found" });
 
-  if (req.user.role !== "PROVIDER")
-    return res.status(403).json({ message: "Only providers" });
+    if (req.user.role !== "PROVIDER") {
+      return res.status(403).json({ message: "Only providers can confirm campaigns" });
+    }
 
-  campaign.confirmationStatus = "provider_confirmed";
-  campaign.providerConfirmedAt = new Date();
-  await campaign.save();
+    campaign.confirmationStatus = "provider_confirmed";
+    campaign.providerConfirmedAt = new Date();
+    await campaign.save();
 
-  await logActivity({
-    actorId: req.user.userId,
-    actorRole: "PROVIDER",
-    actionType: "PROVIDER_CONFIRMED_CAMPAIGN",
-    entityType: "Campaign",
-    entityId: campaign._id,
-    req
-  });
+    await logActivity({
+      actorId: req.user.userId,
+      actorRole: "PROVIDER",
+      actionType: "PROVIDER_CONFIRMED_CAMPAIGN",
+      entityType: "Campaign",
+      entityId: campaign._id,
+      req
+    });
 
-  res.json({ campaign });
+    res.json({ campaign: formatCampaign(campaign) });
+  } catch (err) {
+    next(err);
+  }
 };
 
+/* BENEFICIARY SERVICE RECEIPT CONFIRMATION */
+export const confirmBeneficiary = async (req, res, next) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) return res.status(404).json({ message: "Not found" });
+
+    if (req.user.role !== "BENEFICIARY") {
+      return res.status(403).json({ message: "Only beneficiaries can confirm receipt" });
+    }
+
+    if (campaign.beneficiaryId.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "You can only confirm receipt for your own campaigns" });
+    }
+
+    const { confirmationNote } = req.body || {};
+    const now = new Date();
+
+    campaign.beneficiaryConfirmedAt = now;
+    campaign.beneficiaryReceipt = {
+      confirmedAt: now,
+      note: confirmationNote || ""
+    };
+
+    if (campaign.confirmationStatus === "provider_confirmed") {
+      campaign.confirmationStatus = "both_confirmed";
+    }
+
+    if (campaign.disbursementStatus === "none") {
+      campaign.disbursementStatus = "pending";
+    }
+
+    await campaign.save();
+
+    await logActivity({
+      actorId: req.user.userId,
+      actorRole: "BENEFICIARY",
+      actionType: "BENEFICIARY_CONFIRMED_RECEIPT",
+      entityType: "Campaign",
+      entityId: campaign._id,
+      metadata: { note: confirmationNote || null },
+      req
+    });
+
+    res.json({ campaign: formatCampaign(campaign) });
+  } catch (err) {
+    next(err);
+  }
+};
 
 /**
  * Get All Campaigns - add simple filters/pagination (includes beneficiaryId, confirmationStatus)
