@@ -284,21 +284,33 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       try {
         const data = await campaignService.getAllCampaigns();
         // Normalize campaigns: status to lowercase, provider name formatting
-        const normalizedCampaigns = data.map((c: any) => ({
-          ...c,
-          id: c.id || c._id || c.publicId || "",
-          status: c.status?.toLowerCase() || "active",
-          adminStatus: c.adminStatus?.toLowerCase() || "pending",
-          beneficiary: {
-            ...c.beneficiary,
-            name: c.beneficiaryId ? `${c.beneficiaryId.firstName} ${c.beneficiaryId.lastName || ""}`.trim() : "Beneficiary"
-          },
-          provider: {
-            ...c.provider,
-            name: c.providerId?.organization ||
-              (c.providerId?.firstName ? `${c.providerId.firstName} ${c.providerId.lastName || ""}`.trim() : "DirectAid Provider")
-          }
-        }));
+        const normalizedCampaigns = data.map((c: any) => {
+          const target = c.targetAmount != null ? (typeof c.targetAmount === "number" ? c.targetAmount : parseFloat(String(c.targetAmount))) : 0;
+          const raised = c.amountRaised != null ? (typeof c.amountRaised === "number" ? c.amountRaised : parseFloat(String(c.amountRaised))) : 0;
+          const rawDeadline = c.fundraisingDeadline ?? c.metadata?.fundraisingDeadline;
+
+          return {
+            ...c,
+            id: c.id || c._id || c.publicId || "",
+            status: c.status?.toLowerCase() || "active",
+            adminStatus: c.adminStatus?.toLowerCase() || "pending",
+            location: c.location || c.metadata?.location || "Global",
+            category: c.category || "Other",
+            targetAmount: target,
+            amountRaised: raised,
+            fundraisingDeadline: rawDeadline ? new Date(rawDeadline).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // fallback to 30 days if missing
+            beneficiary: {
+              ...c.beneficiary,
+              name: c.beneficiaryId ? `${c.beneficiaryId.firstName} ${c.beneficiaryId.lastName || ""}`.trim() : "Beneficiary"
+            },
+            provider: {
+              ...c.provider,
+              name: c.providerId?.organization ||
+                (c.providerId?.firstName ? `${c.providerId.firstName} ${c.providerId.lastName || ""}`.trim() : "DirectAid Provider")
+            },
+            beneficiaryReceipt: c.beneficiaryReceipt || null
+          };
+        });
         setCampaigns(normalizedCampaigns);
       } catch (err) {
         console.error("Failed to fetch campaigns", err);

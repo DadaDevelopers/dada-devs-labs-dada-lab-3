@@ -3,6 +3,7 @@
  * Keeps api.ts universal; all beneficiary-specific fallbacks live here.
  */
 import api from "./api";
+import type { BeneficiaryCampaign } from "../hooks/useBeneficiaryApi";
 
 const FALLBACK_METRICS = {
   metrics: {
@@ -47,7 +48,7 @@ export interface BeneficiaryCampaignsListResponse {
   page: number;
   limit: number;
   total: number;
-  campaigns: any[];
+  campaigns: BeneficiaryCampaign[];
 }
 
 export async function getMyCampaigns(params?: { page?: number; limit?: number; status?: string; confirmationStatus?: string }): Promise<BeneficiaryCampaignsListResponse> {

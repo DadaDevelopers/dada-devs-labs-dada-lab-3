@@ -7,6 +7,7 @@ import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
+import { CampaignSummaryCard } from "../components/feature/CampaignSummaryCard";
 import {
   Search,
   MapPin,
@@ -44,6 +45,7 @@ type CampaignListItem = {
   confirmationStatus?: string;
   category: string;
   donorCount: number;
+  providerName: string;
 };
 
 function normalizeCampaign(c: any): CampaignListItem {
@@ -61,14 +63,16 @@ function normalizeCampaign(c: any): CampaignListItem {
     id: c._id || c.id || c.publicId || "",
     title: c.title ?? "",
     description: c.description ?? "",
-    location: c.location ?? "",
+    location: c.location ?? c.metadata?.location ?? "Global",
     fundraisingDeadline,
     amountRaised: raised,
     targetAmount: target,
-    status: c.status ?? "ACTIVE",
+    status: (c.status ?? "active").toLowerCase(),
     confirmationStatus: c.confirmationStatus,
-    category: c.category ?? "",
+    category: c.category ?? c.metadata?.category ?? "Other",
     donorCount: c.donorCount ?? 0,
+    providerName: c.providerId?.organization ||
+      (c.providerId?.firstName ? `${c.providerId.firstName} ${c.providerId.lastName || ""}`.trim() : "DirectAid Provider")
   };
 }
 
@@ -442,106 +446,24 @@ export default function CampaignPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {filteredCampaigns.map((campaign) => (
-                      <Card
+                      <CampaignSummaryCard
                         key={campaign.id}
-                        className="overflow-hidden rounded-xl border border-border bg-card hover:shadow-lg hover:border-primary/20 transition-all duration-200 cursor-pointer group"
+                        id={campaign.id}
+                        title={campaign.title}
+                        description={campaign.description}
+                        organizerName={campaign.providerName}
+                        amountRaised={campaign.amountRaised}
+                        targetAmount={campaign.targetAmount}
+                        donorCount={campaign.donorCount}
+                        category={campaign.category}
+                        location={campaign.location}
+                        deadline={campaign.fundraisingDeadline}
                         onClick={() => handleCardClick(campaign)}
-                      >
-                        {/* Header strip with gradient */}
-                        <div className="h-36 flex items-center justify-center border-b border-border bg-gradient-to-br from-primary/5 via-muted/30 to-primary/10">
-                          <Heart className="w-14 h-14 text-primary/50 group-hover:text-primary/70 transition-colors" />
-                        </div>
-
-                        <div className="p-5">
-                          {/* Status & Category */}
-                          <div className="flex flex-wrap gap-2 mb-3">
-                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getStatusBadgeClass(campaign)}`}>
-                              {getCampaignStatusLabel(campaign)}
-                            </span>
-                            {campaign.category && (
-                              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-muted/80 text-muted-foreground border border-border">
-                                {campaign.category}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Title — clear hierarchy */}
-                          <h3 className="font-bold text-lg leading-tight mb-2 line-clamp-2 text-foreground group-hover:text-primary transition-colors">
-                            {campaign.title}
-                          </h3>
-
-                          {/* Description */}
-                          <p className="text-sm leading-snug mb-4 line-clamp-2 text-muted-foreground">
-                            {campaign.description || "No description."}
-                          </p>
-
-                          {/* Location & Timeline */}
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
-                            {campaign.location && (
-                              <div className="flex items-center gap-1.5">
-                                <MapPin className="w-4 h-4 shrink-0" />
-                                <span className="truncate">{campaign.location}</span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-1.5">
-                              <Clock className="w-4 h-4 shrink-0" />
-                              <span>
-                                {campaign.fundraisingDeadline
-                                  ? (() => {
-                                    const d = daysLeft(campaign.fundraisingDeadline);
-                                    return d === 0 ? "Ended" : `${d} days left`;
-                                  })()
-                                  : "No deadline"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Progress */}
-                          <div className="mb-4">
-                            <div className="flex justify-between items-baseline mb-1.5">
-                              <span className="text-base font-bold text-foreground">
-                                ${campaign.amountRaised.toLocaleString()}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                of ${campaign.targetAmount.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="w-full rounded-full h-2.5 bg-muted overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-primary transition-all duration-300"
-                                style={{ width: `${getProgressPercentage(campaign)}%` }}
-                              />
-                            </div>
-                            <p className="text-xs mt-1 text-muted-foreground">
-                              {getProgressPercentage(campaign).toFixed(0)}% funded
-                            </p>
-                          </div>
-
-                          {/* Donors */}
-                          <div className="flex items-center justify-between pt-3 border-t border-border">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Heart className="w-4 h-4 text-primary/80" />
-                              <span>{campaign.donorCount || 0} donors</span>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                          </div>
-                        </div>
-
-                        {/* CTA: View details — prominent button with arrow */}
-                        <div className="px-5 py-3 border-t border-border bg-primary/5">
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isBeneficiaryMyView) navigate(`/beneficiary/campaigns/${campaign.id}`);
-                              else navigate(`/campaigns/${campaign.id}`);
-                            }}
-                            className="w-full gap-2 rounded-lg bg-primary text-primary-foreground hover:opacity-95 font-semibold shadow-md hover:shadow-lg transition-shadow py-2.5"
-                          >
-                            View details
-                            <ChevronRight className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </Card>
+                        onDonate={(e) => {
+                          e.stopPropagation();
+                          navigate(`/donate?campaignId=${campaign.id}`);
+                        }}
+                      />
                     ))}
                   </div>
                 </>

@@ -15,9 +15,13 @@ export interface BeneficiaryCampaign {
   providerConfirmedAt?: string | null;
   beneficiaryConfirmedAt?: string | null;
   beneficiaryConfirmationNote?: string | null;
+  beneficiaryReceipt?: {
+    confirmedAt: string | null;
+    note: string;
+  };
   beneficiaryId?: string;
   providerId?: string | null;
-  provider?: { firstName?: string; lastName?: string; organization?: string };
+  provider?: { firstName?: string; lastName?: string; organization?: string; name?: string };
   category?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -47,6 +51,13 @@ export function useBeneficiaryCampaigns() {
         list.map((c: BeneficiaryCampaign) => ({
           ...c,
           id: c._id || c.id || c.publicId,
+          provider: c.provider ? {
+            ...c.provider,
+            name: c.provider.organization ||
+              (c.provider.firstName || c.provider.lastName
+                ? [c.provider.firstName, c.provider.lastName].filter(Boolean).join(" ")
+                : "Provider")
+          } : undefined,
           progressPercentage:
             c.targetAmount && (c.amountRaised ?? 0) > 0
               ? Math.min(100, ((c.amountRaised ?? 0) / (typeof c.targetAmount === "number" ? c.targetAmount : 0)) * 100)
@@ -85,11 +96,11 @@ export function useBeneficiaryMetrics() {
         setMetrics(
           m
             ? {
-                totalAidReceived: typeof m.totalAidReceived === "number" ? m.totalAidReceived : 0,
-                totalDisbursements: typeof m.totalDisbursements === "number" ? m.totalDisbursements : 0,
-                campaignsSupportingYou:
-                  typeof m.campaignsSupportingYou === "number" ? m.campaignsSupportingYou : 0,
-              }
+              totalAidReceived: typeof m.totalAidReceived === "number" ? m.totalAidReceived : 0,
+              totalDisbursements: typeof m.totalDisbursements === "number" ? m.totalDisbursements : 0,
+              campaignsSupportingYou:
+                typeof m.campaignsSupportingYou === "number" ? m.campaignsSupportingYou : 0,
+            }
             : null
         );
       })
