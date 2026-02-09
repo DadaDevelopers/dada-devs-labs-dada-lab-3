@@ -1,14 +1,21 @@
 import express from "express";
 import { 
   createCampaign,
+  confirmProvider,
   getAllCampaigns,
+  getMyCampaigns,
   getCampaignById,
   updateCampaign,
   adminUpdateCampaignStatus,
   deleteCampaign,
   linkProviderToCampaign,
   providerAcceptCampaign,
-  submitCampaignForReview 
+  submitCampaignForReview,
+  disburseCampaignFunds,
+  getCampaignDisbursement,
+  submitCampaignReport,
+  getCampaignReports,
+  reviewCampaignReport
 } from "../controllers/campaignController.js";
 import { protect, authorize } from "../middlewares/auth.js";
 
@@ -17,10 +24,16 @@ const router = express.Router();
 // Create a campaign — only BENEFICIARY users
 router.post("/", protect, authorize("BENEFICIARY"), createCampaign);
 
-// List campaigns — public
+// Provider confirm campaign
+router.patch("/:id/confirm-provider", protect, confirmProvider);
+
+// List campaigns — public (supports ?beneficiaryId=, ?confirmationStatus=)
 router.get("/", getAllCampaigns);
 
-// Add this route BEFORE the /:id routes (order matters!)
+// My campaigns — authenticated BENEFICIARY only (must be before /:id)
+router.get("/me", protect, authorize("BENEFICIARY"), getMyCampaigns);
+
+// Provider linking and acceptance
 router.post("/:id/link-provider", protect, linkProviderToCampaign);
 router.post("/:id/provider-accept", protect, authorize("PROVIDER"), providerAcceptCampaign);
 router.post("/:id/submit", protect, submitCampaignForReview);
@@ -33,6 +46,17 @@ router.get("/:id", getCampaignById);
 
 // Update campaign — must be authenticated; controller enforces owner or ADMIN
 router.put("/:id", protect, updateCampaign);
+
+// Admin disburses funds
+router.post("/:id/disburse", protect, authorize("ADMIN"), disburseCampaignFunds);
+
+// Beneficiary sees funds disbursed
+router.get("/:id/disbursement", protect, getCampaignDisbursement);
+
+/* About Campaign Reports */
+router.post("/:id/reports", protect, submitCampaignReport);
+router.get("/:id/reports", protect, getCampaignReports);
+router.patch("/:id/reports/:reportId/review", protect, reviewCampaignReport);
 
 // Delete campaign — must be authenticated; controller enforces owner or ADMIN
 router.delete("/:id", protect, deleteCampaign);

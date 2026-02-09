@@ -33,7 +33,7 @@ interface AuthContextType {
   error: string | null;
   isAuthenticated: boolean;
 
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: any }>;
+  login: (email: string, password: string) => Promise<{ ok: boolean; user?: User; error?: any }>;
   signup: (payload: any) => Promise<{ ok: boolean; error?: any }>;
   updateProfile: (updates: Partial<User>) => Promise<{ ok: boolean; user?: User; error?: any }>;
   selectRoleAndOnboard: (payload: any) => Promise<{ ok: boolean; user?: User; error?: any }>;
@@ -84,45 +84,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Add the return type : Promise<LoginResponse>
-const login = async (email: string, password: string): Promise<LoginResponse> => {
-  setLoading(true);
-  setError(null);
-  try {
-    const res = await api.post("/auth/login", { email, password });
-    
-    // REMOVE '.data' here. Access fields directly from res
-    const u = res.user;
-    const accessToken = res.accessToken;
+  const login = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post("/auth/login", { email, password });
+      console.log("[auth] login received res:", res); // res is already the data
+      
+      // Access data directly (no .data wrapper)
+      const u = res.user;
+      const accessToken = res.accessToken;
 
-    if (!u || !accessToken) {
-      throw new Error("Invalid response format from server");
+      if (!u || !accessToken) {
+        throw new Error("Invalid response format from server");
+      }
+
+      api.setAuthToken(accessToken);
+      setUser(u);
+      setRole(u.role || null);
+      setToken(accessToken);
+      saveToStorage(u, accessToken);
+
+      setLoading(false);
+      return { ok: true, user: u };
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Login failed";
+      setError(message);
+      setLoading(false);
+      return { ok: false, error: message };
     }
+  };
 
-    api.setAuthToken(accessToken);
-    setUser(u);
-    setRole(u.role || null);
-    setToken(accessToken);
-    saveToStorage(u, accessToken);
-
-    setLoading(false);
-    // RETURN the user object here!
-    return { ok: true, user: u }; 
-  } catch (err: any) {
-    const message = err?.response?.data?.message || "Login failed";
-    setError(message);
-    setLoading(false);
-    return { ok: false, error: message };
-  }
-};
-
+  // Signup
   const signup = async (payload: any) => {
     setLoading(true);
     setError(null);
     try {
       // Backend now uses /auth/register (from dev branch)
       const res = await api.post("/auth/register", payload);
-      const u = res.user;
-      const t = res.accessToken;
+      const { user: u, accessToken: t } = res.data;
 
       api.setAuthToken(t);
       setUser(u);
@@ -140,16 +140,21 @@ const login = async (email: string, password: string): Promise<LoginResponse> =>
     }
   };
 
+  // Role selection + basic onboarding (calls /auth/select-role)
   const selectRoleAndOnboard = async (payload: any) => {
     setLoading(true);
     setError(null);
     try {
       const res = await api.post("/auth/select-role", payload);
-      const updatedUser = res.user;
+      console.log("[auth] selectRole received res.data:", res.data, "res.data.user:", (res.data as any)?.user, "res.data.user.role:", (res.data as any)?.user?.role);
+
+      const { user: updatedUser, accessToken: newAccessToken } = res.data as { user: User; accessToken?: string };
 
       setUser(updatedUser);
       setRole(updatedUser.role || null);
-      saveToStorage(updatedUser, token);
+      const tokenToStore = newAccessToken ?? token;
+      setToken(tokenToStore);
+      saveToStorage(updatedUser, tokenToStore);
 
       setLoading(false);
       return { ok: true, user: updatedUser };
@@ -167,7 +172,7 @@ const login = async (email: string, password: string): Promise<LoginResponse> =>
     setError(null);
     try {
       const res = await api.put("/users/me", updates);
-      const updatedUser = res.user || res;
+      const updatedUser = res.user || res.data?.user || res;
 
       setUser(updatedUser);
       saveToStorage(updatedUser, token);
@@ -183,7 +188,7 @@ const login = async (email: string, password: string): Promise<LoginResponse> =>
   };
 
   // Logout
-const logout = async () => {
+  const logout = async () => {
     try {
       await api.post("/auth/logout");
     } catch (err) {

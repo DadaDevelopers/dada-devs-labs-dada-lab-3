@@ -1,3 +1,4 @@
+//ActivityLog.js
 import mongoose from "mongoose";
 
 const activityLogSchema = new mongoose.Schema(
@@ -11,7 +12,7 @@ const activityLogSchema = new mongoose.Schema(
 
     actorRole: {
       type: String,
-      enum: ["ADMIN", "DONOR", "BENEFICIARY", "PROVIDER", "SYSTEM"],
+      enum: ["UNASSIGNED", "ADMIN", "DONOR", "BENEFICIARY", "PROVIDER", "SYSTEM"],
       default: "SYSTEM"
     },
 

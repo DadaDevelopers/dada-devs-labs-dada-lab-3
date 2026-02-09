@@ -5,7 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import compression from "compression";
-import stripeWebhookRouter from "./routes/stripeWebhookRoutes.js";
+//import stripeWebhookRouter from "./routes/stripeWebhookRoutes.js";
 
 import config from "./config/config.js";
 
@@ -37,11 +37,11 @@ startUserPurgeJob();
 /*                              STRIPE WEBHOOK                                 */
 /* IMPORTANT: Must come BEFORE express.json()                                  */
 /* -------------------------------------------------------------------------- */
-app.use(
+/*app.use(
   "/api/payments/webhooks/stripe",
   express.raw({ type: "application/json" }),
   stripeWebhookRouter
-);
+);*/
 
 /* -------------------------------------------------------------------------- */
 /*                                  MIDDLEWARE                                 */

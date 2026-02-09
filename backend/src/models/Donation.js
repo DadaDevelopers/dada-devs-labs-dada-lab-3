@@ -1,4 +1,5 @@
 // src/models/Donation.js
+//intent, totals, final status
 import mongoose from "mongoose";
 import Campaign from "./Campaign.js"; // used to update campaign.amountRaised on completion (optional)
 const { Schema } = mongoose;
@@ -31,17 +32,18 @@ const DonationSchema = new Schema({
   paymentMethod: { 
     type: String, 
     required: true, 
-    enum: ["MPESA","BANK","STRIPE","CARD","BITCOIN","LIGHTNING","CASH","OTHER"], 
+    enum: ["MPESA","BTC_ONCHAIN","BTC_LIGHTNING"], 
     index: true 
   },
-  provider: { type: String, default: null },     // e.g., 'mpesa', 'stripe', 'opennode'
+  
+  //provider: { type: String, default: null },     // e.g., 'mpesa', 'stripe', 'opennode'
   paymentReference: { type: String }, // provider reference (Mpesa ref, bank ref)
   externalId: { type: String },       // provider-side ID (for idempotency)
-  transactionHash: { type: String },  // on-chain tx hash if available
-  confirmations: { type: Number, default: 0 },
+  //transactionHash: { type: String },  // on-chain tx hash if available
+  ///confirmations: { type: Number, default: 0 },
 
   // Processor raw response (webhook payload etc.) - helpful for troubleshooting/reconciliation
-  processorResponse: { type: Schema.Types.Mixed },
+  //processorResponse: { type: Schema.Types.Mixed },
 
   // Payer info (optional, convenient snapshot at time of donation)
   payer: {

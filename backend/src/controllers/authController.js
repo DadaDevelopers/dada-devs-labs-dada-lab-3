@@ -32,7 +32,7 @@ export async function register(req, res, next) {
       email,
       passwordHash,
       role: "UNASSIGNED",
-      isDeleted:false,
+      isDeleted: false,
       isActive: true,
       acceptedTerms: {
         accepted: true,
@@ -96,11 +96,14 @@ export async function login(req, res, next) {
     await RefreshToken.create({ userId: user._id, tokenHash: refreshHash, expiresAt: refreshExpiry });
 
     setRefreshCookie(res, refreshToken);
-    
+
+    const loginPayload = { id: user._id, email: user.email, firstName: user.firstName, role: user.role, isDeleted: user.isDeleted };
+    console.log("[auth] login response — user.role:", user.role, "payload.user:", loginPayload);
+
     res.json({
       accessToken,
       refreshToken,
-      user: { id: user._id, email: user.email, firstName: user.firstName, role: user.role, isDeleted: user.isDeleted }
+      user: loginPayload
     });
   } catch (err) { next(err); }
 }
@@ -174,7 +177,7 @@ export async function resendVerification(req, res, next) {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
     const raw = generateRandomToken(32);
-    await VerificationToken.create({ userId: user._id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 60*60*1000) });
+    await VerificationToken.create({ userId: user._id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
     await sendVerificationEmail(user.email, raw);
     res.json({ message: "Verification email sent" });
   } catch (err) { next(err); }
@@ -190,12 +193,12 @@ export async function selectRole(req, res, next) {
     const allowed = ["DONOR", "BENEFICIARY", "PROVIDER"];
 
     if (req.user.role !== "UNASSIGNED") {
-  return res.status(400).json({ message: "Role already set" });
-}
+      return res.status(400).json({ message: "Role already set" });
+    }
 
-if (!role || !allowed.includes(role)) {
-  return res.status(400).json({ message: "Invalid role" });
-}
+    if (!role || !allowed.includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
 
     const { userId } = req.user; // provided by requireAuth
 
@@ -211,21 +214,26 @@ if (!role || !allowed.includes(role)) {
       updates.city = city;
     }
 
-    // For providers: organization required and set KYC status
+    // For providers: organization required and set KYC status (User model uses kyc.status)
     if (role === "PROVIDER") {
       if (!organization) {
         return res.status(400).json({ message: "organization is required for providers" });
       }
       updates.organization = organization;
-      updates.kycStatus = "PENDING";
+      updates["kyc.status"] = "PENDING";
+      updates["kyc.submittedAt"] = new Date();
     } else {
-      // For donors and beneficiaries (default)
-      updates.kycStatus = "NOT_REQUIRED";
+      updates["kyc.status"] = "NOT_REQUIRED";
     }
 
     const user = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true }).select("-passwordHash");
 
-    res.json({ message: "Role updated", role: user.role, user });
+    // Issue new access token with updated role so subsequent requests (e.g. PUT /users/me) see the correct role
+    const accessToken = signAccessToken({ userId: user._id.toString(), role: user.role, isDeleted: user.isDeleted });
+
+    console.log("[auth] selectRole response — requested role:", role, "updated user.role:", user?.role, "user.id:", user?._id);
+
+    res.json({ message: "Role updated", role: user.role, user, accessToken });
   } catch (err) { next(err); }
 }
 
@@ -238,7 +246,7 @@ export async function forgotPassword(req, res, next) {
     const user = await User.findOne({ email });
     if (!user) return res.json({ message: "If that email exists, a reset was sent" });
     const raw = generateRandomToken(32);
-    await PasswordResetToken.create({ userId: user._id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 60*60*1000) });
+    await PasswordResetToken.create({ userId: user._id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
     await sendResetPasswordEmail(user.email, raw);
     res.json({ message: "If that email exists, a reset was sent" });
   } catch (err) { next(err); }

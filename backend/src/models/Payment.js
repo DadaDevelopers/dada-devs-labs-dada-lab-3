@@ -11,7 +11,7 @@ const paymentSchema = new mongoose.Schema(
 
     provider: {
       type: String,
-      enum: ["MPESA", "STRIPE", "CRYPTO", "BANK"],
+      enum: ["MPESA", "BITCOIN", "LIGHTNING"],
       required: true
     },
 
@@ -53,12 +53,18 @@ const paymentSchema = new mongoose.Schema(
       resultDesc: String
     },
 
-    // -------- Stripe specific ----------
-    stripe: {
-      paymentIntentId: String,
-      chargeId: String
-    },
+    bitcoin: {
+    address: String,
+    txHash: String,
+    confirmations: { type: Number, default: 0 }
+  },
 
+  lightning: {
+    invoice: String,
+    paymentHash: String,
+    settled: Boolean
+  },
+    
     processorResponse: Object, // raw payload
     error: Object
   },

@@ -138,12 +138,15 @@ const ProviderDashboard = () => {
         setLoading(true);
         setError(null);
         
-        const profileResponse = await api.get("/providers/me");
-        if (profileResponse.provider) {
-          setProviderData(profileResponse.provider);
-        }
+        const response = await api.get("/providers/me");
+        console.log("PROVIDER RESPONSE:", response);
         
-        setPayouts([]);
+        // Provider is directly in response.provider
+        if (response.provider) {
+          setProviderData(response.provider);
+          console.log("Provider ID from API:", response.provider.userId);
+          console.log("Your user ID:", user?.id);
+        }
         
       } catch (err: any) {
         console.error("Error fetching provider data:", err);
@@ -156,6 +159,12 @@ const ProviderDashboard = () => {
     fetchProviderData();
   }, []);
 
+  // Add this near the top of your component, after the state declarations
+  useEffect(() => {
+    console.log("Current user data:", user);
+    console.log("Provider data:", providerData);
+  }, [user, providerData]);
+
   // Fetch provider campaigns
   useEffect(() => {
     const fetchProviderCampaigns = async () => {
@@ -163,38 +172,42 @@ const ProviderDashboard = () => {
       
       try {
         const response = await api.get("/campaigns");
+        console.log("FULL API RESPONSE:", response);
+        
+        // Campaigns are directly in response.campaigns (not response.data.campaigns)
         const allCampaigns = response.campaigns || [];
         
-        // Filter campaigns where providerId matches your User ID
+        console.log("Number of campaigns from API:", allCampaigns.length);
+        console.log("Campaigns data:", allCampaigns);
+        
+        // Filter campaigns where YOU are the provider
         const providerCampaigns = allCampaigns.filter((campaign: any) => {
+          // Check the provider ID - it's an object with _id field
           const campaignProviderId = campaign.providerId?._id || campaign.providerId;
-          return campaignProviderId === user.id;
+          const userId = user.id;
+          
+          console.log(`Comparing: Campaign "${campaign.title}"`);
+          console.log(`  Campaign Provider ID: ${campaignProviderId}`);
+          console.log(`  User ID: ${userId}`);
+          console.log(`  Match: ${campaignProviderId === userId}`);
+          
+          return campaignProviderId === userId;
         });
         
-        console.log("Campaigns linked to you:", providerCampaigns);
-        
-        // Calculate metrics
-        const totalRaised = providerCampaigns.reduce((sum: number, c: any) => 
-          sum + (c.amountRaised || 0), 0);
-        
-        const totalDonors = providerCampaigns.reduce((sum: number, c: any) => 
-          sum + (c.donorCount || 0), 0);
+        console.log("YOUR CAMPAIGNS after filter:", providerCampaigns.length);
+        console.log("Your campaigns:", providerCampaigns);
         
         setMetrics({
           totalCampaigns: providerCampaigns.length,
-          totalFundsRaised: totalRaised,
-          activeDonors: totalDonors
+          totalFundsRaised: providerCampaigns.reduce((sum: number, c: any) => sum + (c.amountRaised || 0), 0),
+          activeDonors: providerCampaigns.reduce((sum: number, c: any) => sum + (c.donorCount || 0), 0)
         });
         
-        // Separate by status
-        const pending = providerCampaigns.filter((c: any) => !c.providerAccepted);
-        const accepted = providerCampaigns.filter((c: any) => c.providerAccepted);
+        setPendingCampaigns(providerCampaigns.filter((c: any) => !c.providerAccepted));
+        setAcceptedCampaigns(providerCampaigns.filter((c: any) => c.providerAccepted));
         
-        setPendingCampaigns(pending);
-        setAcceptedCampaigns(accepted);
-        
-      } catch (err) {
-        console.error("Error fetching provider campaigns:", err);
+      } catch (err: any) {
+        console.error("Error fetching campaigns:", err);
       }
     };
     

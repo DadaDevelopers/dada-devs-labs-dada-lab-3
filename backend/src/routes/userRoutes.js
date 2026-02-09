@@ -4,6 +4,7 @@ import express from "express";
 import {
   // self-service
   getMe,
+  getBeneficiaryMetrics,
   updateProfile,
   requestAccountDeletion,
   restoreAccount,
@@ -33,6 +34,9 @@ router.get("/public/:publicId", getPublicProfile);
 /* SELF-SERVICE ROUTES */
 // Route to get currently logged-in user's full profile/info
 router.get("/me", protect, getMe);
+
+// Beneficiary dashboard metrics (BENEFICIARY role only)
+router.get("/me/metrics", protect, getBeneficiaryMetrics);
 
 // Update your own profile (beneficiary / donor / provider) -(name, phone, etc.)
 router.put("/me", protect, updateProfile);
