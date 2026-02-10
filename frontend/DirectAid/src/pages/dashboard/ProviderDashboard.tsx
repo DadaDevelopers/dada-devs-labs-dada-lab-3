@@ -100,6 +100,8 @@ interface AppCampaign {
   donorCount: number;
   status: string;
   confirmationStatus: string;
+  // May be a string ID or populated object
+  providerId?: any;
 }
 
 const ProviderDashboard = () => {
@@ -400,13 +402,34 @@ const ProviderDashboard = () => {
   const walletBalance = {
     total: (providerData?.totalDonationsReceived || 0) * 100,
     available: (providerData?.totalDonationsReceived || 0) * 100,
-    locked: 0
+    locked: 0,
   };
 
-  // Filter campaigns for display
-  const providerCampaigns = (campaigns as AppCampaign[]).filter((campaign: AppCampaign) => 
-    providerData?.campaigns?.includes(campaign._id) || campaign.status === 'active'
-  );
+  // Filter campaigns for display in "Active Campaigns" section:
+  // - Only campaigns belonging to this provider (Campaign.providerId is User id, not Provider doc _id)
+  // - Only campaigns with active status
+  const currentUserId = providerData?.userId ?? user?.id;
+
+  const providerCampaigns = (campaigns as AppCampaign[]).filter((campaign: AppCampaign) => {
+    const fromProviderDoc =
+      Array.isArray(providerData?.campaigns) &&
+      providerData!.campaigns.includes(campaign._id);
+
+    const rawProvider = (campaign as any).providerId;
+    const providerIdFromCampaign =
+      rawProvider && typeof rawProvider === "object"
+        ? rawProvider._id || rawProvider.id
+        : rawProvider;
+
+    const matchesProvider =
+      currentUserId &&
+      providerIdFromCampaign &&
+      String(providerIdFromCampaign) === String(currentUserId);
+
+    const isActive = campaign.status?.toLowerCase?.() === "active";
+
+    return isActive && (fromProviderDoc || matchesProvider);
+  });
 
   // Loading state
   if (loading) {
@@ -621,15 +644,29 @@ const ProviderDashboard = () => {
           <Card className="p-6 card-elevated">
             <h2 className="text-xl sm:text-2xl font-bold mb-4">Campaigns Waiting Your Acceptance</h2>
             {pendingCampaigns.map((campaign: any) => (
-              <div key={campaign._id} className="p-4 mb-3 rounded-lg bg-yellow-50 border border-yellow-200">
-                <h3 className="font-bold">{campaign.title}</h3>
-                <p className="text-sm text-gray-600 mb-2">{campaign.description}</p>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => handleAcceptCampaign(campaign._id)}>
-                    Accept Campaign
+              <div
+                key={campaign._id}
+                className="p-4 mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10"
+              >
+                <h3 className="font-bold text-amber-50">{campaign.title}</h3>
+                <p className="text-sm text-amber-100/80 mb-3 line-clamp-3">
+                  {campaign.description}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    className="gap-2 rounded-full bg-amber-500 text-black hover:bg-amber-400"
+                    onClick={() => handleAcceptCampaign(campaign._id)}
+                  >
+                    Accept campaign
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/campaigns/${campaign._id}`)}>
-                    View Details
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 rounded-full border-amber-500/60 text-amber-100 hover:bg-amber-500/10"
+                    onClick={() => navigate(`/campaigns/${campaign._id}`)}
+                  >
+                    View details
                   </Button>
                 </div>
               </div>
@@ -642,24 +679,47 @@ const ProviderDashboard = () => {
           <Card className="p-6 card-elevated">
             <h2 className="text-xl sm:text-2xl font-bold mb-4">Your Accepted Campaigns</h2>
             {acceptedCampaigns.map((campaign: any) => (
-              <div key={campaign._id} className="p-4 mb-3 rounded-lg bg-green-50 border border-green-200">
-                <h3 className="font-bold">{campaign.title}</h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  Status: {campaign.confirmationStatus === "provider_confirmed" ? "Provider confirmed" : campaign.submittedForReview ? "Submitted for Review" : "Accepted - Ready to confirm"}
+              <div
+                key={campaign._id}
+                className="p-4 mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10"
+              >
+                <h3 className="font-bold text-emerald-50">{campaign.title}</h3>
+                <p className="text-sm text-emerald-100/80 mb-2">
+                  Status:{" "}
+                  {campaign.confirmationStatus === "provider_confirmed"
+                    ? "Provider confirmed"
+                    : campaign.submittedForReview
+                    ? "Submitted for review"
+                    : "Accepted – ready to confirm"}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {campaign.confirmationStatus !== "provider_confirmed" && (
-                    <Button size="sm" onClick={() => handleConfirmCampaign(campaign._id)} disabled={confirmingId === campaign._id}>
+                    <Button
+                      size="sm"
+                      className="gap-2 rounded-full bg-emerald-500 text-black hover:bg-emerald-400"
+                      onClick={() => handleConfirmCampaign(campaign._id)}
+                      disabled={confirmingId === campaign._id}
+                    >
                       {confirmingId === campaign._id ? "Confirming…" : "Confirm campaign"}
                     </Button>
                   )}
                   {!campaign.submittedForReview && (
-                    <Button size="sm" variant="outline" onClick={() => handleSubmitForReview(campaign._id)}>
-                      Submit for Admin Review
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 rounded-full border-emerald-500/60 text-emerald-100 hover:bg-emerald-500/10"
+                      onClick={() => handleSubmitForReview(campaign._id)}
+                    >
+                      Submit for admin review
                     </Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/campaigns/${campaign._id}`)}>
-                    View Details
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 rounded-full border-border text-emerald-50 hover:bg-emerald-500/5"
+                    onClick={() => navigate(`/campaigns/${campaign._id}`)}
+                  >
+                    View details
                   </Button>
                 </div>
               </div>

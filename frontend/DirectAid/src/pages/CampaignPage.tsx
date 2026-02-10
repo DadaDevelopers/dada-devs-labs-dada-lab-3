@@ -39,6 +39,7 @@ type CampaignListItem = {
   amountRaised: number;
   targetAmount: number;
   status: string;
+  adminStatus?: string;
   confirmationStatus?: string;
   category: string;
   donorCount: number;
@@ -67,6 +68,7 @@ function normalizeCampaign(c: any): CampaignListItem {
     amountRaised: raised,
     targetAmount: target,
     status: (c.status ?? "active").toLowerCase(),
+    adminStatus: c.adminStatus ?? "pending",
     confirmationStatus: c.confirmationStatus,
     category: c.category ?? c.metadata?.category ?? "Other",
     donorCount: c.donorCount ?? 0,
@@ -120,7 +122,15 @@ export default function CampaignPage() {
       .finally(() => setMyCampaignsLoading(false));
   }, [normalizedRole]);
 
-  const displayList = normalizedRole === "BENEFICIARY" && campaignsView === "my" ? myCampaigns : campaigns;
+  const rawDisplayList = normalizedRole === "BENEFICIARY" && campaignsView === "my" ? myCampaigns : campaigns;
+  // Donor/guest discovery: only show admin-approved campaigns. Provider and beneficiary "My campaigns" see full list.
+  const isDiscoverList = !(normalizedRole === "BENEFICIARY" && campaignsView === "my") && normalizedRole !== "PROVIDER";
+  const displayList =
+    isDiscoverList
+      ? rawDisplayList.filter(
+          (c: any) => (c.adminStatus && String(c.adminStatus).toLowerCase() === "approved") || false
+        )
+      : rawDisplayList;
   const listLoading = normalizedRole === "BENEFICIARY" && campaignsView === "my" ? myCampaignsLoading : campaignsLoading;
   const isBeneficiaryMyView = normalizedRole === "BENEFICIARY" && campaignsView === "my";
 
@@ -284,10 +294,7 @@ export default function CampaignPage() {
       userName={userName}
       userRole={userRole}
       settingsNavItems={settingsNavItems}
-      onLogout={async () => {
-        await logout();
-        navigate("/");
-      }}
+      onLogout={user ? async () => { await logout(); navigate("/"); } : undefined}
     >
       <div className="space-y-10 animate-fade-in">
         {/* Fancy Hero Header */}
@@ -311,16 +318,24 @@ export default function CampaignPage() {
 
         {/* Beneficiary: Discover vs My campaigns tabs */}
         {normalizedRole === "BENEFICIARY" && (
-          <div className="flex gap-2 border-b border-border pb-2">
+          <div className="flex gap-4 border-b border-border pb-2">
             <button
               onClick={() => setCampaignsView("discover")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${campaignsView === "discover" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              className={`pb-2 text-sm font-medium transition border-b-2 ${
+                campaignsView === "discover"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
             >
               Discover
             </button>
             <button
               onClick={() => setCampaignsView("my")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${campaignsView === "my" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              className={`pb-2 text-sm font-medium transition border-b-2 ${
+                campaignsView === "my"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
             >
               My campaigns
             </button>
@@ -329,47 +344,20 @@ export default function CampaignPage() {
 
         {/* Provider-only tabs: All / To approve / My campaigns */}
         {normalizedRole === "PROVIDER" && (
-          <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-            {(
-              [
-                { id: "all" as const, label: "All campaigns" },
-                { id: "to_approve" as const, label: "To approve" },
-                { id: "my" as const, label: "My campaigns" },
-              ] as const
-            ).map(({ id, label }) => (
+          <div className="flex gap-4 border-b border-border pb-2">
+            {[
+              { id: "all" as const, label: "All campaigns" },
+              { id: "to_approve" as const, label: "To approve" },
+              { id: "my" as const, label: "My campaigns" },
+            ].map(({ id, label }) => (
               <button
                 key={id}
                 onClick={() => setProviderTab(id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                className={`pb-2 text-sm font-medium transition border-b-2 ${
                   providerTab === id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted hover:bg-accent"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Provider-only tabs: All / To approve / My campaigns */}
-        {normalizedRole === "PROVIDER" && (
-          <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-            {(
-              [
-                { id: "all" as const, label: "All campaigns" },
-                { id: "to_approve" as const, label: "To approve" },
-                { id: "my" as const, label: "My campaigns" },
-              ] as const
-            ).map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => setProviderTab(id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                  providerTab === id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted hover:bg-accent"
-                }`}
+                    ? "border-primary text-primary bg-primary/10"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border hover:bg-muted/20"
+                } px-4 rounded-t-md`}
               >
                 {label}
               </button>
@@ -400,7 +388,7 @@ export default function CampaignPage() {
               <Filter className="w-4 h-4" />
               <span className="font-bold">Filters</span>
             </Button>
-            {role === "PROVIDER" && (
+            {normalizedRole === "BENEFICIARY" && (
               <Button
                 className="h-14 px-8 rounded-2xl btn-cta"
                 onClick={() => navigate("/campaigns/create")}

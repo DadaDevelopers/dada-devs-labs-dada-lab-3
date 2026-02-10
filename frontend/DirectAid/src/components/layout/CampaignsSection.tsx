@@ -88,12 +88,12 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ id, title, description, tar
   const progressPercent = Math.min(100, Math.max(0, (raised / (target || 1)) * 100));
 
   const handleCardClick = () => {
-    navigate(`/campaigns/${id}`);
+    navigate("/campaigns");
   };
 
   const handleDonateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/donate?campaignId=${id}`);
+    navigate("/campaigns");
   };
 
   return (
@@ -150,9 +150,12 @@ const CampaignsSection: React.FC = () => {
         const data = await campaignService.getAllCampaigns();
         // Ensure strictly array
         const list = Array.isArray(data) ? data : (data as any).campaigns || [];
-        // Filter for active/approved campaigns if needed, for now just slice first 10
-        // Ideally checking campaign.status === 'ACTIVE' (backend enum)
-        const activeCampaigns = list.filter((c: any) => c.status === 'ACTIVE' || c.status === 'active');
+        // Only show admin-approved, active campaigns for donor-facing discovery
+        const activeCampaigns = list.filter(
+          (c: any) =>
+            (c.status === 'ACTIVE' || c.status === 'active') &&
+            (c.adminStatus === 'approved' || (c.adminStatus && c.adminStatus.toLowerCase() === 'approved'))
+        );
         setCampaigns(activeCampaigns.slice(0, 10));
       } catch (err) {
         console.error("Failed to fetch campaigns for landing page", err);

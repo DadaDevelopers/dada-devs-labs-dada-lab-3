@@ -519,7 +519,15 @@ export const updateCampaign = async (req, res, next) => {
     if (description !== undefined) campaign.description = description;
     if (targetAmount !== undefined) campaign.targetAmount = mongoose.Types.Decimal128.fromString(String(targetAmount));
     if (currency !== undefined) campaign.currency = currency;
-    if (providerId !== undefined) campaign.providerId = providerId;
+    // providerId in body is Provider document _id; Campaign stores User id (ref: User)
+    if (providerId !== undefined) {
+      if (providerId === null || providerId === "") {
+        campaign.providerId = null;
+      } else {
+        const provider = await Provider.findById(providerId);
+        campaign.providerId = provider ? provider.userId : providerId;
+      }
+    }
     if (status !== undefined) campaign.status = status;
     if (category !== undefined) campaign.category = category;
 

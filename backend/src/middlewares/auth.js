@@ -29,6 +29,29 @@ export const protect = async (req, res, next) => {
   }
 };
 
+// Optional auth: set req.user if valid token present; do not reject if no token (for guest donations).
+export const optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    req.user = null;
+    return next();
+  }
+  const token = authHeader.split(" ")[1];
+  try {
+    const payload = verifyAccessToken(token);
+    const current = await User.findById(payload.userId).select("role isDeleted").lean();
+    if (!current || current.isDeleted) {
+      req.user = null;
+      return next();
+    }
+    req.user = { userId: payload.userId, role: current.role, isDeleted: current.isDeleted };
+    next();
+  } catch {
+    req.user = null;
+    next();
+  }
+};
+
 // Authorize middleware: restrict by roles
 export const authorize = (...roles) => (req, res, next) => {
   if (!req.user) return res.status(401).json({ message: "Unauthorized" });

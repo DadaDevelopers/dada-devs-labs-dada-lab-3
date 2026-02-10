@@ -14,7 +14,7 @@ const { Schema } = mongoose;
  */
 
 const DonationSchema = new Schema({
-  donorId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+  donorId: { type: Schema.Types.ObjectId, ref: "User", required: false, index: true }, // null for guest donations
 
   // Link to campaign (optional if donation is general)
   campaignId: { type: Schema.Types.ObjectId, ref: "Campaign", index: true },
@@ -94,10 +94,10 @@ DonationSchema.index({ provider: 1, paymentReference: 1 }, { unique: true, spars
 
 /**
  * Pre-save: update updatedAt
+ * Use promise/sync style (no `next`) to avoid middleware signature issues.
  */
-DonationSchema.pre("save", function (next) {
+DonationSchema.pre("save", function () {
   this.updatedAt = new Date();
-  next();
 });
 
 /**

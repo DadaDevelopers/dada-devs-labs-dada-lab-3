@@ -17,7 +17,6 @@ import {
   Smartphone,
   Copy,
   Check,
-  LogIn,
 } from "lucide-react";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
@@ -129,6 +128,7 @@ const DonationFlow = () => {
   const [invoiceCopied, setInvoiceCopied] = useState(false);
   const [lightningInvoice, setLightningInvoice] = useState("");
   const [btcAddress, setBtcAddress] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // Calculate amounts
   const donationAmountUSD = parseFloat(formData.amount) || 0;
@@ -151,55 +151,27 @@ const DonationFlow = () => {
     }
   };
 
-  const navItems = [
-    {
-      label: "Discover",
-      href: "/donor",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Campaigns",
-      href: "/donor/campaigns",
-      icon: <FolderKanban className="w-5 h-5" />,
-    },
-    {
-      label: "My Donations",
-      href: "/donor/donations",
-      icon: <Heart className="w-5 h-5" />,
-    },
-    {
-      label: "Receipts",
-      href: "/donor/receipts",
-      icon: <Receipt className="w-5 h-5" />,
-    },
-  ];
+  // Guest sidebar matches CampaignPage: Discover, Campaigns, Settings (Sign In)
+  const navItems = isAuthenticated
+    ? [
+        { label: "Discover", href: "/donor", icon: <LayoutDashboard className="w-5 h-5" /> },
+        { label: "Campaigns", href: "/donor/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+        { label: "My Donations", href: "/donor/donations", icon: <Heart className="w-5 h-5" /> },
+        { label: "Receipts", href: "/donor/receipts", icon: <Receipt className="w-5 h-5" /> },
+      ]
+    : [
+        { label: "Discover", href: "/", icon: <LayoutDashboard className="w-5 h-5" /> },
+        { label: "Campaigns", href: "/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+      ];
 
-  const settingsNavItems = [
-    {
-      id: "profile",
-      label: "Profile",
-      href: "/donor/settings/profile",
-      icon: <User className="w-5 h-5" />,
-    },
-    {
-      id: "payment",
-      label: "Payment Methods",
-      href: "/donor/settings/payment",
-      icon: <CreditCard className="w-5 h-5" />,
-    },
-    {
-      id: "notifications",
-      label: "Notifications",
-      href: "/donor/settings/notifications",
-      icon: <Bell className="w-5 h-5" />,
-    },
-    {
-      id: "change-password",
-      label: "Change Password",
-      href: "/donor/settings/change-password",
-      icon: <Lock className="w-5 h-5" />,
-    },
-  ];
+  const settingsNavItems = isAuthenticated
+    ? [
+        { id: "profile", label: "Profile", href: "/donor/settings/profile", icon: <User className="w-5 h-5" /> },
+        { id: "payment", label: "Payment Methods", href: "/donor/settings/payment", icon: <CreditCard className="w-5 h-5" /> },
+        { id: "notifications", label: "Notifications", href: "/donor/settings/notifications", icon: <Bell className="w-5 h-5" /> },
+        { id: "change-password", label: "Change Password", href: "/donor/settings/change-password", icon: <Lock className="w-5 h-5" /> },
+      ]
+    : [{ id: "login", label: "Sign In", href: "/login", icon: <User className="w-5 h-5" /> }];
 
   const canProceedToPayment = () => {
     return (
@@ -212,7 +184,7 @@ const DonationFlow = () => {
   const requireAuth = () => {
     if (!isAuthenticated) {
       console.error("[DonationFlow] User is not authenticated");
-      alert("Please log in to make a donation.");
+      alert("Please sign in to complete your donation. You’ll be taken to the login page.");
       navigate("/login");
       return false;
     }
@@ -230,10 +202,11 @@ const DonationFlow = () => {
     return true;
   };
 
+  const campaignsRedirect = isAuthenticated ? "/donor/campaigns" : "/campaigns";
   const requireValidCampaign = () => {
     if (!selectedCampaign || campaign.id === "camp_fallback") {
       alert("Please select a valid campaign first.");
-      navigate("/donor/campaigns");
+      navigate(campaignsRedirect);
       return false;
     }
     return true;
@@ -266,7 +239,7 @@ const DonationFlow = () => {
   // };
 
   const handleLightningPayment = async () => {
-    if (!requireAuth() || !requireValidCampaign()) return;
+    if (!requireValidCampaign()) return;
     // 1. Create Donation Intent on Backend
     setPaymentStatus("sending");
 
@@ -332,7 +305,7 @@ const DonationFlow = () => {
   };
 
   const handleOnChainPayment = async () => {
-    if (!requireAuth() || !requireValidCampaign()) return;
+    if (!requireValidCampaign()) return;
     // 1. Create Donation Intent on Backend
     setPaymentStatus("sending");
 
@@ -518,10 +491,7 @@ support@directaid.example.com
       userName={donor.name || "Guest"}
       userRole="Donor"
       settingsNavItems={settingsNavItems}
-      onLogout={async () => {
-        await logout();
-        navigate("/");
-      }}
+      onLogout={isAuthenticated ? async () => { await logout(); navigate("/"); } : undefined}
     >
       <div
         className="min-h-screen p-4 sm:p-6"
@@ -533,7 +503,7 @@ support@directaid.example.com
             onClick={() => {
               if (currentStep === "processing") return;
               if (currentStep === "campaign") {
-                navigate("/donor/campaigns");
+                navigate(campaignsRedirect);
               } else {
                 setCurrentStep("campaign");
               }
@@ -686,8 +656,25 @@ support@directaid.example.com
                     </div>
                   </div>
 
+                  {!isAuthenticated && (
+                    <div className="mb-4 p-3 rounded-lg border border-white/20" style={{ backgroundColor: "rgba(0,255,255,0.05)" }}>
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={acceptedTerms}
+                          onChange={(e) => setAcceptedTerms(e.target.checked)}
+                          className="mt-1 rounded border-2 accent-[#00ffff]"
+                        />
+                        <span className="text-sm" style={{ color: "#e0e0e0" }}>
+                          By continuing, I accept the platform&apos;s Terms and Conditions and understand this donation is subject to them.
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
                   <Button
                     onClick={() => setCurrentStep("amount")}
+                    disabled={!isAuthenticated && !acceptedTerms}
                     className="w-full rounded-full"
                     style={{ backgroundColor: "#00ffff", color: "#0a0e1a" }}
                   >
@@ -1966,7 +1953,7 @@ support@directaid.example.com
                   Download Receipt
                 </Button>
                 <Button
-                  onClick={() => navigate("/donor/campaigns")}
+                  onClick={() => navigate(campaignsRedirect)}
                   className="w-full rounded-full text-sm sm:text-base py-2"
                   style={{ color: "#00ffff", backgroundColor: "transparent" }}
                 >
