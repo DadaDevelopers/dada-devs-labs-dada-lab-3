@@ -44,7 +44,7 @@ export default function HeroSection(): JSX.Element {
           </div>
 
           {/* Right Column: Hero Image */}
-          <div className="relative max-w-lg mx-auto lg:mx-0 w-full">
+          <div className="relative max-w-lg pt-8 mx-auto lg:mx-0 w-full">
             <div className="absolute -inset-1 bg-gradient-to-r from-[#00d4ff] to-[#00b37e] rounded-3xl blur opacity-15 transition duration-1000" />
 
             <div className="relative glass-card overflow-hidden border-white/20 p-2 shadow-2xl transform lg:rotate-1 hover:rotate-0 transition-transform duration-700"> 
