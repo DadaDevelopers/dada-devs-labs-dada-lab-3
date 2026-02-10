@@ -43,10 +43,9 @@ const InvoiceSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// Update updatedAt automatically
-InvoiceSchema.pre("save", function(next) {
+// Update updatedAt automatically (Mongoose 9+ no longer passes next to pre hooks)
+InvoiceSchema.pre("save", function() {
   this.updatedAt = new Date();
-  next();
 });
 
 // Convert Decimal128 to number for API responses
