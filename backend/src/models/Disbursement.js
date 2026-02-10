@@ -6,6 +6,7 @@ const DisbursementSchema = new Schema(
   {
     campaignId: { type: Schema.Types.ObjectId, ref: "Campaign", index: true },
     beneficiaryId: { type: Schema.Types.ObjectId, ref: "User", index: true },
+    providerId: { type: Schema.Types.ObjectId, ref: "Provider", index: true },
     amount: { type: Number, required: true },
     currency: { type: String, required: true },
     status: {

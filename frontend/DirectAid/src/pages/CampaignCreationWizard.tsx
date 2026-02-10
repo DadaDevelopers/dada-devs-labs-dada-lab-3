@@ -11,13 +11,13 @@ import {
   ArrowLeft,
   CheckCircle2,
   FileText,
+  FolderKanban,
   Heart,
   MapPin,
   DollarSign,
   UploadCloud,
   Clock,
   LayoutDashboard,
-  FolderKanban,
   X,
   User,
   Bell,
@@ -39,7 +39,7 @@ const CampaignCreationWizard = () => {
   // Colleague's nav & user display – kept (vital for UX)
   const navItems = [
     { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
-    { label: "Campaigns", href: "/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
     { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
     { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
@@ -94,7 +94,7 @@ const CampaignCreationWizard = () => {
       setLoadingProviders(true);
       try {
         const res = await api.get("/providers/public");
-        setProviders(res.data.providers || []);
+        setProviders(res?.providers ?? []);
       } catch (err) {
         console.warn("Failed to fetch providers, using empty list", err);
         setProviders([]);
@@ -152,60 +152,32 @@ const CampaignCreationWizard = () => {
     setSupportingDocs((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Your full handleCreateCampaign with FormData (KEPT INTACT)
+  // Submit campaign as JSON so backend receives req.body (express.json() does not parse FormData)
   const handleCreateCampaign = async () => {
     setSubmitError(null);
     setIsSubmitting(true);
 
     try {
-      // 1. We use FormData because we are uploading FILES
-      const data = new FormData();
-      
-      // Append basic text fields
-      data.append("title", formData.title);
-      data.append("description", formData.description);
-      data.append("targetAmount", formData.targetAmount);
-      data.append("category", formData.category);
-      data.append("location", formData.location);
-      data.append("fundraisingDeadline", formData.fundraisingDeadline);
-      
-      // Provider Logic
-      if (providerSelection === "platform") {
-        data.append("providerId", selectedProviderId);
-      } else {
-        data.append("manualProvider", JSON.stringify(manualProvider));
-      }
-
-      // 2. Append the Files
-      if (invoiceData.invoiceFile) {
-        data.append("invoiceFile", invoiceData.invoiceFile);
-      }
-      data.append("invoiceAmount", invoiceData.invoiceAmount);
-      data.append("invoiceDate", invoiceData.invoiceDate);
-
-      // Append supporting documents array
-      supportingDocs.forEach((file) => {
-        data.append("supportingDocuments", file);
-      });
-
-      // 3. THE REAL API CALL using fetch with FormData
-      const API_BASE = import.meta.env.VITE_BASE_URL || "http://localhost:5000/api";
-      const response = await fetch(`${API_BASE}/campaigns`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("auth_token")}`,
-          // DO NOT set Content-Type header when sending FormData
+      const payload: Record<string, unknown> = {
+        title: formData.title,
+        description: formData.description || "",
+        targetAmount: Number(formData.targetAmount) || 0,
+        currency: "USD",
+        category: formData.category || null,
+        metadata: {
+          location: formData.location || undefined,
+          fundraisingDeadline: formData.fundraisingDeadline ? new Date(formData.fundraisingDeadline).toISOString() : undefined,
+          manualProvider: providerSelection === "manual" ? manualProvider : undefined,
         },
-        body: data,
-      });
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create campaign");
+      if (providerSelection === "platform" && selectedProviderId) {
+        payload.providerId = selectedProviderId;
       }
 
-      const serverCampaign = await response.json();
-      
+      const res = await api.post("/campaigns", payload);
+      const serverCampaign = (res as any).campaign ?? res;
+
       if (createCampaign) {
         createCampaign(serverCampaign);
       }
@@ -214,7 +186,7 @@ const CampaignCreationWizard = () => {
       setCurrentStep("success");
     } catch (error: any) {
       console.error("Failed to create campaign:", error);
-      setSubmitError(error.message || "Something went wrong. Please try again.");
+      setSubmitError(error?.message || error?.response?.data?.message || "Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

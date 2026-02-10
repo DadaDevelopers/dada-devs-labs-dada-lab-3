@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import api from "../../services/api";
+import api, { confirmProviderCampaign } from "../../services/api";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
 import { Button } from "../../components/ui/Button";
@@ -36,6 +36,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "../../components/ui/sheet";
+import { getBeneficiaryDisplayName } from "../../lib/utils";
 import {
   LineChart,
   Line,
@@ -98,8 +99,9 @@ interface AppCampaign {
 
 const ProviderDashboard = () => {
   const navigate = useNavigate();
-  const { campaigns } = useApp();
+  const { campaigns, updateCampaign } = useApp();
   const { user, logout } = useAuth();
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   // State for API data
   const [providerData, setProviderData] = useState<ProviderData | null>(null);
@@ -131,26 +133,28 @@ const ProviderDashboard = () => {
     };
   }>({});
 
-  // Fetch provider data
+  // Fetch provider data (retry once on 404 so backend auto-create can run)
   useEffect(() => {
-    const fetchProviderData = async () => {
+    const fetchProviderData = async (retry = false) => {
       try {
         setLoading(true);
         setError(null);
-        
+
         const response = await api.get("/providers/me");
-        console.log("PROVIDER RESPONSE:", response);
-        
-        // Provider is directly in response.provider
         if (response.provider) {
           setProviderData(response.provider);
-          console.log("Provider ID from API:", response.provider.userId);
-          console.log("Your user ID:", user?.id);
         }
-        
       } catch (err: any) {
-        console.error("Error fetching provider data:", err);
-        setError(err.message || "Failed to load provider data");
+        const status = err?.response?.status;
+        if (status === 404 && !retry) {
+          await fetchProviderData(true);
+          return;
+        }
+        if (status === 401) {
+          setError("Please log in again.");
+          return;
+        }
+        setError(err?.message || "Failed to load provider data");
       } finally {
         setLoading(false);
       }
@@ -342,6 +346,17 @@ const ProviderDashboard = () => {
   };
 
   const handleViewAll = () => navigate("/campaigns");
+  const handleConfirmCampaign = async (campaignId: string) => {
+    setConfirmingId(campaignId);
+    try {
+      await confirmProviderCampaign(campaignId);
+      updateCampaign(campaignId, { confirmationStatus: "provider_confirmed" });
+    } catch (err: any) {
+      alert(err?.message || "Failed to confirm campaign");
+    } finally {
+      setConfirmingId(null);
+    }
+  };
   const handleInvoiceUploadClick = (campaignId: string) => navigate(`/provider/invoices?campaignId=${campaignId}`);
   const handleCampaignWithdrawalClick = (campaignId: string) => navigate(`/provider/withdrawals?campaignId=${campaignId}`);
   const handleProofUploadClick = (campaignId: string) => navigate(`/provider/proof-upload?campaignId=${campaignId}`);
@@ -411,7 +426,21 @@ const ProviderDashboard = () => {
           <div className="text-center">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto" />
             <p className="mt-4 text-red-500">{error}</p>
-            <Button className="mt-4" onClick={() => window.location.reload()}>
+            <Button
+              className="mt-4"
+              onClick={async () => {
+                setError(null);
+                try {
+                  setLoading(true);
+                  const response = await api.get("/providers/me");
+                  if (response.provider) setProviderData(response.provider);
+                } catch (err: any) {
+                  setError(err?.response?.status === 401 ? "Please log in again." : err?.message || "Failed to load provider data");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
               Retry
             </Button>
           </div>
@@ -577,7 +606,7 @@ const ProviderDashboard = () => {
                   <Button size="sm" onClick={() => handleAcceptCampaign(campaign._id)}>
                     Accept Campaign
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/campaign/${campaign._id}`)}>
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/campaigns/${campaign._id}`)}>
                     View Details
                   </Button>
                 </div>
@@ -594,15 +623,20 @@ const ProviderDashboard = () => {
               <div key={campaign._id} className="p-4 mb-3 rounded-lg bg-green-50 border border-green-200">
                 <h3 className="font-bold">{campaign.title}</h3>
                 <p className="text-sm text-gray-600 mb-2">
-                  Status: {campaign.submittedForReview ? 'Submitted for Review' : 'Accepted - Ready to Submit'}
+                  Status: {campaign.confirmationStatus === "provider_confirmed" ? "Provider confirmed" : campaign.submittedForReview ? "Submitted for Review" : "Accepted - Ready to confirm"}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {campaign.confirmationStatus !== "provider_confirmed" && (
+                    <Button size="sm" onClick={() => handleConfirmCampaign(campaign._id)} disabled={confirmingId === campaign._id}>
+                      {confirmingId === campaign._id ? "Confirming…" : "Confirm campaign"}
+                    </Button>
+                  )}
                   {!campaign.submittedForReview && (
-                    <Button size="sm" onClick={() => handleSubmitForReview(campaign._id)}>
+                    <Button size="sm" variant="outline" onClick={() => handleSubmitForReview(campaign._id)}>
                       Submit for Admin Review
                     </Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/campaign/${campaign._id}`)}>
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/campaigns/${campaign._id}`)}>
                     View Details
                   </Button>
                 </div>
@@ -639,7 +673,7 @@ const ProviderDashboard = () => {
                     <h3 className="font-bold text-lg sm:text-xl line-clamp-2">{campaign.title}</h3>
                     <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 xs:gap-3">
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        Beneficiary: <span className="font-semibold">{campaign.beneficiary?.name || "Unknown"}</span>
+                        Beneficiary: <span className="font-semibold">{getBeneficiaryDisplayName(campaign, "Unknown")}</span>
                       </p>
                       <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium w-fit ${
                         status === "completed" ? "bg-green-100 text-green-700" :
@@ -691,6 +725,18 @@ const ProviderDashboard = () => {
                     )}
                   </div>
 
+                  {/* Confirm campaign (when provider has not yet confirmed) */}
+                  {(campaign.confirmationStatus === "pending" || !campaign.confirmationStatus) && (
+                    <Button
+                      size="sm"
+                      className="w-full gap-2 rounded-lg"
+                      disabled={confirmingId === campaign._id}
+                      onClick={() => handleConfirmCampaign(campaign._id)}
+                    >
+                      {confirmingId === campaign._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                      {confirmingId === campaign._id ? "Confirming…" : "Confirm campaign"}
+                    </Button>
+                  )}
                   {/* Action buttons */}
                   <div className="flex flex-col gap-2">
                     <Button size="sm" variant={workflow.invoiceUploaded ? "outline" : "default"} className="w-full gap-2 rounded-lg" onClick={() => handleInvoiceUploadClick(campaign._id)}>

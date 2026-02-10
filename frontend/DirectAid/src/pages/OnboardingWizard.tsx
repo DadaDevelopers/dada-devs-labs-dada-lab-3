@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import FormInput from "../components/ui/FormInput";
 import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/card";
+import { Building2, Landmark, Zap, FileText, UploadCloud } from "lucide-react";
 
 type BackendRole = "DONOR" | "BENEFICIARY" | "PROVIDER";
 
@@ -79,10 +81,10 @@ const OnboardingWizard: React.FC = () => {
     return null;
   }
 
-  // Already have a role — send to the right dashboard so they can use the app
+  // Already have a role — send to the right place (unchanged for beneficiary/donor; provider tuned to existing pattern)
   const effectiveRole = String(user?.role ?? "").trim().toUpperCase();
   if (effectiveRole && effectiveRole !== "UNASSIGNED") {
-    if (effectiveRole === "PROVIDER") navigate("/provider", { replace: true });
+    if (effectiveRole === "PROVIDER") navigate("/provider/settings/profile", { replace: true });
     else if (effectiveRole === "BENEFICIARY") navigate("/beneficiary/settings/profile", { replace: true });
     else if (effectiveRole === "ADMIN") navigate("/admin", { replace: true });
     else navigate("/donor", { replace: true });
@@ -142,7 +144,8 @@ const OnboardingWizard: React.FC = () => {
         city: formData.city,
         organization: selectedRole === "PROVIDER" ? formData.organization : undefined,
       });
-      if (!result.ok) {
+      const roleAlreadySet = !result.ok && result.error === "Role already set";
+      if (!result.ok && !roleAlreadySet) {
         setErrors({ general: result.error || "There was a problem saving your details. Please try again." });
         setSubmitting(false);
         return;
@@ -172,9 +175,14 @@ const OnboardingWizard: React.FC = () => {
         }
       }
 
-      const finalRole = result.user?.role;
-      // Defer navigation so the new token is applied to api headers before the next page makes requests
-      const to = finalRole === "PROVIDER" ? "/provider" : finalRole === "BENEFICIARY" ? "/beneficiary/settings/profile" : "/donor";
+      const finalRole = result.user?.role ?? (roleAlreadySet ? selectedRole : null);
+      // Beneficiary and donor: unchanged (profile and donor dashboard). Provider only: tuned to existing pattern → profile.
+      const to =
+        finalRole === "PROVIDER"
+          ? "/provider/settings/profile"
+          : finalRole === "BENEFICIARY"
+            ? "/beneficiary/settings/profile"
+            : "/donor";
       requestAnimationFrame(() => navigate(to));
     } catch (e) {
       setErrors({ general: "Something went wrong. Please try again." });
@@ -205,7 +213,7 @@ const OnboardingWizard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[var(--color-primary-bg)] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-3xl">
+      <div className={`w-full ${step === 3 && selectedRole === "PROVIDER" ? "max-w-4xl" : "max-w-3xl"}`}>
         <div className="mb-6 text-center">
           <p className="text-sm text-white/60 mb-2" aria-live="polite">
             Step {step} of {stepCount}
@@ -368,103 +376,135 @@ const OnboardingWizard: React.FC = () => {
           )}
 
           {step === 3 && selectedRole === "PROVIDER" && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-[var(--color-text-light)]">
-                Organization details
-              </h2>
-              <p className="text-sm text-white/60">
-                Optional. You can complete this later in settings.
-              </p>
-
+            <div className="space-y-8">
               <div>
-                <label className="block text-sm font-medium text-[var(--color-text-light)] mb-2">
-                  Organization Type
-                </label>
-                <select
-                  name="organizationType"
-                  value={providerProfile.organizationType}
-                  onChange={handleProviderChange}
-                  className="w-full px-4 py-3 rounded-lg bg-[#151D2C] border border-white/20 text-[var(--color-text-light)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                >
-                  <option value="">Select type (optional)</option>
-                  <option value="hospital">Hospital</option>
-                  <option value="school">School</option>
-                  <option value="pharmacy">Pharmacy</option>
-                  <option value="vendor">Vendor</option>
-                  <option value="other">Other</option>
-                </select>
+                <h2 className="text-xl font-semibold text-[var(--color-text-light)]">
+                  Organization profile
+                </h2>
+                <p className="text-sm text-white/60 mt-1">
+                  Complete your provider profile. You can update any of this later in Settings → Profile.
+                </p>
               </div>
 
-              <FormInput
-                label="Business Registration Number (optional)"
-                type="text"
-                name="businessRegNumber"
-                value={providerProfile.businessRegNumber}
-                onChange={handleProviderChange}
-                placeholder="CAC / Business registration number"
-              />
-              <FormInput
-                label="Primary Contact Person (optional)"
-                type="text"
-                name="contactPerson"
-                value={providerProfile.contactPerson}
-                onChange={handleProviderChange}
-                placeholder="Contact person's name"
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="p-6 bg-[#151D2C]/50 border-white/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <Building2 className="w-5 h-5 text-[var(--color-accent)]" />
+                  <h3 className="text-lg font-medium text-[var(--color-text-light)]">Organization details</h3>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-text-light)] mb-2">
+                      Organization Type
+                    </label>
+                    <select
+                      name="organizationType"
+                      value={providerProfile.organizationType}
+                      onChange={handleProviderChange}
+                      className="w-full px-4 py-3 rounded-lg bg-[var(--color-primary-bg)] border border-white/20 text-[var(--color-text-light)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                    >
+                      <option value="">Select type (optional)</option>
+                      <option value="hospital">Hospital</option>
+                      <option value="school">School</option>
+                      <option value="pharmacy">Pharmacy</option>
+                      <option value="vendor">Vendor</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <FormInput
+                    label="Business Registration Number (optional)"
+                    type="text"
+                    name="businessRegNumber"
+                    value={providerProfile.businessRegNumber}
+                    onChange={handleProviderChange}
+                    placeholder="CAC / Business registration number"
+                  />
+                  <FormInput
+                    label="Primary Contact Person (optional)"
+                    type="text"
+                    name="contactPerson"
+                    value={providerProfile.contactPerson}
+                    onChange={handleProviderChange}
+                    placeholder="Contact person's name"
+                  />
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-[#151D2C]/50 border-white/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <Landmark className="w-5 h-5 text-[var(--color-accent)]" />
+                  <h3 className="text-lg font-medium text-[var(--color-text-light)]">Banking (optional)</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormInput
+                    label="Bank Account Name"
+                    type="text"
+                    name="bankAccountName"
+                    value={providerProfile.bankAccountName}
+                    onChange={handleProviderChange}
+                    placeholder="Account name"
+                  />
+                  <FormInput
+                    label="Bank Account Number"
+                    type="text"
+                    name="bankAccountNumber"
+                    value={providerProfile.bankAccountNumber}
+                    onChange={handleProviderChange}
+                    placeholder="Account number"
+                  />
+                  <FormInput
+                    label="Bank Name"
+                    type="text"
+                    name="bankName"
+                    value={providerProfile.bankName}
+                    onChange={handleProviderChange}
+                    placeholder="Bank name"
+                    className="md:col-span-2"
+                  />
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-[#151D2C]/50 border-white/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap className="w-5 h-5 text-[var(--color-accent)]" />
+                  <h3 className="text-lg font-medium text-[var(--color-text-light)]">Lightning / Bitcoin</h3>
+                </div>
                 <FormInput
-                  label="Bank Account Name (optional)"
+                  label="Lightning Pubkey or Wallet Address (optional)"
                   type="text"
-                  name="bankAccountName"
-                  value={providerProfile.bankAccountName}
+                  name="lightningPubkey"
+                  value={providerProfile.lightningPubkey}
                   onChange={handleProviderChange}
-                  placeholder="Account name"
+                  placeholder="For receiving Bitcoin payments"
                 />
-                <FormInput
-                  label="Bank Account Number (optional)"
-                  type="text"
-                  name="bankAccountNumber"
-                  value={providerProfile.bankAccountNumber}
-                  onChange={handleProviderChange}
-                  placeholder="Account number"
-                />
-                <FormInput
-                  label="Bank Name (optional)"
-                  type="text"
-                  name="bankName"
-                  value={providerProfile.bankName}
-                  onChange={handleProviderChange}
-                  placeholder="Bank name"
-                  className="md:col-span-2"
-                />
-              </div>
-              <FormInput
-                label="Lightning Pubkey / Wallet (optional)"
-                type="text"
-                name="lightningPubkey"
-                value={providerProfile.lightningPubkey}
-                onChange={handleProviderChange}
-                placeholder="Lightning pubkey or wallet address"
-              />
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text-light)] mb-2">
-                  Short Description (optional)
-                </label>
-                <textarea
-                  name="shortDescription"
-                  value={providerProfile.shortDescription}
-                  onChange={handleProviderChange}
-                  rows={3}
-                  placeholder="A short description about your organization..."
-                  className="w-full px-4 py-3 rounded-lg bg-[#151D2C] border border-white/20 text-[var(--color-text-light)] placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text-light)] mb-2">
-                  License / Proof of Business (optional)
-                </label>
-                <p className="text-xs text-white/60 mb-3">
-                  PDF or image. You can upload later in settings.
+              </Card>
+
+              <Card className="p-6 bg-[#151D2C]/50 border-white/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="w-5 h-5 text-[var(--color-accent)]" />
+                  <h3 className="text-lg font-medium text-[var(--color-text-light)]">About your organization</h3>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text-light)] mb-2">
+                    Short description (optional)
+                  </label>
+                  <textarea
+                    name="shortDescription"
+                    value={providerProfile.shortDescription}
+                    onChange={handleProviderChange}
+                    rows={4}
+                    placeholder="A short description about your organization and how you help beneficiaries..."
+                    className="w-full px-4 py-3 rounded-lg bg-[var(--color-primary-bg)] border border-white/20 text-[var(--color-text-light)] placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] resize-none"
+                  />
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-[#151D2C]/50 border-white/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <UploadCloud className="w-5 h-5 text-[var(--color-accent)]" />
+                  <h3 className="text-lg font-medium text-[var(--color-text-light)]">License / proof of business</h3>
+                </div>
+                <p className="text-sm text-white/60 mb-4">
+                  PDF or image. You can upload later in Settings if you prefer.
                 </p>
                 <input
                   ref={licenseDocsRef}
@@ -480,22 +520,22 @@ const OnboardingWizard: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => licenseDocsRef.current?.click()}
-                  className="mb-3"
+                  className="gap-2"
                 >
-                  Choose Files
+                  <UploadCloud className="w-4 h-4" /> Choose files
                 </Button>
                 {providerProfile.licenseDocs.length > 0 && (
-                  <ul className="space-y-2 mt-3">
+                  <ul className="space-y-2 mt-4">
                     {providerProfile.licenseDocs.map((file, index) => (
                       <li
                         key={index}
-                        className="flex items-center justify-between p-2 bg-[#151D2C] rounded border border-white/10"
+                        className="flex items-center justify-between p-3 rounded-lg bg-[var(--color-primary-bg)] border border-white/10"
                       >
                         <span className="text-sm text-white/80 truncate flex-1">{file.name}</span>
                         <button
                           type="button"
                           onClick={() => removeFile(index)}
-                          className="text-red-400 hover:text-red-300 text-sm ml-2"
+                          className="text-red-400 hover:text-red-300 text-sm ml-2 font-medium"
                         >
                           Remove
                         </button>
@@ -503,9 +543,9 @@ const OnboardingWizard: React.FC = () => {
                     ))}
                   </ul>
                 )}
-              </div>
+              </Card>
 
-              <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/10">
+              <div className="flex items-center justify-between pt-4 border-t border-white/10">
                 <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)}>
                   Back
                 </Button>
@@ -516,7 +556,7 @@ const OnboardingWizard: React.FC = () => {
                   disabled={submitting}
                   onClick={handleSubmit}
                 >
-                  {submitting ? "Saving…" : "Finish"}
+                  {submitting ? "Saving…" : "Continue to profile"}
                 </Button>
               </div>
             </div>

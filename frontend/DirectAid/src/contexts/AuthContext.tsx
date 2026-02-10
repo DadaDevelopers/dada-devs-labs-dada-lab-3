@@ -120,17 +120,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Signup
+  // Signup — API returns body directly (no .data wrapper)
   const signup = async (payload: any) => {
     setLoading(true);
     setError(null);
     try {
-      // Backend now uses /auth/register (from dev branch)
       const res = await api.post("/auth/register", payload);
-      const { user: u, accessToken: t } = res.data;
+      const u = (res as any).user;
+      const t = (res as any).accessToken;
+      if (!u || !t) throw new Error("Invalid response from server");
 
       api.setAuthToken(t);
-      // Normalize user object - combine firstName and lastName into name
       const normalizedUser = {
         ...u,
         name: u.name || `${(u as any).firstName || ''} ${(u as any).lastName || ''}`.trim() || u.email
@@ -156,9 +156,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const res = await api.post("/auth/select-role", payload);
-      console.log("[auth] selectRole received res.data:", res.data, "res.data.user:", (res.data as any)?.user, "res.data.user.role:", (res.data as any)?.user?.role);
-
-      const { user: updatedUser, accessToken: newAccessToken } = res.data as { user: User; accessToken?: string };
+      // API returns body directly (no .data wrapper)
+      const updatedUser = (res as any).user;
+      const newAccessToken = (res as any).accessToken;
+      if (!updatedUser) throw new Error("Invalid response from server");
 
       // Normalize user object
       const normalizedUser = {

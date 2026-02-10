@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import config from "../config/config.js";
-//import User from "../models/User.js";
 import { User, RefreshToken, VerificationToken, PasswordResetToken } from "../models/User.js";
+import Provider from "../models/Provider.js";
 import { generateRandomToken, hashToken, signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/token.js";
 import { sendVerificationEmail, sendResetPasswordEmail } from "../utils/mailer.js";
 
@@ -60,7 +60,15 @@ export async function register(req, res, next) {
     await RefreshToken.create({ userId: user._id, tokenHash: refreshHash, expiresAt: refreshExpiry });
 
     setRefreshCookie(res, refreshToken);
-    res.status(201).json({ accessToken, user: { id: user._id, email: user.email, firstName: user.firstName, role: user.role } });
+    const userPayload = {
+      id: user._id,
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName ?? "",
+      role: user.role,
+    };
+    res.status(201).json({ accessToken, user: userPayload });
   } catch (err) { next(err); }
 }
 
@@ -192,8 +200,21 @@ export async function selectRole(req, res, next) {
     const { role, phoneNumber, country, city, organization } = req.body;
     const allowed = ["DONOR", "BENEFICIARY", "PROVIDER"];
 
+    // If role already set, return 200 with existing user so frontend can proceed to next step/profile
     if (req.user.role !== "UNASSIGNED") {
-      return res.status(400).json({ message: "Role already set" });
+      const existingUser = await User.findById(req.user.userId).select("-passwordHash").lean();
+      if (!existingUser) return res.status(401).json({ message: "User not found" });
+      const accessToken = signAccessToken({
+        userId: existingUser._id.toString(),
+        role: existingUser.role,
+        isDeleted: existingUser.isDeleted
+      });
+      return res.json({
+        message: "Role already set",
+        role: existingUser.role,
+        user: existingUser,
+        accessToken
+      });
     }
 
     if (!role || !allowed.includes(role)) {
@@ -228,7 +249,15 @@ export async function selectRole(req, res, next) {
 
     const user = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true }).select("-passwordHash");
 
-    // Issue new access token with updated role so subsequent requests (e.g. PUT /users/me) see the correct role
+    // When role is PROVIDER, ensure a Provider document exists so GET /providers/me works
+    if (role === "PROVIDER") {
+      await Provider.findOneAndUpdate(
+        { userId: user._id },
+        { $setOnInsert: { userId: user._id, businessName: organization || user.organization || "My Organization", email: user.email, phone: user.phoneNumber } },
+        { upsert: true }
+      );
+    }
+
     const accessToken = signAccessToken({ userId: user._id.toString(), role: user.role, isDeleted: user.isDeleted });
 
     console.log("[auth] selectRole response — requested role:", role, "updated user.role:", user?.role, "user.id:", user?._id);

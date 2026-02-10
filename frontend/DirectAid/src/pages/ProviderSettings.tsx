@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDataService } from "../services/mockData";
+import api from "../services/api";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
@@ -11,7 +11,6 @@ import {
   Save,
   Bell,
   Lock,
-  CreditCard,
   Eye,
   EyeOff,
   CheckCircle2,
@@ -27,10 +26,8 @@ const ProviderSettings = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useApp();
-  const { updateProfile } = useAuth();
-  const provider = mockDataService.getProviderUser();
-  
-  // Get active tab from pathname, default to "profile"
+  const { user, updateProfile } = useAuth();
+
   const getActiveTabFromPath = () => {
     const pathParts = location.pathname.split("/");
     const tab = pathParts[pathParts.length - 1];
@@ -39,41 +36,56 @@ const ProviderSettings = () => {
     }
     return "profile";
   };
-  
+
   const [activeTab, setActiveTab] = useState<
     "profile" | "payouts" | "notifications" | "change-password"
   >(getActiveTabFromPath());
-  
-  // Sync with URL changes and redirect if needed
+
   useEffect(() => {
-    // If we're at /provider/settings (without a tab), redirect to profile
     if (location.pathname === "/provider/settings") {
       navigate("/provider/settings/profile", { replace: true });
       return;
     }
-    const tab = getActiveTabFromPath();
-    setActiveTab(tab);
+    setActiveTab(getActiveTabFromPath());
   }, [location.pathname, navigate]);
+
   const [isSaving, setIsSaving] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errors, setErrors] = useState<{ general?: string }>({});
 
   const [profileData, setProfileData] = useState({
-    organizationName: provider.name,
-    contactPerson: "Ahmed Hassan",
-    type: "NGO",
-    email: provider.email,
-    phone: "+1 (555) 246-8135",
-    website: "https://example.org",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    country: "",
+    city: "",
+    organization: "",
+    organizationType: "",
+    businessRegNumber: "",
+    contactPerson: "",
+    bankAccountName: "",
+    bankAccountNumber: "",
+    bankName: "",
+    lightningPubkey: "",
+    shortDescription: "",
+    businessName: "",
+    phone: "",
   });
 
-  const [payoutData, setPayoutData] = useState({
-    bankName: "Global Bank",
-    accountHolder: "Organization Name",
-    accountNumber: "****1234",
-    swiftCode: "GBUSUS33",
+  type PayoutMethodItem = { method: string; mpesaPhone?: string; bankName?: string; accountName?: string; accountNumberMasked?: string };
+  const [payoutMethods, setPayoutMethods] = useState<PayoutMethodItem[]>([]);
+  const [payoutForm, setPayoutForm] = useState<{ method: "MPESA" | "BANK"; mpesaPhone: string; bankName: string; accountName: string; accountNumber: string }>({
+    method: "MPESA",
+    mpesaPhone: "",
+    bankName: "",
+    accountName: "",
+    accountNumber: "",
   });
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
 
   const [notifications, setNotifications] = useState({
     campaigns: true,
@@ -89,6 +101,53 @@ const ProviderSettings = () => {
     confirmPassword: "",
   });
 
+  const loadProfile = useCallback(async () => {
+    setProfileLoading(true);
+    setProfileLoadFailed(false);
+    setErrors({});
+    try {
+      const [providerRes, userRes] = await Promise.all([
+        api.get("/providers/me"),
+        api.get("/users/me"),
+      ]);
+      const provider = (providerRes as any)?.provider ?? providerRes;
+      const userData = (userRes as any)?.user ?? userRes;
+      const u = userData || user || {};
+      const p = provider || {};
+      const pp = (u as any).providerProfile || {};
+      if (provider?.payoutMethods) setPayoutMethods(provider.payoutMethods);
+      setProfileData({
+        firstName: (u as any).firstName ?? "",
+        lastName: (u as any).lastName ?? "",
+        email: (u as any).email ?? p.email ?? "",
+        phoneNumber: (u as any).phoneNumber ?? "",
+        country: (u as any).country ?? "",
+        city: (u as any).city ?? "",
+        organization: (u as any).organization ?? "",
+        organizationType: pp.organizationType ?? "",
+        businessRegNumber: pp.businessRegNumber ?? "",
+        contactPerson: pp.contactPerson ?? "",
+        bankAccountName: pp.bankAccountName ?? "",
+        bankAccountNumber: pp.bankAccountNumber ?? "",
+        bankName: pp.bankName ?? "",
+        lightningPubkey: pp.lightningPubkey ?? "",
+        shortDescription: pp.shortDescription ?? "",
+        businessName: p.businessName ?? (u as any).organization ?? "",
+        phone: p.phone ?? (u as any).phoneNumber ?? "",
+      });
+    } catch (e) {
+      console.error("Failed to load provider/user profile", e);
+      setErrors({ general: "Couldn't load profile. Check your connection and try again." });
+      setProfileLoadFailed(true);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
   const handleProfileChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -100,25 +159,40 @@ const ProviderSettings = () => {
     setIsSaving(true);
     setErrors({});
     try {
-      // Call backend API to update profile
-      const result = await updateProfile({
-        firstName: profileData.organizationName.split(" ")[0] || profileData.organizationName,
-        lastName: profileData.organizationName.split(" ").slice(1).join(" ") || "",
-        phoneNumber: profileData.phone,
-        // Note: country and city would need to be added to form if available
-      });
-      
+      const userPayload = {
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        phoneNumber: profileData.phoneNumber,
+        country: profileData.country,
+        city: profileData.city,
+        organization: profileData.organization,
+        providerProfile: {
+          organizationType: profileData.organizationType,
+          businessRegNumber: profileData.businessRegNumber,
+          contactPerson: profileData.contactPerson,
+          bankAccountName: profileData.bankAccountName,
+          bankAccountNumber: profileData.bankAccountNumber,
+          bankName: profileData.bankName,
+          lightningPubkey: profileData.lightningPubkey,
+          shortDescription: profileData.shortDescription,
+        },
+      };
+      const result = await updateProfile(userPayload as any);
       if (!result.ok) {
-        setErrors({ general: result.error || "Failed to save profile" });
+        setErrors({ general: (result as any).error || "Failed to save profile" });
         setIsSaving(false);
         return;
       }
-      
+      await api.put("/providers/me", {
+        businessName: profileData.businessName,
+        email: profileData.email,
+        phone: profileData.phone,
+      });
       setSuccessMessage("Saved successfully!");
-      setIsSaving(false);
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
       setErrors({ general: "An error occurred while saving" });
+    } finally {
       setIsSaving(false);
     }
   };
@@ -175,11 +249,13 @@ const ProviderSettings = () => {
     { id: "change-password", label: "Change Password", href: "/provider/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
+  const displayName = profileData.businessName || profileData.firstName || (user as any)?.name || (user as any)?.email || "Provider";
+
   return (
     <DashboardLayout
       navItems={navItems}
-      userName={provider.name}
-      userRole="Aid Provider"
+      userName={displayName}
+      userRole="Provider"
       settingsNavItems={settingsNavItems}
       onLogout={() => {
         logout();
@@ -220,55 +296,131 @@ const ProviderSettings = () => {
           {/* Main Content */}
           <div className="lg:col-span-3">
             {activeTab === "profile" && (
-              <Card className="p-6 sm:p-8">
+              <div className="space-y-6">
                 <h2
-                  className="text-2xl font-bold mb-6"
+                  className="text-2xl font-bold"
                   style={{ color: "var(--color-text-light)" }}
                 >
                   Provider Profile
                 </h2>
-                <div className="space-y-6">
-                  {[
-                    "organizationName",
-                    "contactPerson",
-                    "type",
-                    "email",
-                    "phone",
-                    "website",
-                  ].map((field) => (
-                    <div key={field}>
-                      <label
-                        className="block text-sm font-medium mb-2"
-                        style={{ color: "var(--color-text-light)" }}
-                      >
-                        {field.replace(/([A-Z])/g, " $1").trim()}
-                      </label>
-                      <Input
-                        name={field}
-                        value={profileData[field as keyof typeof profileData]}
-                        onChange={handleProfileChange}
-                        style={{
-                          backgroundColor: "var(--color-primary-bg)",
-                          color: "var(--color-text-light)",
-                          borderColor: "var(--color-accent)",
-                        }}
-                      />
+                {profileLoading ? (
+                  <p className="text-muted-foreground">Loading profile...</p>
+                ) : profileLoadFailed ? (
+                  <Card className="p-6 bg-[#151D2C]/50 border border-white/10 shadow-[var(--shadow-md)]">
+                    <div className="space-y-4">
+                      <p className="text-destructive text-sm">{errors.general}</p>
+                      <Button onClick={() => loadProfile()} style={{ backgroundColor: "var(--color-accent)", color: "var(--color-primary-bg)" }}>
+                        Retry
+                      </Button>
                     </div>
-                  ))}
-                  <Button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="w-full"
-                    style={{
-                      backgroundColor: "var(--color-accent)",
-                      color: "var(--color-primary-bg)",
-                    }}
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {isSaving ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              </Card>
+                  </Card>
+                ) : (
+                  <>
+                    {/* Personal — onboarding-style card with light borders and shadow */}
+                    <Card className="p-6 bg-[#151D2C]/50 border border-white/10 shadow-[var(--shadow-md)]">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: "var(--color-accent)" }}>
+                        Personal
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {[
+                          { key: "firstName", label: "First name" },
+                          { key: "lastName", label: "Last name" },
+                          { key: "email", label: "Email" },
+                          { key: "phoneNumber", label: "Phone number" },
+                          { key: "country", label: "Country" },
+                          { key: "city", label: "City" },
+                        ].map(({ key, label }) => (
+                          <div key={key} className="space-y-2">
+                            <label className="block text-sm font-medium" style={{ color: "var(--color-text-light)" }}>{label}</label>
+                            <Input
+                              name={key}
+                              value={profileData[key as keyof typeof profileData] ?? ""}
+                              onChange={handleProfileChange}
+                              className="py-3 rounded-lg border border-white/20 bg-[var(--color-primary-bg)] focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-secondary-bg)]"
+                              style={{ color: "var(--color-text-light)" }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    {/* Organization / business */}
+                    <Card className="p-6 bg-[#151D2C]/50 border border-white/10 shadow-[var(--shadow-md)]">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: "var(--color-accent)" }}>
+                        Organization / business
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {[
+                          { key: "organization", label: "Organization" },
+                          { key: "businessName", label: "Business name (Provider)" },
+                          { key: "phone", label: "Provider phone" },
+                          { key: "organizationType", label: "Organization type" },
+                          { key: "businessRegNumber", label: "Business registration number" },
+                          { key: "contactPerson", label: "Contact person" },
+                        ].map(({ key, label }) => (
+                          <div key={key} className="space-y-2">
+                            <label className="block text-sm font-medium" style={{ color: "var(--color-text-light)" }}>{label}</label>
+                            <Input
+                              name={key}
+                              value={profileData[key as keyof typeof profileData] ?? ""}
+                              onChange={handleProfileChange}
+                              className="py-3 rounded-lg border border-white/20 bg-[var(--color-primary-bg)] focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-secondary-bg)]"
+                              style={{ color: "var(--color-text-light)" }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="space-y-2 mt-4">
+                        <label className="block text-sm font-medium" style={{ color: "var(--color-text-light)" }}>Short description</label>
+                        <Input
+                          name="shortDescription"
+                          value={profileData.shortDescription ?? ""}
+                          onChange={handleProfileChange}
+                          className="py-3 rounded-lg border border-white/20 bg-[var(--color-primary-bg)] focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-secondary-bg)]"
+                          style={{ color: "var(--color-text-light)" }}
+                        />
+                      </div>
+                    </Card>
+
+                    {/* Banking & payout */}
+                    <Card className="p-6 bg-[#151D2C]/50 border border-white/10 shadow-[var(--shadow-md)]">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: "var(--color-accent)" }}>
+                        Banking & payout
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {[
+                          { key: "bankName", label: "Bank name" },
+                          { key: "bankAccountName", label: "Bank account name" },
+                          { key: "bankAccountNumber", label: "Bank account number" },
+                          { key: "lightningPubkey", label: "Lightning pubkey" },
+                        ].map(({ key, label }) => (
+                          <div key={key} className="space-y-2">
+                            <label className="block text-sm font-medium" style={{ color: "var(--color-text-light)" }}>{label}</label>
+                            <Input
+                              name={key}
+                              value={profileData[key as keyof typeof profileData] ?? ""}
+                              onChange={handleProfileChange}
+                              className="py-3 rounded-lg border border-white/20 bg-[var(--color-primary-bg)] focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-secondary-bg)]"
+                              style={{ color: "var(--color-text-light)" }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    {errors.general && <p className="text-destructive text-sm">{errors.general}</p>}
+                    <Button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="w-full py-3 rounded-lg"
+                      style={{ backgroundColor: "var(--color-accent)", color: "var(--color-primary-bg)" }}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {isSaving ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </>
+                )}
+              </div>
             )}
 
             {activeTab === "payouts" && (
@@ -280,26 +432,118 @@ const ProviderSettings = () => {
                   Payout Settings
                 </h2>
                 <div className="space-y-6">
-                  {Object.entries(payoutData).map(([key, value]) => (
-                    <div key={key}>
-                      <label
-                        className="block text-sm font-medium mb-2"
-                        style={{ color: "var(--color-text-light)" }}
-                      >
-                        {key.replace(/([A-Z])/g, " $1").trim()}
-                      </label>
-                      <Input
-                        value={value}
-                        disabled
-                        style={{
-                          backgroundColor: "var(--color-primary-bg)",
-                          color: "var(--color-text-light)",
-                          borderColor: "var(--color-accent)",
-                          opacity: 0.6,
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-light)" }}>
+                      Your payout methods
+                    </h3>
+                    {payoutMethods.length === 0 ? (
+                      <p className="text-muted-foreground text-sm">No payout methods yet. Add one below.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {payoutMethods.map((pm, i) => (
+                          <li
+                            key={i}
+                            className="flex items-center gap-2 p-3 rounded-lg border border-white/10"
+                            style={{ backgroundColor: "var(--color-primary-bg)" }}
+                          >
+                            <span className="font-medium">{pm.method}</span>
+                            {pm.method === "MPESA" && pm.mpesaPhone && <span>{pm.mpesaPhone}</span>}
+                            {pm.method === "BANK" && (
+                              <span>
+                                {pm.bankName} {pm.accountName} {pm.accountNumberMasked ?? "****"}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-light)" }}>
+                      Add payout method
+                    </h3>
+                    <div className="space-y-4 max-w-md">
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Method</label>
+                        <select
+                          value={payoutForm.method}
+                          onChange={(e) => setPayoutForm((prev) => ({ ...prev, method: e.target.value as "MPESA" | "BANK" }))}
+                          className="w-full rounded-md border px-3 py-2"
+                          style={{
+                            backgroundColor: "var(--color-primary-bg)",
+                            color: "var(--color-text-light)",
+                            borderColor: "var(--color-accent)",
+                          }}
+                        >
+                          <option value="MPESA">MPESA</option>
+                          <option value="BANK">Bank</option>
+                        </select>
+                      </div>
+                      {payoutForm.method === "MPESA" ? (
+                        <div>
+                          <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>MPESA phone</label>
+                          <Input
+                            value={payoutForm.mpesaPhone}
+                            onChange={(e) => setPayoutForm((prev) => ({ ...prev, mpesaPhone: e.target.value }))}
+                            placeholder="e.g. +254712345678"
+                            style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Bank name</label>
+                            <Input
+                              value={payoutForm.bankName}
+                              onChange={(e) => setPayoutForm((prev) => ({ ...prev, bankName: e.target.value }))}
+                              style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Account name</label>
+                            <Input
+                              value={payoutForm.accountName}
+                              onChange={(e) => setPayoutForm((prev) => ({ ...prev, accountName: e.target.value }))}
+                              style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Account number</label>
+                            <Input
+                              value={payoutForm.accountNumber}
+                              onChange={(e) => setPayoutForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
+                              style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
+                            />
+                          </div>
+                        </>
+                      )}
+                      <Button
+                        disabled={payoutSubmitting || (payoutForm.method === "MPESA" ? !payoutForm.mpesaPhone : !payoutForm.bankName || !payoutForm.accountName || !payoutForm.accountNumber)}
+                        onClick={async () => {
+                          setPayoutSubmitting(true);
+                          try {
+                            const body = payoutForm.method === "MPESA"
+                              ? { method: "MPESA", mpesaPhone: payoutForm.mpesaPhone }
+                              : { method: "BANK", bankName: payoutForm.bankName, accountName: payoutForm.accountName, accountNumber: payoutForm.accountNumber };
+                            await api.post("/providers/me/payout-methods", body);
+                            const res = await api.get("/providers/me");
+                            const p = (res as any).provider;
+                            if (p?.payoutMethods) setPayoutMethods(p.payoutMethods);
+                            setSuccessMessage("Payout method added.");
+                            setPayoutForm({ method: "MPESA", mpesaPhone: "", bankName: "", accountName: "", accountNumber: "" });
+                            setTimeout(() => setSuccessMessage(""), 3000);
+                          } catch (e) {
+                            setErrors({ general: "Failed to add payout method" });
+                          } finally {
+                            setPayoutSubmitting(false);
+                          }
                         }}
-                      />
+                        style={{ backgroundColor: "var(--color-accent)", color: "var(--color-primary-bg)" }}
+                      >
+                        {payoutSubmitting ? "Adding..." : "Add payout method"}
+                      </Button>
                     </div>
-                  ))}
+                  </div>
                 </div>
               </Card>
             )}

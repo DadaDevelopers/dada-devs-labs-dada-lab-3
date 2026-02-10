@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDataService } from "../services/mockData";
+import api from "../services/api";
+import { CampaignService } from "../services/apiServices";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import type { Campaign, Invoice } from "../types/index";
+import type { Campaign } from "../types/index";
 
 import {
   ArrowLeft,
@@ -34,14 +34,42 @@ interface InvoiceFormState {
   invoiceFile: File | null;
 }
 
+const PAYMENT_METHODS = ["MPESA", "BANK", "STRIPE", "CARD", "BITCOIN", "LIGHTNING", "CASH", "OTHER"] as const;
+
 const ProviderInvoiceUpload = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { campaigns, updateCampaign } = useApp();
   const { user, role, logout } = useAuth();
-
-  const provider = mockDataService.getProviderUser();
   const campaignId = searchParams.get("campaignId");
+
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [provider, setProvider] = useState<{ _id: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  // MVP: only campaigns this provider is linked to (providerId === current user)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [campRes, provRes] = await Promise.all([
+          CampaignService.getAll(),
+          api.get("/providers/me"),
+        ]);
+        const rawList = campRes?.campaigns || [];
+        const prov = (provRes as any).provider || null;
+        setProvider(prov);
+        const userId = (user as any)?.id ?? (user as any)?._id ?? (prov as any)?.userId;
+        const myCampaigns = rawList.filter((c: any) => {
+          const pid = c.providerId?._id ?? c.providerId;
+          return pid != null && String(pid) === String(userId);
+        });
+        setCampaigns(myCampaigns);
+      } catch (e) {
+        console.error("Failed to load campaigns/provider", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [user]);
 
   const navItems = [
     { label: "Dashboard", href: "/provider", icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -73,18 +101,19 @@ const ProviderInvoiceUpload = () => {
     description: "",
     invoiceFile: null,
   });
+  const [paymentMethod, setPaymentMethod] = useState<string>("OTHER");
+  const [currency, setCurrency] = useState("USD");
+  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
-    if (!campaignId) {
-      const providerCampaigns = campaigns.filter(c => c.providerId === provider?.id);
-      if (providerCampaigns.length > 0) {
-        setSelectedCampaign(providerCampaigns[0] as Campaign);
-      }
-      return;
+    if (!campaigns.length) return;
+    if (campaignId) {
+      const campaign = campaigns.find((c) => String((c as any)._id || (c as any).id) === campaignId);
+      if (campaign) setSelectedCampaign(campaign as Campaign);
+    } else {
+      setSelectedCampaign(campaigns[0] as Campaign);
     }
-    const campaign = campaigns.find((c) => (c._id === campaignId || (c as any).id === campaignId));
-    if (campaign) setSelectedCampaign(campaign as Campaign);
-  }, [campaignId, campaigns, provider?.id]);
+  }, [campaignId, campaigns]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setInvoiceData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -104,22 +133,57 @@ const ProviderInvoiceUpload = () => {
   };
 
   const canProceed = () => {
-    const { invoiceNumber, invoiceDate, invoiceAmount, description, invoiceFile } = invoiceData;
-    return invoiceNumber && invoiceDate && invoiceAmount && description && invoiceFile;
+    const { invoiceAmount } = invoiceData;
+    return selectedCampaign && provider && invoiceAmount && Number(invoiceAmount) > 0;
   };
 
   const handleSubmitInvoice = async () => {
-    if (!selectedCampaign) return;
+    if (!selectedCampaign || !provider) return;
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    // ... same logic for updateCampaign as provided
-    setCurrentStep("success");
-    setIsSubmitting(false);
+    setSubmitError("");
+    try {
+      const amount = Number(invoiceData.invoiceAmount);
+      const campaignId = (selectedCampaign as any)._id || (selectedCampaign as any).id;
+      await api.post("/invoices", {
+        campaignId,
+        providerId: provider._id,
+        amount,
+        currency: currency || "USD",
+        paymentMethod: paymentMethod || "OTHER",
+        invoiceFileUrl: null,
+      });
+      setCurrentStep("success");
+    } catch (e: any) {
+      setSubmitError(e?.response?.data?.message || e?.message || "Failed to submit invoice");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const backToDashboard = () => navigate("/provider");
 
-  if (!selectedCampaign) return <div className="p-10 text-center">Loading...</div>;
+  if (loading) return <div className="p-10 text-center">Loading...</div>;
+  if (!selectedCampaign) {
+    return (
+      <DashboardLayout
+        navItems={navItems}
+        userName={userName}
+        userRole={userRole}
+        settingsNavItems={settingsNavItems}
+        onLogout={async () => { await logout(); navigate("/"); }}
+      >
+        <div className="max-w-2xl mx-auto p-10 text-center space-y-4">
+          <p className="text-muted-foreground">
+            You haven&apos;t been assigned to any campaign yet. When a beneficiary creates a campaign and an admin links you as the provider, or you accept a campaign from your Campaigns page, it will appear here so you can upload an invoice.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Campaigns appear here once you&apos;re assigned by an admin or after you accept a campaign in <strong>Campaigns → To approve</strong>.
+          </p>
+          <Button variant="outline" onClick={() => navigate("/provider/campaigns")}>Go to Campaigns</Button>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout
@@ -138,21 +202,43 @@ const ProviderInvoiceUpload = () => {
         {currentStep === "upload-invoice" && (
           <>
             <h1 className="text-3xl font-bold mb-2">Provider Confirmation</h1>
+            <p className="text-sm text-muted-foreground mb-4">
+              Campaigns appear here once you&apos;re assigned by an admin or after you accept a campaign in Campaigns → To approve.
+            </p>
+            {campaigns.length > 1 && (
+              <div className="mb-4">
+                <label className="text-sm font-medium block mb-2">Campaign</label>
+                <select
+                  value={(selectedCampaign as any)?._id || (selectedCampaign as any)?.id}
+                  onChange={(e) => {
+                    const c = campaigns.find((x) => String((x as any)._id || (x as any).id) === e.target.value);
+                    if (c) setSelectedCampaign(c as Campaign);
+                  }}
+                  className="w-full max-w-md rounded-md border px-3 py-2 bg-background"
+                >
+                  {campaigns.map((c) => (
+                    <option key={(c as any)._id || (c as any).id} value={(c as any)._id || (c as any).id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <p className="text-muted-foreground mb-6">
-              Upload your invoice for <span className="font-semibold text-foreground">{selectedCampaign.title}</span>
+              Upload your invoice for <span className="font-semibold text-foreground">{selectedCampaign?.title}</span>
             </p>
 
-            <Card className="p-4 mb-6 bg-primary/5 border-primary/10">
+            <Card className="p-4 mb-6 bg-primary/5 border-primary/10 border border-white/10 shadow-[var(--shadow-sm)] transition-all duration-200">
               <div className="flex gap-3">
                 <AlertCircle className="w-5 h-5 text-primary" />
                 <div className="text-sm">
-                  <p className="font-semibold mb-1">What is Provider Confirmation?</p>
-                  <p className="text-muted-foreground">Uploading your invoice confirms your readiness to deliver services.</p>
+                  <p className="font-semibold mb-1">Upload invoice for services you are rendering</p>
+                  <p className="text-muted-foreground">
+                    Upload your invoice for the services you are providing to this beneficiary. This helps the beneficiary get funded—you are confirming you are the provider of record for this campaign.
+                  </p>
                 </div>
               </div>
             </Card>
 
-            <Card className="p-6 space-y-6">
+            <Card className="p-6 space-y-6 card-elevated">
               <h2 className="text-xl font-bold">Invoice Details</h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -164,9 +250,27 @@ const ProviderInvoiceUpload = () => {
                   <Input type="date" name="invoiceDate" value={invoiceData.invoiceDate} onChange={handleInputChange} />
                 </div>
               </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Amount</label>
+                  <Input type="number" name="invoiceAmount" value={invoiceData.invoiceAmount} onChange={handleInputChange} placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Currency</label>
+                  <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full rounded-md border px-3 py-2 bg-background">
+                    <option value="USD">USD</option>
+                    <option value="KES">KES</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+                </div>
+              </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Amount (USD)</label>
-                <Input type="number" name="invoiceAmount" value={invoiceData.invoiceAmount} onChange={handleInputChange} placeholder="0.00" />
+                <label className="text-sm font-medium">Payment method</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full rounded-md border px-3 py-2 bg-background">
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Description</label>
@@ -209,16 +313,21 @@ const ProviderInvoiceUpload = () => {
         {currentStep === "review" && (
           <div className="space-y-6">
             <h1 className="text-3xl font-bold">Review Invoice</h1>
-            <Card className="p-6">
+            {submitError && <p className="text-destructive text-sm">{submitError}</p>}
+            <Card className="p-6 card-elevated">
               <h2 className="text-lg font-bold mb-4">Invoice Summary</h2>
               <div className="space-y-3">
                 <div className="flex justify-between border-b pb-2">
-                  <span className="text-muted-foreground">Number</span>
-                  <span className="font-semibold">{invoiceData.invoiceNumber}</span>
+                  <span className="text-muted-foreground">Campaign</span>
+                  <span className="font-semibold">{selectedCampaign?.title}</span>
                 </div>
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-muted-foreground">Amount</span>
-                  <span className="font-semibold text-primary">${Number(invoiceData.invoiceAmount).toLocaleString()}</span>
+                  <span className="font-semibold text-primary">{currency} {Number(invoiceData.invoiceAmount).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Payment method</span>
+                  <span className="font-semibold">{paymentMethod}</span>
                 </div>
               </div>
             </Card>

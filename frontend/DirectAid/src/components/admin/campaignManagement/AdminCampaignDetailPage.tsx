@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { getCampaignById } from "../../../services/api";
+import { CampaignTransactionsSection } from "../../feature/CampaignTransactionsSection";
+import { getBeneficiaryDisplayName } from "../../../lib/utils";
 
 export default function AdminCampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -45,11 +47,8 @@ export default function AdminCampaignDetailPage() {
     );
   }
 
-  const beneficiary = campaign.beneficiaryId as { firstName?: string; lastName?: string; email?: string } | undefined;
+  const beneficiaryName = getBeneficiaryDisplayName(campaign, "—");
   const provider = campaign.providerId as { firstName?: string; lastName?: string; organization?: string } | undefined;
-  const beneficiaryName = beneficiary
-    ? [beneficiary.firstName, beneficiary.lastName].filter(Boolean).join(" ") || beneficiary.email
-    : "—";
   const providerName = provider?.organization ?? (provider ? [provider.firstName, provider.lastName].filter(Boolean).join(" ") : null) ?? "—";
 
   return (
@@ -105,6 +104,12 @@ export default function AdminCampaignDetailPage() {
             </p>
           </div>
         </div>
+
+        {id && (
+          <div className="pt-6 border-t border-white/10">
+            <CampaignTransactionsSection campaignId={id} />
+          </div>
+        )}
       </div>
     </div>
   );

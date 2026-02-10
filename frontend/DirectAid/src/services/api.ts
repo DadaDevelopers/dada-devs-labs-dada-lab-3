@@ -1,7 +1,7 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
-export const API_BASE = "https://directaid-backend.onrender.com/api";
-// export const API_BASE = "http://localhost:5000/api";
+// export const API_BASE = "https://directaid-backend.onrender.com/api";
+export const API_BASE = "http://localhost:5000/api";
 
 import type { AdminMetrics } from "../types";
 
@@ -271,7 +271,7 @@ export interface AdminStatsRaw {
 /** GET /users/stats — throws on error (no mock). */
 export async function getAdminStats(): Promise<AdminStatsRaw> {
   const res = await api.get("/users/stats");
-  return res?.data as AdminStatsRaw;
+  return (res?.data ?? res) as AdminStatsRaw;
 }
 
 /** Map backend stats to AdminMetrics for Overview. Uses only real backend data. */
@@ -333,37 +333,37 @@ export async function getUsers(params?: { page?: number; limit?: number; role?: 
   if (params?.search) sp.set("search", params.search);
   const q = sp.toString();
   const res = await api.get(`/users${q ? `?${q}` : ""}`);
-  return res?.data as { page: number; limit: number; total: number; users: unknown[] };
+  return (res?.data ?? res) as { page: number; limit: number; total: number; users: unknown[] };
 }
 
 /** GET /users/:id */
 export async function getUserById(id: string) {
   const res = await api.get(`/users/${id}`);
-  return res?.data as { user: unknown };
+  return (res?.data ?? res) as { user: unknown };
 }
 
 /** POST /users/:id/verify-identity — body: { identityVerified: boolean, notes?: string } */
 export async function verifyUserIdentity(userId: string, body: { identityVerified: boolean; notes?: string }) {
   const res = await api.post(`/users/${userId}/verify-identity`, body);
-  return res?.data;
+  return res?.data ?? res;
 }
 
 /** GET /providers */
 export async function getProviders() {
   const res = await api.get("/providers");
-  return res?.data as { providers?: unknown[] };
+  return (res?.data ?? res) as { providers?: unknown[] };
 }
 
 /** GET /providers/:id */
 export async function getProviderById(id: string) {
   const res = await api.get(`/providers/${id}`);
-  return res?.data as { provider: unknown };
+  return (res?.data ?? res) as { provider: unknown };
 }
 
 /** PUT /providers/:id/kyc — body: { status: "APPROVED" | "REJECTED", notes?: string } */
 export async function approveProviderKyc(providerId: string, body: { status: "APPROVED" | "REJECTED"; notes?: string }) {
   const res = await api.put(`/providers/${providerId}/kyc`, body);
-  return res?.data;
+  return res?.data ?? res;
 }
 
 /** GET /campaigns with optional adminStatus, page, limit */
@@ -374,19 +374,31 @@ export async function getCampaigns(params?: { page?: number; limit?: number; adm
   if (params?.adminStatus) sp.set("adminStatus", params.adminStatus);
   const q = sp.toString();
   const res = await api.get(`/campaigns${q ? `?${q}` : ""}`);
-  return res?.data as { page: number; limit: number; total: number; campaigns: unknown[] };
+  return (res?.data ?? res) as { page: number; limit: number; total: number; campaigns: unknown[] };
 }
 
 /** GET /campaigns/:id */
 export async function getCampaignById(id: string) {
   const res = await api.get(`/campaigns/${id}`);
-  return res?.data as { campaign: unknown };
+  return (res?.data ?? res) as { campaign: unknown };
 }
 
 /** PATCH /campaigns/:id/status — body: { status: "approved" | "rejected" | "flagged" | "pending" } */
 export async function updateCampaignStatus(campaignId: string, status: "approved" | "rejected" | "flagged" | "pending") {
   const res = await api.patch(`/campaigns/${campaignId}/status`, { status });
-  return res?.data as { campaign: unknown };
+  return (res?.data ?? res) as { campaign: unknown };
+}
+
+/** PATCH /campaigns/:id/confirm-provider — provider confirms campaign (sets confirmationStatus to provider_confirmed) */
+export async function confirmProviderCampaign(campaignId: string) {
+  const res = await api.patch(`/campaigns/${campaignId}/confirm-provider`);
+  return (res?.data ?? res) as { campaign: unknown };
+}
+
+/** POST /campaigns/:id/disburse-to-provider — beneficiary owner sends funds to provider (MVP) */
+export async function disburseToProvider(campaignId: string, body: { amount: number; notes?: string }) {
+  const res = await api.post(`/campaigns/${campaignId}/disburse-to-provider`, body);
+  return (res?.data ?? res) as { disbursement?: unknown; campaign?: unknown };
 }
 
 // Create the axios-like API instance

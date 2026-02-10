@@ -21,6 +21,7 @@ import {
   User,
   UploadCloud,
   X,
+  FolderKanban,
 } from "lucide-react";
 
 type ProfileTab = "profile" | "address" | "notifications" | "change-password";
@@ -116,7 +117,7 @@ const BeneficiarySettings = () => {
     setErrors({});
     try {
       const res = await api.get("/users/me");
-      const u = (res.data as { user?: any }).user ?? res.data;
+      const u = (res as any)?.user ?? res;
       if (!u) {
         setLoadingProfile(false);
         return;
@@ -283,6 +284,7 @@ const BeneficiarySettings = () => {
 
   const navItems = [
     { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
     { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
     { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];

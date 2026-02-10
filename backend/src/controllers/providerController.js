@@ -2,6 +2,7 @@
 import Provider from "../models/Provider.js";
 import { User } from "../models/User.js";
 import Campaign from "../models/Campaign.js";
+import Withdrawal from "../models/Withdrawal.js";
 
 // --------------------------
 // Create provider profile
@@ -33,15 +34,25 @@ export const createProvider = async (req, res, next) => {
 };
 
 // --------------------------
-// Get logged-in provider
+// Get logged-in provider (auto-create if missing so first load never 404s)
 // --------------------------
 export const getProviderByUser = async (req, res, next) => {
   try {
-    const provider = await Provider.findOne({ userId: req.user.userId })
+    let provider = await Provider.findOne({ userId: req.user.userId })
       .populate("campaigns", "title status");
 
     if (!provider) {
-      return res.status(404).json({ message: "Provider not found" });
+      const user = await User.findById(req.user.userId)
+        .select("email phoneNumber organization");
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      provider = await Provider.create({
+        userId: req.user.userId,
+        businessName: user.organization || "My Organization",
+        email: user.email || undefined,
+        phone: user.phoneNumber || undefined
+      });
     }
 
     res.json({ provider: provider.toClient() });
@@ -107,11 +118,11 @@ export const addPayoutMethod = async (req, res, next) => {
 };
 
 // --------------------------
-// Request payout (mock)
+// Request payout (persists Withdrawal for campaign transparency)
 // --------------------------
 export const requestPayout = async (req, res, next) => {
   try {
-    const { amount, currency } = req.body;
+    const { amount, currency, campaignId } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
@@ -126,15 +137,56 @@ export const requestPayout = async (req, res, next) => {
       return res.status(403).json({ message: "KYC not approved" });
     }
 
+    const reference = `PAYOUT-${Date.now()}`;
+    let withdrawal = null;
+    if (campaignId) {
+      withdrawal = await Withdrawal.create({
+        campaignId,
+        providerId: provider._id,
+        amount,
+        currency: currency || "USD",
+        status: "PENDING",
+        reference,
+      });
+    }
+
     res.json({
       message: "Payout request received",
       payout: {
         amount,
-        currency,
+        currency: currency || "USD",
         status: "PENDING",
-        reference: `PAYOUT-${Date.now()}`
-      }
+        reference,
+        withdrawalId: withdrawal?._id,
+      },
+      withdrawal: withdrawal ? withdrawal.toClient() : undefined,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// --------------------------
+// Public: list providers for beneficiary campaign creation (select provider dropdown)
+// --------------------------
+export const listPublicProviders = async (req, res, next) => {
+  try {
+    const providers = await Provider.find()
+      .populate("userId", "city country organization providerProfile");
+
+    const list = providers.map((p) => {
+      const u = p.userId || {};
+      const pp = u.providerProfile || {};
+      return {
+        id: p._id.toString(),
+        organizationName: p.businessName || u.organization || "Provider",
+        organizationType: pp.organizationType || "other",
+        city: u.city || "",
+        country: u.country || ""
+      };
+    });
+
+    res.json({ providers: list });
   } catch (err) {
     next(err);
   }

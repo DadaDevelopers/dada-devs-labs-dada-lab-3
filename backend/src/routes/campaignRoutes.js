@@ -1,10 +1,12 @@
 import express from "express";
-import { 
+import {
   createCampaign,
   confirmProvider,
   getAllCampaigns,
   getMyCampaigns,
   getCampaignById,
+  getCampaignWithdrawals,
+  getCampaignTransactions,
   updateCampaign,
   adminUpdateCampaignStatus,
   deleteCampaign,
@@ -12,10 +14,11 @@ import {
   providerAcceptCampaign,
   submitCampaignForReview,
   disburseCampaignFunds,
+  beneficiaryDisburseToProvider,
   getCampaignDisbursement,
   submitCampaignReport,
   getCampaignReports,
-  reviewCampaignReport
+  reviewCampaignReport,
 } from "../controllers/campaignController.js";
 import { protect, authorize } from "../middlewares/auth.js";
 
@@ -43,12 +46,18 @@ router.patch("/:id/status", protect, authorize("ADMIN"), adminUpdateCampaignStat
 
 // Get single campaign by id — public
 router.get("/:id", getCampaignById);
+// Campaign transparency: withdrawals and transactions (public)
+router.get("/:id/withdrawals", getCampaignWithdrawals);
+router.get("/:id/transactions", getCampaignTransactions);
 
 // Update campaign — must be authenticated; controller enforces owner or ADMIN
 router.put("/:id", protect, updateCampaign);
 
 // Admin disburses funds
 router.post("/:id/disburse", protect, authorize("ADMIN"), disburseCampaignFunds);
+
+// Beneficiary disburses to provider (campaign owner)
+router.post("/:id/disburse-to-provider", protect, authorize("BENEFICIARY"), beneficiaryDisburseToProvider);
 
 // Beneficiary sees funds disbursed
 router.get("/:id/disbursement", protect, getCampaignDisbursement);

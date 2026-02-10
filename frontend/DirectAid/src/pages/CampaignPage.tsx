@@ -13,9 +13,11 @@ import {
   Wallet, FileText, DollarSign, Receipt, User, Bell,
   Lock, CreditCard,
 } from "lucide-react";
+import { getCampaignDeadlineDisplay } from "../lib/utils";
 
 type FilterCategory = "all" | "medical" | "education" | "food" | "shelter";
 type FilterStatus = "all" | "active" | "completed" | "draft";
+type ProviderCampaignTab = "all" | "to_approve" | "my";
 
 export default function CampaignPage() {
   const navigate = useNavigate();
@@ -26,6 +28,7 @@ export default function CampaignPage() {
   const [selectedCategory, setSelectedCategory] = useState<FilterCategory>("all");
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [providerTab, setProviderTab] = useState<ProviderCampaignTab>("all");
 
   // API state for campaigns
   const [realCampaigns, setRealCampaigns] = useState<Campaign[]>([]);
@@ -113,13 +116,12 @@ export default function CampaignPage() {
     { id: "draft", label: "Draft" },
   ];
 
-  // YOUR API LOGIC
+  // API: GET /campaigns returns body directly (campaigns, page, total) — no .data
   useEffect(() => {
     const loadCampaigns = async () => {
       try {
         const response = await CampaignService.getAll();
-        // Handle both MongoDB _id and standard id
-        setRealCampaigns(response.data?.campaigns || []);
+        setRealCampaigns(response?.campaigns || []);
       } catch (error) {
         console.error("Failed to fetch campaigns", error);
       } finally {
@@ -136,14 +138,23 @@ export default function CampaignPage() {
     return Math.min(pct, 100);
   };
 
-  const calculateDaysLeft = (deadline?: string) => {
-    if (!deadline) return 0;
-    const diff = Math.ceil((new Date(deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return diff > 0 ? diff : 0;
-  };
+
+  const currentUserId = (user as any)?.id ?? (user as any)?._id ?? "";
 
   const filteredCampaigns = useMemo(() => {
-    return realCampaigns.filter((campaign) => {
+    let list = realCampaigns;
+    if (role === "PROVIDER" && currentUserId) {
+      const pid = (c: Campaign) => {
+        const p = (c as any).providerId;
+        return p && (typeof p === "object" && p._id ? p._id : p);
+      };
+      if (providerTab === "to_approve") {
+        list = list.filter((c) => String(pid(c)) === String(currentUserId) && !(c as any).providerAccepted);
+      } else if (providerTab === "my") {
+        list = list.filter((c) => String(pid(c)) === String(currentUserId));
+      }
+    }
+    return list.filter((campaign) => {
       const title = campaign.title || "";
       const desc = campaign.description || "";
       const matchesSearch =
@@ -153,7 +164,7 @@ export default function CampaignPage() {
       const matchesStatus = selectedStatus === "all" || campaign.status === selectedStatus;
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [realCampaigns, searchQuery, selectedCategory, selectedStatus]);
+  }, [realCampaigns, searchQuery, selectedCategory, selectedStatus, role, providerTab, currentUserId]);
 
   if (loading) return <div className="p-20 text-center text-primary">Loading Campaigns...</div>;
 
@@ -173,6 +184,31 @@ export default function CampaignPage() {
           <h1 className="text-3xl font-bold">Browse Campaigns</h1>
           <p className="text-muted-foreground">Support real-world impact through verified campaigns.</p>
         </header>
+
+        {/* Provider-only tabs: All / To approve / My campaigns */}
+        {role === "PROVIDER" && (
+          <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+            {(
+              [
+                { id: "all" as const, label: "All campaigns" },
+                { id: "to_approve" as const, label: "To approve" },
+                { id: "my" as const, label: "My campaigns" },
+              ] as const
+            ).map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setProviderTab(id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  providerTab === id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card text-foreground border border-border hover:bg-accent"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Search & Filter Controls */}
         <div className="flex gap-3">
@@ -263,41 +299,55 @@ export default function CampaignPage() {
                   return (
                     <Card
                       key={campaignId}
-                      className="overflow-hidden hover:shadow-lg transition cursor-pointer group"
+                      className="overflow-hidden cursor-pointer group transition-all duration-200 hover:shadow-[var(--shadow-lg)] hover:-translate-y-0.5 hover:border-primary/20 focus-within:ring-2 focus-within:ring-primary/50"
                       onClick={() => navigate(`/campaigns/${campaignId}`)}
                     >
-                      <div className="p-5 space-y-4">
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded bg-primary/10 text-primary">
-                    {campaign.category}
-                  </span>
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <MapPin className="w-3 h-3 mr-1" /> {campaign.location}
-                  </div>
-                </div>
-                
-                <h3 className="font-bold text-lg line-clamp-1">{campaign.title}</h3>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span>${campaign.amountRaised?.toLocaleString()} raised</span>
-                    <span className="text-muted-foreground">{getProgressPercentage(campaign).toFixed(0)}%</span>
-                  </div>
-                  <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-primary h-full transition-all" 
-                      style={{ width: `${getProgressPercentage(campaign)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    {calculateDaysLeft(campaign.fundraisingDeadline)} days left
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-all" />
-                </div>
+                      <div className="p-6 space-y-4">
+                        {/* Category/location: reduced emphasis for hierarchy */}
+                        <div className="flex justify-between items-start flex-wrap gap-2">
+                          <div className="flex gap-2 flex-wrap">
+                            <span
+                              className="text-[10px] uppercase tracking-wider font-medium px-3 py-1.5 rounded-md border"
+                              style={{ backgroundColor: "var(--color-secondary-bg)", color: "var(--color-accent)", borderColor: "var(--color-accent)" }}
+                            >
+                              {campaign.category}
+                            </span>
+                            <span
+                              className="text-[10px] uppercase tracking-wider font-medium px-3 py-1.5 rounded-md border"
+                              style={{ backgroundColor: "var(--color-secondary-bg)", color: "var(--color-accent)", borderColor: "var(--color-accent)" }}
+                            >
+                              {(campaign as any).adminStatus === "pending" ? "Pending" : (campaign as any).status ?? "Active"}
+                            </span>
+                          </div>
+                          <div className="flex items-center text-xs text-muted-foreground opacity-80">
+                            <MapPin className="w-3 h-3 mr-1" /> {(campaign as any).metadata?.location ?? (campaign as any).location ?? "—"}
+                          </div>
+                        </div>
+                        {/* Title as primary focus */}
+                        <h3 className="font-bold text-xl line-clamp-2 leading-tight" style={{ color: "var(--color-text-light)" }}>
+                          {campaign.title}
+                        </h3>
+                        {/* Progress bar uses accent for consistency */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs font-medium text-muted-foreground">
+                            <span>${campaign.amountRaised?.toLocaleString()} raised</span>
+                            <span>{getProgressPercentage(campaign).toFixed(0)}%</span>
+                          </div>
+                          <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
+                            <div
+                              className="h-full transition-all duration-200"
+                              style={{ width: `${getProgressPercentage(campaign)}%`, backgroundColor: "var(--color-accent)" }}
+                            />
+                          </div>
+                        </div>
+                        {/* CTA zone: days left + chevron for clickability */}
+                        <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            {getCampaignDeadlineDisplay(campaign)}
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-all duration-200" />
+                        </div>
                       </div>
                     </Card>
                   );

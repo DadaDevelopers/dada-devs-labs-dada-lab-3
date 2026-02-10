@@ -4,10 +4,10 @@ const { Schema } = mongoose;
 
 const InvoiceSchema = new Schema({
   invoiceNumber: { type: String, unique: true, required: true }, // e.g., INV-20251212-001
-  donationId: { type: Schema.Types.ObjectId, ref: "Donation", required: true },
+  donationId: { type: Schema.Types.ObjectId, ref: "Donation", required: false }, // optional for provider-issued campaign invoice (MVP)
   campaignId: { type: Schema.Types.ObjectId, ref: "Campaign", required: true },
   providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
-  donorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  donorId: { type: Schema.Types.ObjectId, ref: "User", required: false }, // optional for MVP
 
   invoiceFileUrl: { type: String, default: null },
 
@@ -15,7 +15,7 @@ const InvoiceSchema = new Schema({
   amount: { type: Schema.Types.Decimal128, required: true }, // base amount in donor currency
   currency: { type: String, required: true },               // donor currency (KES, USD, EUR)
   fees: { type: Schema.Types.Decimal128, default: 0 },
-  netAmount: { type: Schema.Types.Decimal128, required: true }, // amount after fees
+  netAmount: { type: Schema.Types.Decimal128, required: false }, // amount after fees; default from amount if not set
 
   // Payment info
   paymentMethod: { 

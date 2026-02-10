@@ -5,8 +5,8 @@ export const campaignService = {
     getAllCampaigns: async (): Promise<Campaign[]> => {
         try {
             const response = await api.get("/campaigns");
-            // Backend returns campaigns in data property usually
-            return response.data.campaigns || response.data || [];
+            // API returns body directly: { campaigns, page, total }
+            return response?.campaigns || response?.data?.campaigns || [];
         } catch (error) {
             console.error("Error fetching campaigns:", error);
             throw error;
@@ -16,7 +16,7 @@ export const campaignService = {
     getCampaignById: async (id: string): Promise<Campaign> => {
         try {
             const response = await api.get(`/campaigns/${id}`);
-            return response.data;
+            return (response as any)?.campaign ?? response;
         } catch (error) {
             console.error(`Error fetching campaign ${id}:`, error);
             throw error;

@@ -42,7 +42,7 @@ export function useBeneficiaryCampaigns() {
     setError(null);
     try {
       const res = await api.get("/campaigns/me");
-      const list = (res.data as { campaigns?: BeneficiaryCampaign[] }).campaigns || [];
+      const list = (res as any)?.campaigns ?? [];
       setCampaigns(
         list.map((c: BeneficiaryCampaign) => ({
           ...c,
@@ -81,7 +81,7 @@ export function useBeneficiaryMetrics() {
       .get("/users/me/metrics")
       .then((res) => {
         if (cancelled) return;
-        const m = (res.data as { metrics?: BeneficiaryMetrics }).metrics;
+        const m = (res as any)?.metrics ?? (res as any)?.data?.metrics;
         setMetrics(
           m
             ? {

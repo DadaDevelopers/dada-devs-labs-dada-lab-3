@@ -201,9 +201,10 @@ section, .section {
   box-shadow: var(--shadow-neu);
 }
 
+/* Card depth and hover: shadow-md by default, stronger on hover; smooth transitions for accessibility */
 .card-elevated {
   box-shadow: var(--shadow-md);
-  transition: box-shadow 0.3s ease;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 .card-elevated:hover {
   box-shadow: var(--shadow-lg);

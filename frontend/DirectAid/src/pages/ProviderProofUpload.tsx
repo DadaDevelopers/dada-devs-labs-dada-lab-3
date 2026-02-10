@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDataService } from "../services/mockData";
 import api from "../services/api";
+import { CampaignService } from "../services/apiServices";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
@@ -20,6 +20,7 @@ import {
   Bell,
   Lock,
 } from "lucide-react";
+import { getBeneficiaryDisplayName } from "../lib/utils";
 
 type Step = "select-campaign" | "upload-proof" | "review" | "success";
 
@@ -27,14 +28,47 @@ const ProviderProofUpload = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const campaignId = searchParams.get("campaignId");
+  const { user, logout } = useAuth();
 
-  const provider = mockDataService.getProviderUser();
-  const campaigns = mockDataService.getCampaigns();
+  const [provider, setProvider] = useState<any>(null);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get the campaign if passed via URL
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [campRes, provRes] = await Promise.all([
+          CampaignService.getAll(),
+          api.get("/providers/me"),
+        ]);
+        const list = (campRes as any)?.campaigns ?? campRes ?? [];
+        setCampaigns(Array.isArray(list) ? list : []);
+        const p = (provRes as any)?.provider ?? provRes;
+        setProvider(p || null);
+      } catch (e) {
+        console.error("Failed to load provider/campaigns", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const userId = (user as any)?.id ?? (user as any)?._id ?? (provider as any)?.userId;
+  const eligibleCampaigns = campaigns.filter(
+    (c) =>
+      (String((c as any).providerId?._id ?? (c as any).providerId) === userId ||
+        String((c as any).providerId) === userId) &&
+      (c as any).providerAccepted === true
+  );
+
   const selectedCampaignId = campaignId || null;
   const selectedCampaign = selectedCampaignId
-    ? campaigns.find((c) => c.id === selectedCampaignId)
+    ? eligibleCampaigns.find(
+        (c) => String((c as any)._id ?? (c as any).id) === selectedCampaignId
+      ) ?? campaigns.find(
+        (c) => String((c as any)._id ?? (c as any).id) === selectedCampaignId
+      )
     : null;
 
   const [currentStep, setCurrentStep] = useState<Step>(
@@ -47,12 +81,6 @@ const ProviderProofUpload = () => {
   const [description, setDescription] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Get campaigns with withdrawals initiated (eligible for proof upload)
-  const eligibleCampaigns = campaigns.filter(
-    (c) =>
-      c.providerId === provider.id && c.confirmationStatus === "both_confirmed"
-  );
 
   const navItems = [
     {
@@ -172,10 +200,33 @@ const ProviderProofUpload = () => {
     setCurrentStep("select-campaign");
   };
 
+  const providerName =
+    (provider as any)?.businessName ??
+    (user as any)?.name ??
+    ((user as any)?.firstName
+      ? `${(user as any).firstName ?? ""} ${(user as any).lastName ?? ""}`.trim()
+      : null) ??
+    (user as any)?.email ??
+    "Provider";
+
+  if (loading) {
+    return (
+      <DashboardLayout
+        navItems={navItems}
+        userName={providerName}
+        userRole="Aid Provider"
+        settingsNavItems={settingsNavItems}
+        onLogout={async () => { await logout(); navigate("/"); }}
+      >
+        <div className="p-10 text-center">Loading...</div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       navItems={navItems}
-      userName={provider.name}
+      userName={providerName}
       userRole="Aid Provider"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -205,10 +256,14 @@ const ProviderProofUpload = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {eligibleCampaigns.length > 0 ? (
-                eligibleCampaigns.map((campaign) => (
+                eligibleCampaigns.map((campaign) => {
+                  const cId = (campaign as any)._id ?? (campaign as any).id;
+                  const raw = Number((campaign as any).amountRaised) || 0;
+                  const raisedDollars = raw >= 1000 ? raw / 100 : raw;
+                  return (
                   <Card
-                    key={campaign.id}
-                    className="p-4 sm:p-6 card-elevated cursor-pointer hover:border-primary transition"
+                    key={cId}
+                    className="p-4 sm:p-6 card-elevated cursor-pointer hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)] transition-all duration-200"
                     onClick={() => handleCampaignSelect(campaign)}
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -219,7 +274,7 @@ const ProviderProofUpload = () => {
                         <p className="text-sm text-muted-foreground mb-3">
                           Beneficiary:{" "}
                           <span className="font-semibold">
-                            {campaign.beneficiary?.name}
+                            {getBeneficiaryDisplayName(campaign)}
                           </span>
                         </p>
                       </div>
@@ -236,7 +291,7 @@ const ProviderProofUpload = () => {
                       <div className="text-sm">
                         <p className="text-muted-foreground">Amount Raised</p>
                         <p className="font-bold text-lg">
-                          ${(campaign.amountRaised / 100).toFixed(2)}
+                          ${raisedDollars.toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -251,7 +306,8 @@ const ProviderProofUpload = () => {
                       Upload Proof
                     </Button>
                   </Card>
-                ))
+                  );
+                })
               ) : (
                 <div className="col-span-full">
                   <Card className="p-8 card-elevated text-center">
@@ -288,7 +344,7 @@ const ProviderProofUpload = () => {
                 <p className="text-sm text-muted-foreground mb-2">Campaign</p>
                 <h3 className="font-bold text-lg">{chosenCampaign.title}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Beneficiary: {chosenCampaign.beneficiary?.name}
+                  Beneficiary: {getBeneficiaryDisplayName(chosenCampaign)}
                 </p>
               </div>
 
