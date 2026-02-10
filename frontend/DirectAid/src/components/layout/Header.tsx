@@ -13,13 +13,16 @@ const Header: React.FC = () => {
           {/* LOGO */}
           <a
             href="/"
-            className="font-extrabold text-2xl tracking-wider text-[var(--color-accent)] shrink-0 z-50"
-          >
-            DirectAid
+           className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-amber-400 to-cyan-400 flex items-center justify-center text-slate-900 font-bold">DA</div>
+          <span className="font-semibold text-white">DirectAid</span>
           </a>
 
           {/* DESKTOP: Centered Nav Links */}
           <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-10">
+            <a href="/" className="text-sm text-white/90 hover:text-[var(--color-accent)] transition">
+              Home
+            </a>
             <a href="#how" className="text-sm text-white/90 hover:text-[var(--color-accent)] transition">
               How it works
             </a>
@@ -28,6 +31,9 @@ const Header: React.FC = () => {
             </a>
             <a href="#providers" className="text-sm text-white/90 hover:text-[var(--color-accent)] transition">
               Providers
+            </a>
+            <a href="#faq" className="text-sm text-white/90 hover:text-[var(--color-accent)] transition">
+              FAQ
             </a>
           </div>
 
