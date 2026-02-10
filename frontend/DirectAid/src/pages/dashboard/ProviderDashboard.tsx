@@ -128,8 +128,8 @@ const ProviderDashboard = () => {
   );
   const [selectedPayoutId, setSelectedPayoutId] = useState<string | null>(
     provider.payoutMethods?.find((p) => p.isDefault)?.id ||
-      provider.payoutMethods?.[0]?.id ||
-      null
+    provider.payoutMethods?.[0]?.id ||
+    null
   );
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
@@ -151,8 +151,8 @@ const ProviderDashboard = () => {
     setWithdrawAmount(Math.max(0, provider.walletBalance.available / 100));
     setSelectedPayoutId(
       provider.payoutMethods?.find((p) => p.isDefault)?.id ||
-        provider.payoutMethods?.[0]?.id ||
-        null
+      provider.payoutMethods?.[0]?.id ||
+      null
     );
     setWithdrawOpen(true);
   };
@@ -578,23 +578,22 @@ const ProviderDashboard = () => {
                         </span>
                       </p>
                       <span
-                        className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium w-fit ${
-                          status === "completed"
+                        className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium w-fit ${status === "completed"
                             ? "bg-green-100 text-green-700"
                             : status === "in_progress"
-                            ? "bg-blue-100 text-blue-700"
-                            : status === "ready_for_withdrawal"
-                            ? "bg-purple-100 text-purple-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
+                              ? "bg-blue-100 text-blue-700"
+                              : status === "ready_for_withdrawal"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-yellow-100 text-yellow-700"
+                          }`}
                       >
                         {status === "completed"
                           ? "Completed"
                           : status === "in_progress"
-                          ? "In Progress"
-                          : status === "ready_for_withdrawal"
-                          ? "Ready for Withdrawal"
-                          : "Pending"}
+                            ? "In Progress"
+                            : status === "ready_for_withdrawal"
+                              ? "Ready for Withdrawal"
+                              : "Pending"}
                       </span>
                     </div>
                   </div>
@@ -617,7 +616,7 @@ const ProviderDashboard = () => {
                         style={{
                           width: `${Math.min(
                             (campaign.amountRaised / campaign.targetAmount) *
-                              100,
+                            100,
                             100
                           )}%`,
                         }}
@@ -699,8 +698,8 @@ const ProviderDashboard = () => {
                       {workflow.proofUploaded
                         ? "View Proof"
                         : isEligibleForProofUpload
-                        ? "Upload Proof"
-                        : "Proof Upload"}
+                          ? "Upload Proof"
+                          : "Proof Upload"}
                     </Button>
                   </div>
 
@@ -922,13 +921,13 @@ const ProviderDashboard = () => {
               <div className="space-y-2 sm:space-y-3">
                 {campaigns.filter(
                   (c) =>
-                    c.status === "active" &&
+                    c.status?.toLowerCase() === "active" &&
                     c.confirmationStatus === "both_confirmed"
                 ).length > 0 ? (
                   campaigns
                     .filter(
                       (c) =>
-                        c.status === "active" &&
+                        c.status?.toLowerCase() === "active" &&
                         c.confirmationStatus === "both_confirmed"
                     )
                     .map((campaign) => (
@@ -1042,13 +1041,12 @@ const ProviderDashboard = () => {
                         ${(payout.amount / 100).toFixed(2)}
                       </p>
                       <p
-                        className={`text-xs sm:text-sm ${
-                          payout.status === "completed"
+                        className={`text-xs sm:text-sm ${payout.status === "completed"
                             ? "text-green-600"
                             : payout.status === "processing"
-                            ? "text-blue-600"
-                            : "text-yellow-400"
-                        }`}
+                              ? "text-blue-600"
+                              : "text-yellow-400"
+                          }`}
                       >
                         {payout.status.charAt(0).toUpperCase() +
                           payout.status.slice(1)}

@@ -5,27 +5,29 @@ import api from "../services/api";
 import * as beneficiaryApi from "../services/beneficiaryApi";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import { Card } from "../components/ui/card";
+import { CampaignSummaryCard } from "../components/feature/CampaignSummaryCard";
 import {
   Search,
   MapPin,
   Clock,
-  Heart,
   Filter,
-  ChevronRight,
   AlertCircle,
   LayoutDashboard,
+  DollarSign,
   FolderKanban,
   Upload,
   Wallet,
   FileText,
-  DollarSign,
+  Heart,
   Receipt,
   User,
   Bell,
   Lock,
   CreditCard,
+  Sparkles,
+  ChevronRight,
 } from "lucide-react";
 
 type FilterCategory = "all" | "medical" | "education" | "food" | "shelter";
@@ -43,6 +45,7 @@ type CampaignListItem = {
   confirmationStatus?: string;
   category: string;
   donorCount: number;
+  providerName: string;
 };
 
 function normalizeCampaign(c: any): CampaignListItem {
@@ -60,14 +63,16 @@ function normalizeCampaign(c: any): CampaignListItem {
     id: c._id || c.id || c.publicId || "",
     title: c.title ?? "",
     description: c.description ?? "",
-    location: c.location ?? "",
+    location: c.location ?? c.metadata?.location ?? "Global",
     fundraisingDeadline,
     amountRaised: raised,
     targetAmount: target,
-    status: c.status ?? "ACTIVE",
+    status: (c.status ?? "active").toLowerCase(),
     confirmationStatus: c.confirmationStatus,
-    category: c.category ?? "",
+    category: c.category ?? c.metadata?.category ?? "Other",
     donorCount: c.donorCount ?? 0,
+    providerName: c.providerId?.organization ||
+      (c.providerId?.firstName ? `${c.providerId.firstName} ${c.providerId.lastName || ""}`.trim() : "DirectAid Provider")
   };
 }
 
@@ -154,15 +159,16 @@ export default function CampaignPage() {
           { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
           { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
           { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Funds", href: "/beneficiary/funds", icon: <Wallet className="w-5 h-5" /> },
           { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
         ];
       case "PROVIDER":
         return [
           { label: "Dashboard", href: "/provider", icon: <LayoutDashboard className="w-5 h-5" /> },
           { label: "Campaigns", href: "/provider/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
-          { label: "Upload Invoices", href: "/provider/invoices", icon: <Upload className="w-5 h-5" />, },
+          { label: "Invoices", href: "/provider/invoices", icon: <Upload className="w-5 h-5" />, },
           { label: "Withdrawals", href: "/provider/withdrawals", icon: <Wallet className="w-5 h-5" />, },
-          { label: "Proof Upload", href: "/provider/proof-upload", icon: <FileText className="w-5 h-5" />, },
+          { label: "Proof", href: "/provider/proof-upload", icon: <FileText className="w-5 h-5" />, },
         ];
       default:
         return [
@@ -188,7 +194,6 @@ export default function CampaignPage() {
       case "BENEFICIARY":
         return [
           { id: "profile", label: "Profile", href: "/beneficiary/settings/profile", icon: <User className="w-5 h-5" /> },
-          { id: "address", label: "Address", href: "/beneficiary/settings/address", icon: <MapPin className="w-5 h-5" /> },
           { id: "notifications", label: "Notifications", href: "/beneficiary/settings/notifications", icon: <Bell className="w-5 h-5" /> },
           { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
         ];
@@ -200,23 +205,22 @@ export default function CampaignPage() {
           { id: "change-password", label: "Change Password", href: "/provider/settings/change-password", icon: <Lock className="w-5 h-5" /> },
         ];
       default:
-        return [{ id: "profile", label: "Profile Settings", href: "/settings", icon: <User className="w-5 h-5" /> }];
+        return [{ id: "profile", label: "Settings", href: "/settings", icon: <User className="w-5 h-5" /> }];
     }
   }, [user, normalizedRole]);
 
   const categories: { id: FilterCategory; label: string }[] = [
-    { id: "all", label: "All Categories" },
-    { id: "medical", label: "Medical" },
+    { id: "all", label: "All Cases" },
+    { id: "medical", label: "Medical Aid" },
     { id: "education", label: "Education" },
-    { id: "food", label: "Food" },
-    { id: "shelter", label: "Shelter" },
+    { id: "food", label: "Nutrition" },
+    { id: "shelter", label: "Housing" },
   ];
 
   const statuses: { id: FilterStatus; label: string }[] = [
-    { id: "all", label: "All Status" },
-    { id: "active", label: "Active" },
-    { id: "completed", label: "Completed" },
-    { id: "draft", label: "Draft" },
+    { id: "all", label: "Any Status" },
+    { id: "active", label: "Active Now" },
+    { id: "completed", label: "Fully Funded" },
   ];
 
   // Filter and search campaigns (apply to current display list)
@@ -262,6 +266,7 @@ export default function CampaignPage() {
     }
   };
 
+
   const userName = user?.name || user?.email || "User";
   const userRole = role || "Guest";
 
@@ -276,15 +281,24 @@ export default function CampaignPage() {
         navigate("/");
       }}
     >
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold mb-2">
-            Browse Campaigns
-          </h1>
-          <p className="text-muted-foreground">
-            Find and support campaigns making a real impact
-          </p>
+      <div className="space-y-10 animate-fade-in">
+        {/* Fancy Hero Header */}
+        <div className="relative p-8 sm:p-12 rounded-[2rem] overflow-hidden border border-white/10 glass-morphism shadow-2xl">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 blur-[100px] -mr-32 -mt-32" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent/10 blur-[100px] -ml-32 -mb-32" />
+
+          <div className="relative z-10 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest mb-6">
+              <Sparkles className="w-3 h-3" />
+              <span>Direct Aid Protocol</span>
+            </div>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 tracking-tight leading-tight">
+              Verified <span className="text-primary italic">Impact</span> Campaigns
+            </h1>
+            <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
+              Every contribution is purpose-locked and only released upon dual-confirmation of service delivery.
+            </p>
+          </div>
         </div>
 
         {/* Beneficiary: Discover vs My campaigns tabs */}
@@ -305,46 +319,54 @@ export default function CampaignPage() {
           </div>
         )}
 
-        {/* Search Bar */}
-        <div className="flex gap-3 items-center">
-          <div className="flex-1 relative">
+        {/* Search & Action Bar */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center p-4 rounded-3xl border border-white/5 bg-white/5 backdrop-blur-sm shadow-xl">
+          <div className="flex-1 relative w-full group">
             <Search
-              className="absolute left-3 top-3 w-5 h-5 text-muted-foreground"
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors"
             />
             <Input
               type="text"
-              placeholder="Search campaigns..."
+              placeholder="Search by title, location or keyword..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-11"
+              className="pl-12 h-14 bg-black/20 border-white/10 rounded-2xl focus:border-primary/50 transition-all text-base"
             />
           </div>
-          <Button
-            onClick={() => setShowFilters(!showFilters)}
-            className="gap-2"
-          >
-            <Filter className="w-4 h-4" />
-            Filter
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`h-14 px-6 gap-2 rounded-2xl border-white/10 transition-all ${showFilters ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-black/20 hover:bg-black/40'}`}
+            >
+              <Filter className="w-4 h-4" />
+              <span className="font-bold">Filters</span>
+            </Button>
+            {role === "PROVIDER" && (
+              <Button
+                className="h-14 px-8 rounded-2xl btn-cta"
+                onClick={() => navigate("/campaigns/create")}
+              >
+                Create New
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Filter Section */}
+        {/* Dynamic Filter Section */}
         {showFilters && (
-          <div className="border-t border-border pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Category Filter */}
+          <div className="p-8 rounded-3xl border border-white/10 glass-morphism animate-slide-down">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div>
-                <label className="block text-sm font-medium mb-3">
-                  Category
-                </label>
-                <div className="flex flex-wrap gap-2">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-6">Category</h3>
+                <div className="flex flex-wrap gap-2.5">
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition border ${selectedCategory === cat.id
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-card text-foreground border-border hover:bg-accent"
+                      className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all border ${selectedCategory === cat.id
+                        ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(0,255,255,0.4)]"
+                        : "bg-white/5 text-muted-foreground border-white/10 hover:border-white/20 hover:bg-white/10"
                         }`}
                     >
                       {cat.label}
@@ -353,19 +375,16 @@ export default function CampaignPage() {
                 </div>
               </div>
 
-              {/* Status Filter */}
               <div>
-                <label className="block text-sm font-medium mb-3">
-                  Campaign Status
-                </label>
-                <div className="flex flex-wrap gap-2">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-6">Execution Status</h3>
+                <div className="flex flex-wrap gap-2.5">
                   {statuses.map((status) => (
                     <button
                       key={status.id}
                       onClick={() => setSelectedStatus(status.id)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition border ${selectedStatus === status.id
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-card text-foreground border-border hover:bg-accent"
+                      className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all border ${selectedStatus === status.id
+                        ? "bg-accent text-black border-accent shadow-[0_0_15px_rgba(0,255,255,0.4)]"
+                        : "bg-white/5 text-muted-foreground border-white/10 hover:border-white/20 hover:bg-white/10"
                         }`}
                     >
                       {status.label}
@@ -375,12 +394,18 @@ export default function CampaignPage() {
               </div>
             </div>
 
-            <button
-              onClick={() => setShowFilters(false)}
-              className="text-sm mt-4 text-primary hover:opacity-80 transition"
-            >
-              Hide Filters
-            </button>
+            <div className="mt-10 pt-6 border-t border-white/5 flex justify-end">
+              <button
+                onClick={() => {
+                  setSelectedCategory("all");
+                  setSelectedStatus("all");
+                  setSearchQuery("");
+                }}
+                className="text-xs font-bold text-muted-foreground hover:text-white transition-colors"
+              >
+                Reset All Filters
+              </button>
+            </div>
           </div>
         )}
 
@@ -390,131 +415,60 @@ export default function CampaignPage() {
             <div className="text-center py-12">
               <p className="text-muted-foreground">Loading campaigns…</p>
             </div>
-          ) : filteredCampaigns.length === 0 ? (
-            <div className="text-center py-12">
-              <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg">No campaigns found matching your filters.</p>
-              <p className="text-sm mt-1 text-muted-foreground">
-                Try adjusting your search or filters
-              </p>
-            </div>
           ) : (
-            <>
-              <div className="mb-6 flex items-center justify-between">
-                <p>
-                  Showing{" "}
-                  <span className="font-semibold">
-                    {filteredCampaigns.length}
-                  </span>{" "}
-                  {filteredCampaigns.length === 1 ? "campaign" : "campaigns"}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredCampaigns.map((campaign) => (
-                  <Card
-                    key={campaign.id}
-                    className="overflow-hidden rounded-xl border border-border bg-card hover:shadow-lg hover:border-primary/20 transition-all duration-200 cursor-pointer group"
-                    onClick={() => handleCardClick(campaign)}
+            <div className="pb-12 text-center">
+              {filteredCampaigns.length === 0 ? (
+                <div className="py-24 p-8 rounded-3xl border border-dashed border-white/10 glass-morphism max-w-xl mx-auto">
+                  <AlertCircle className="w-16 h-16 mx-auto mb-6 text-muted-foreground opacity-30" />
+                  <h3 className="text-2xl font-bold mb-3">No matches found</h3>
+                  <p className="text-muted-foreground">
+                    We couldn't find any campaigns matching your search or filter criteria. Try expanding your search.
+                  </p>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setSelectedCategory("all");
+                      setSelectedStatus("all");
+                      setSearchQuery("");
+                    }}
+                    className="mt-8 text-primary font-bold"
                   >
-                    {/* Header strip with gradient */}
-                    <div className="h-36 flex items-center justify-center border-b border-border bg-gradient-to-br from-primary/5 via-muted/30 to-primary/10">
-                      <Heart className="w-14 h-14 text-primary/50 group-hover:text-primary/70 transition-colors" />
-                    </div>
+                    Clear all filters
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-8 flex items-center justify-between px-2">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Found <span className="text-white font-bold">{filteredCampaigns.length}</span> active campaigns
+                    </p>
+                  </div>
 
-                    <div className="p-5">
-                      {/* Status & Category */}
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getStatusBadgeClass(campaign)}`}>
-                          {getCampaignStatusLabel(campaign)}
-                        </span>
-                        {campaign.category && (
-                          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-muted/80 text-muted-foreground border border-border">
-                            {campaign.category}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Title — clear hierarchy */}
-                      <h3 className="font-bold text-lg leading-tight mb-2 line-clamp-2 text-foreground group-hover:text-primary transition-colors">
-                        {campaign.title}
-                      </h3>
-
-                      {/* Description */}
-                      <p className="text-sm leading-snug mb-4 line-clamp-2 text-muted-foreground">
-                        {campaign.description || "No description."}
-                      </p>
-
-                      {/* Location & Timeline */}
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
-                        {campaign.location && (
-                          <div className="flex items-center gap-1.5">
-                            <MapPin className="w-4 h-4 shrink-0" />
-                            <span className="truncate">{campaign.location}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-4 h-4 shrink-0" />
-                          <span>
-                            {campaign.fundraisingDeadline
-                              ? (() => {
-                                  const d = daysLeft(campaign.fundraisingDeadline);
-                                  return d === 0 ? "Ended" : `${d} days left`;
-                                })()
-                              : "No deadline"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Progress */}
-                      <div className="mb-4">
-                        <div className="flex justify-between items-baseline mb-1.5">
-                          <span className="text-base font-bold text-foreground">
-                            ${campaign.amountRaised.toLocaleString()}
-                          </span>
-                          <span className="text-sm text-muted-foreground">
-                            of ${campaign.targetAmount.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="w-full rounded-full h-2.5 bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all duration-300"
-                            style={{ width: `${getProgressPercentage(campaign)}%` }}
-                          />
-                        </div>
-                        <p className="text-xs mt-1 text-muted-foreground">
-                          {getProgressPercentage(campaign).toFixed(0)}% funded
-                        </p>
-                      </div>
-
-                      {/* Donors */}
-                      <div className="flex items-center justify-between pt-3 border-t border-border">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Heart className="w-4 h-4 text-primary/80" />
-                          <span>{campaign.donorCount || 0} donors</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                      </div>
-                    </div>
-
-                    {/* CTA: View details — prominent button with arrow */}
-                    <div className="px-5 py-3 border-t border-border bg-primary/5">
-                      <Button
-                        onClick={(e) => {
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {filteredCampaigns.map((campaign) => (
+                      <CampaignSummaryCard
+                        key={campaign.id}
+                        id={campaign.id}
+                        title={campaign.title}
+                        description={campaign.description}
+                        organizerName={campaign.providerName}
+                        amountRaised={campaign.amountRaised}
+                        targetAmount={campaign.targetAmount}
+                        donorCount={campaign.donorCount}
+                        category={campaign.category}
+                        location={campaign.location}
+                        deadline={campaign.fundraisingDeadline}
+                        onClick={() => handleCardClick(campaign)}
+                        onDonate={(e) => {
                           e.stopPropagation();
-                          if (isBeneficiaryMyView) navigate(`/beneficiary/campaigns/${campaign.id}`);
-                          else navigate(`/campaigns/${campaign.id}`);
+                          navigate(`/donate?campaignId=${campaign.id}`);
                         }}
-                        className="w-full gap-2 rounded-lg bg-primary text-primary-foreground hover:opacity-95 font-semibold shadow-md hover:shadow-lg transition-shadow py-2.5"
-                      >
-                        View details
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </>
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>

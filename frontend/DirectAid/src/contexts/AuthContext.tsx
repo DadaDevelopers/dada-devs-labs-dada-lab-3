@@ -85,8 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (token) {
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      console.log("[AuthContext] Token attached to API headers:", token.substring(0, 20) + "...");
     } else {
       delete api.defaults.headers.common["Authorization"];
+      console.log("[AuthContext] Token removed from API headers");
     }
   }, [token]);
 

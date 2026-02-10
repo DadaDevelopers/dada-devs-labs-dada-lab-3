@@ -120,11 +120,16 @@ export type ConfirmationStatus =
   | "both_confirmed"
   | "disputed";
 
+export interface BeneficiaryReceipt {
+  confirmedAt: string | null;
+  note: string;
+}
+
 export interface Campaign {
   id: string;
-  providerId: string;
+  providerId: string | any;
   provider: Partial<Provider>;
-  beneficiaryId: string;
+  beneficiaryId: string | any;
   beneficiary: Partial<Beneficiary>;
   invoiceId: string;
   invoice: Invoice;
@@ -144,6 +149,7 @@ export interface Campaign {
   confirmationStatus: ConfirmationStatus;
   providerConfirmedAt?: string;
   beneficiaryConfirmedAt?: string;
+  beneficiaryReceipt?: BeneficiaryReceipt;
 
   // Proofs & Documents
   proofDocuments: Document[];
