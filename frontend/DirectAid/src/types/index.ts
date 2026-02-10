@@ -120,11 +120,21 @@ export type ConfirmationStatus =
   | "both_confirmed"
   | "disputed";
 
+export interface BeneficiaryReceipt {
+  confirmedAt: string | null;
+  note: string;
+}
+
 export interface Campaign {
-  _id: string;
-  providerId: string;
+  // Mongo-backed APIs commonly return `_id`, but some parts of the frontend/dev mocks use `id`.
+  // Keep both to remain compatible across environments/branches.
+  _id?: string;
+  id?: string;
+
+  // May be a string ID or a populated object depending on endpoint.
+  providerId: string | Partial<Provider>;
   provider: Partial<Provider>;
-  beneficiaryId: string;
+  beneficiaryId: string | Partial<Beneficiary>;
   beneficiary: Partial<Beneficiary>;
   invoiceId: string;
   invoice: Invoice;
@@ -146,6 +156,7 @@ export interface Campaign {
   confirmationStatus: ConfirmationStatus;
   providerConfirmedAt?: string;
   beneficiaryConfirmedAt?: string;
+  beneficiaryReceipt?: BeneficiaryReceipt;
 
   // Proofs & Documents
   proofDocuments: Document[];

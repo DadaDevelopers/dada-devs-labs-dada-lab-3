@@ -246,11 +246,11 @@ const CampaignCreationWizard = () => {
           </button>
 
           {/* Stepper */}
-          <div className="mb-8">
-            <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-[var(--color-text-light)]">
+          <div className="mb-8 flex flex-col items-center">
+            <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-[var(--color-text-light)] text-center w-full">
               Create campaign
             </h1>
-            <div className="flex items-start w-full max-w-2xl">
+            <div className="flex items-start w-full max-w-2xl mx-auto justify-center">
               {[
                 { key: "info", label: "Details", short: "1" },
                 { key: "invoice", label: "Documents", short: "2" },

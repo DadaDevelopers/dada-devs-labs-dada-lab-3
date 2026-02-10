@@ -83,6 +83,8 @@ const BeneficiarySettings = () => {
   const [profileData, setProfileData] = useState<BeneficiaryProfileForm>(emptyProfile);
   const [profilePictureId, setProfilePictureId] = useState<string | null>(null);
   const [nationalIdUploadId, setNationalIdUploadId] = useState<string | null>(null);
+  const [nationalIdUploading, setNationalIdUploading] = useState(false);
+  const [nationalIdUploadError, setNationalIdUploadError] = useState<string | null>(null);
   const [supportingDocIds, setSupportingDocIds] = useState<string[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -178,6 +180,33 @@ const BeneficiarySettings = () => {
     }
     setActiveTab(getActiveTabFromPath());
   }, [location.pathname, navigate]);
+
+  const handleNationalIdUpload = async (file: File) => {
+    setNationalIdUploadError(null);
+    setNationalIdUploading(true);
+    try {
+      const { data } = await api.post("/uploads/presign", {
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        purpose: "national_id",
+      });
+      const { uploadId, presignedUrl } = data as { uploadId: string; presignedUrl: string };
+      await fetch(presignedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+      });
+      const confirmRes = await api.post("/uploads/confirm", { uploadId });
+      const id = (confirmRes.data as { id?: string }).id ?? uploadId;
+      setNationalIdUploadId(id);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Upload failed. Check that file storage is configured.";
+      setNationalIdUploadError(msg);
+    } finally {
+      setNationalIdUploading(false);
+    }
+  };
 
   const handleProfileChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -443,15 +472,71 @@ const BeneficiarySettings = () => {
                 <hr className="border-border" />
 
                 <FormInput
-                  label="National ID"
+                  label="National ID (optional)"
                   name="nationalId"
                   value={profileData.nationalId}
                   onChange={handleProfileChange}
                   placeholder="National identification number (stored securely, hashed)"
                 />
-                <p className="text-xs text-muted-foreground">
-                  National ID document can be uploaded when the upload feature is connected. Backend stores a hashed value only.
-                </p>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-foreground">
+                    National ID document (upload)
+                  </label>
+                  {nationalIdUploadId ? (
+                    <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-muted/30">
+                      <span className="text-sm text-foreground">ID document uploaded</span>
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          className="hidden"
+                          id="national-id-replace"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleNationalIdUpload(file);
+                            e.target.value = "";
+                          }}
+                        />
+                        <label htmlFor="national-id-replace" className="cursor-pointer">
+                          <Button type="button" variant="outline" size="sm" className="rounded-lg pointer-events-none">
+                            Replace
+                          </Button>
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-lg text-destructive hover:text-destructive"
+                          onClick={() => setNationalIdUploadId(null)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        id="national-id-upload"
+                        className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground file:cursor-pointer cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleNationalIdUpload(file);
+                          e.target.value = "";
+                        }}
+                        disabled={!!nationalIdUploading}
+                      />
+                      {nationalIdUploadError && (
+                        <p className="text-xs text-destructive">{nationalIdUploadError}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Upload a clear photo or PDF of your national ID. Backend stores the document for verification.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex items-start gap-3">
                   <input

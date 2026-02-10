@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { useBeneficiaryCampaigns, useBeneficiaryMetrics } from "../../hooks/useBeneficiaryApi";
+import { useBeneficiaryCampaigns, useBeneficiaryMetrics, useBeneficiaryDisbursements } from "../../hooks/useBeneficiaryApi";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
@@ -30,22 +30,12 @@ const BeneficiaryFunds = () => {
   const { user, logout } = useAuth();
   const { campaigns: userCampaigns, loading: campaignsLoading, error: campaignsError } = useBeneficiaryCampaigns();
   const { metrics, loading: metricsLoading, error: metricsError } = useBeneficiaryMetrics();
+  const { disbursements, loading: disbursementsLoading, error: disbursementsError } = useBeneficiaryDisbursements();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
   const beneficiaryName = user?.firstName || user?.name || user?.email || "User";
-
-  // Disbursements: backend endpoint not yet implemented — show empty until GET /api/beneficiaries/me/disbursements exists
-  const disbursements: Array<{
-    id: string;
-    campaignId?: string;
-    amount: number;
-    status: string;
-    disbursedAt: string;
-    description: string;
-    transactionRef: string;
-  }> = [];
 
   const filteredDisbursements = disbursements.filter((d) => {
     const campaign = userCampaigns.find((c) => c.id === d.campaignId);
@@ -100,9 +90,9 @@ const BeneficiaryFunds = () => {
           </Button>
         </div>
 
-        {(campaignsError || metricsError) && (
+        {(campaignsError || metricsError || disbursementsError) && (
           <p className="text-sm text-destructive" role="alert">
-            {campaignsError || metricsError}
+            {campaignsError || metricsError || disbursementsError}
           </p>
         )}
         {/* Summary Cards */}
@@ -175,7 +165,11 @@ const BeneficiaryFunds = () => {
 
         {/* Disbursements List */}
         <div className="space-y-4">
-          {filteredDisbursements.length > 0 ? (
+          {disbursementsLoading ? (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">Loading disbursements…</p>
+            </Card>
+          ) : filteredDisbursements.length > 0 ? (
             filteredDisbursements.map((disbursement) => {
               const campaign = userCampaigns.find((c) => c.id === disbursement.campaignId);
               return (
@@ -191,16 +185,20 @@ const BeneficiaryFunds = () => {
                             {campaign?.title || "Campaign"}
                           </h3>
                           <p className="text-sm text-muted-foreground mb-2">
-                            {disbursement.description}
+                            {disbursement.description ?? "—"}
                           </p>
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              {new Date(disbursement.disbursedAt).toLocaleDateString()}
+                              {disbursement.disbursedAt
+                                ? new Date(disbursement.disbursedAt).toLocaleDateString()
+                                : "—"}
                             </span>
-                            <span className="flex items-center gap-1">
-                              Ref: {disbursement.transactionRef}
-                            </span>
+                            {disbursement.transactionRef && (
+                              <span className="flex items-center gap-1">
+                                Ref: {disbursement.transactionRef}
+                              </span>
+                            )}
                             <span className={`px-2 py-1 rounded-full ${
                               disbursement.status === 'completed' ? 'bg-green-100 text-green-700' :
                               disbursement.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
@@ -218,7 +216,7 @@ const BeneficiaryFunds = () => {
                     <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
                       <div className="sm:text-right">
                         <p className="font-bold text-xl">
-                          ${(disbursement.amount / 100).toFixed(2)}
+                          ${(typeof disbursement.amount === "number" ? disbursement.amount / 100 : Number(disbursement.amount) / 100 || 0).toFixed(2)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Disbursed
@@ -230,7 +228,7 @@ const BeneficiaryFunds = () => {
                           variant="outline"
                           size="sm"
                           className="rounded-full"
-                          onClick={() => navigate(`/campaigns/${campaign?.id}`)}
+                          onClick={() => navigate(campaign?.id ? `/beneficiary/campaigns/${campaign.id}` : "/beneficiary/campaigns")}
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -269,7 +267,7 @@ const BeneficiaryFunds = () => {
           )}
         </div>
 
-        {/* Monthly Breakdown — driven by GET /api/beneficiaries/me/disbursements (see BACKEND_HANDOFF_BENEFICIARY.md) */}
+        {/* Monthly Breakdown */}
         <Card className="p-4 sm:p-6 card-elevated">
           <h2 className="text-xl font-bold mb-4">Monthly breakdown</h2>
           {filteredDisbursements.length > 0 ? (
@@ -277,6 +275,7 @@ const BeneficiaryFunds = () => {
               {(() => {
                 const byMonth = new Map<string, { amount: number; count: number }>();
                 filteredDisbursements.forEach((d) => {
+                  if (!d.disbursedAt) return;
                   const month = new Date(d.disbursedAt).toLocaleString("default", { month: "long", year: "numeric" });
                   const prev = byMonth.get(month) ?? { amount: 0, count: 0 };
                   const amt = typeof d.amount === "number" ? d.amount : Number(d.amount) || 0;
@@ -295,7 +294,7 @@ const BeneficiaryFunds = () => {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-4">
-              Monthly breakdown will appear here once disbursements are available. It is derived from the disbursements list when the backend implements <code className="text-xs bg-muted px-1 rounded">GET /api/beneficiaries/me/disbursements</code>.
+              Monthly breakdown will appear here once disbursements with dates are available.
             </p>
           )}
         </Card>

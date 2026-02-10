@@ -2,6 +2,7 @@ import express from "express";
 import {
   createCampaign,
   confirmProvider,
+  confirmBeneficiary,
   getAllCampaigns,
   getMyCampaigns,
   getCampaignById,
@@ -27,8 +28,11 @@ const router = express.Router();
 // Create a campaign — only BENEFICIARY users
 router.post("/", protect, authorize("BENEFICIARY"), createCampaign);
 
-// Provider confirm campaign
+// Provider confirms they will provide the service
 router.patch("/:id/confirm-provider", protect, confirmProvider);
+
+// Beneficiary confirms they have received the service
+router.patch("/:id/confirm-beneficiary", protect, authorize("BENEFICIARY"), confirmBeneficiary);
 
 // List campaigns — public (supports ?beneficiaryId=, ?confirmationStatus=)
 router.get("/", getAllCampaigns);

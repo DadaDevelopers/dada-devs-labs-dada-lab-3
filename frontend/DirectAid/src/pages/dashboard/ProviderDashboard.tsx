@@ -57,11 +57,16 @@ interface ProviderData {
   email?: string;
   phone?: string;
   campaigns: string[];
-  payoutMethods: any[];
+  payoutMethods: PayoutMethod[];
   kycStatus: "PENDING" | "APPROVED" | "REJECTED";
   totalDonationsReceived: number;
   createdAt: string;
   updatedAt: string;
+  walletBalance?: {
+    available: number; // cents
+    locked?: number;
+    total?: number;
+  };
 }
 
 interface PayoutMethod {
@@ -110,7 +115,7 @@ const ProviderDashboard = () => {
     totalFundsRaised: 0,
     activeDonors: 0
   });
-  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [payouts] = useState<Payout[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingCampaigns, setPendingCampaigns] = useState<any[]>([]);
@@ -122,7 +127,7 @@ const ProviderDashboard = () => {
   const [selectedPayoutId, setSelectedPayoutId] = useState<string | null>(null);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
-  const [campaignWorkflows, setCampaignWorkflows] = useState<{
+  const [campaignWorkflows] = useState<{
     [key: string]: {
       invoiceId?: string;
       invoiceUploaded: boolean;
@@ -142,7 +147,19 @@ const ProviderDashboard = () => {
 
         const response = await api.get("/providers/me");
         if (response.provider) {
-          setProviderData(response.provider);
+          const p = response.provider as any;
+          setProviderData(p);
+
+          // Initialize withdrawal defaults once provider data is available
+          setWithdrawAmount((prev) =>
+            prev > 0 ? prev : Math.max(0, Number(p?.walletBalance?.available ?? 0) / 100)
+          );
+          setSelectedPayoutId((prev) =>
+            prev ??
+            p?.payoutMethods?.find((m: any) => m?.isDefault)?.id ??
+            p?.payoutMethods?.[0]?.id ??
+            null
+          );
         }
       } catch (err: any) {
         const status = err?.response?.status;
@@ -254,12 +271,17 @@ const ProviderDashboard = () => {
   // Handler functions
   const handleWithdraw = () => {
     setWithdrawError(null);
-    const availableBalance = (providerData?.totalDonationsReceived || 0) * 100;
-    setWithdrawAmount(Math.max(0, availableBalance / 100));
-    
-    const defaultPayout = providerData?.payoutMethods?.[0];
-    setSelectedPayoutId(defaultPayout?._id || defaultPayout?.id || null);
-    
+    const availableDollars =
+      providerData?.walletBalance?.available != null
+        ? Math.max(0, Number(providerData.walletBalance.available) / 100)
+        : Math.max(0, Number(providerData?.totalDonationsReceived ?? 0));
+    setWithdrawAmount(availableDollars);
+
+    const defaultPayout =
+      providerData?.payoutMethods?.find((p: any) => p?.isDefault) ??
+      providerData?.payoutMethods?.[0];
+    setSelectedPayoutId((defaultPayout as any)?._id || (defaultPayout as any)?.id || null);
+
     setWithdrawOpen(true);
   };
 
@@ -675,15 +697,23 @@ const ProviderDashboard = () => {
                       <p className="text-xs sm:text-sm text-muted-foreground">
                         Beneficiary: <span className="font-semibold">{getBeneficiaryDisplayName(campaign, "Unknown")}</span>
                       </p>
-                      <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium w-fit ${
-                        status === "completed" ? "bg-green-100 text-green-700" :
-                        status === "in_progress" ? "bg-blue-100 text-blue-700" :
-                        status === "ready_for_withdrawal" ? "bg-purple-100 text-purple-700" :
-                        "bg-yellow-100 text-yellow-700"
-                      }`}>
-                        {status === "completed" ? "Completed" :
-                         status === "in_progress" ? "In Progress" :
-                         status === "ready_for_withdrawal" ? "Ready for Withdrawal" : "Pending"}
+                      <span
+                        className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium w-fit ${status === "completed"
+                            ? "bg-green-100 text-green-700"
+                            : status === "in_progress"
+                              ? "bg-blue-100 text-blue-700"
+                              : status === "ready_for_withdrawal"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-yellow-100 text-yellow-700"
+                          }`}
+                      >
+                        {status === "completed"
+                          ? "Completed"
+                          : status === "in_progress"
+                            ? "In Progress"
+                            : status === "ready_for_withdrawal"
+                              ? "Ready for Withdrawal"
+                              : "Pending"}
                       </span>
                     </div>
                   </div>
@@ -697,9 +727,16 @@ const ProviderDashboard = () => {
                       </p>
                     </div>
                     <div className="w-full bg-secondary/50 rounded-full h-2 overflow-hidden">
-                      <div className="h-full bg-linear-to-r from-primary to-purple-500" style={{
-                        width: `${Math.min((campaign.amountRaised / campaign.targetAmount) * 100, 100)}%`,
-                      }}></div>
+                      <div
+                        className="h-full bg-linear-to-r from-primary to-purple-500"
+                        style={{
+                          width: `${Math.min(
+                            (campaign.amountRaised / campaign.targetAmount) *
+                            100,
+                            100
+                          )}%`,
+                        }}
+                      ></div>
                     </div>
                     <p className="text-xs text-muted-foreground">{campaign.donorCount} donors</p>
                   </div>
@@ -749,7 +786,11 @@ const ProviderDashboard = () => {
                     </Button>
                     <Button size="sm" variant={workflow.proofUploaded ? "outline" : "secondary"} className="w-full gap-2 rounded-lg" disabled={!isEligibleForProofUpload} onClick={() => handleProofUploadClick(campaign._id)}>
                       <Upload className="w-4 h-4" />
-                      {workflow.proofUploaded ? "View Proof" : isEligibleForProofUpload ? "Upload Proof" : "Proof Upload"}
+                      {workflow.proofUploaded
+                        ? "View Proof"
+                        : isEligibleForProofUpload
+                          ? "Upload Proof"
+                          : "Proof Upload"}
                     </Button>
                   </div>
 
@@ -853,23 +894,36 @@ const ProviderDashboard = () => {
               </div>
 
               <div className="space-y-2 sm:space-y-3">
-                {providerCampaigns.filter((c: AppCampaign) => c.status === "active" && c.confirmationStatus === "both_confirmed").length > 0 ? (
-                  providerCampaigns.filter((c: AppCampaign) => c.status === "active" && c.confirmationStatus === "both_confirmed").map((campaign: AppCampaign) => (
-                    <div key={campaign._id} className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[#0B1221]/50 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
-                        <span className="text-xs sm:text-sm font-medium truncate">{campaign.title}</span>
+                {(() => {
+                  const confirmedActive = providerCampaigns.filter(
+                    (c: AppCampaign) =>
+                      String(c.status || "").toLowerCase() === "active" &&
+                      c.confirmationStatus === "both_confirmed"
+                  );
+
+                  return confirmedActive.length > 0 ? (
+                    confirmedActive.map((campaign: AppCampaign) => (
+                      <div
+                        key={campaign._id}
+                        className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[#0B1221]/50 gap-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                          <span className="text-xs sm:text-sm font-medium truncate">
+                            {campaign.title}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))
-                ) : (
+                    ))
+                  ) : (
                   <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[#0B1221]/50 gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <Clock className="w-4 h-4 text-yellow-600 shrink-0" />
                       <span className="text-xs sm:text-sm font-medium truncate">Awaiting confirmations</span>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           </Card>
@@ -929,12 +983,19 @@ const ProviderDashboard = () => {
                   </div>
                   <div className="flex items-center justify-between sm:justify-end sm:text-right gap-3">
                     <div>
-                      <p className="font-bold text-sm sm:text-base">${(payout.amount / 100).toFixed(2)}</p>
-                      <p className={`text-xs sm:text-sm ${
-                        payout.status === "completed" ? "text-green-600" :
-                        payout.status === "processing" ? "text-blue-600" : "text-yellow-400"
-                      }`}>
-                        {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
+                      <p className="font-bold text-sm sm:text-base">
+                        ${(payout.amount / 100).toFixed(2)}
+                      </p>
+                      <p
+                        className={`text-xs sm:text-sm ${payout.status === "completed"
+                            ? "text-green-600"
+                            : payout.status === "processing"
+                              ? "text-blue-600"
+                              : "text-yellow-400"
+                          }`}
+                      >
+                        {payout.status.charAt(0).toUpperCase() +
+                          payout.status.slice(1)}
                       </p>
                     </div>
                   </div>

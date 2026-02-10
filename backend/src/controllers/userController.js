@@ -4,6 +4,7 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import { User, RefreshToken } from "../models/User.js";
 import Campaign from "../models/Campaign.js";
+import Disbursement from "../models/Disbursement.js";
 import bcrypt from "bcryptjs";
 import { verifyAccessToken } from "../utils/token.js";
 import Upload from "../models/Upload.js";
@@ -67,6 +68,42 @@ export const getBeneficiaryMetrics = async (req, res, next) => {
         campaignsSupportingYou
       }
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/users/me/disbursements — beneficiary list of disbursements (paginated)
+ */
+export const getBeneficiaryDisbursements = async (req, res, next) => {
+  try {
+    if (req.user.role !== "BENEFICIARY") {
+      return res.status(403).json({ message: "Only beneficiaries can access disbursements" });
+    }
+    const { page = 1, limit = 20, status, campaignId } = req.query;
+    const filter = { beneficiaryId: req.user.userId };
+    if (status) filter.status = status;
+    if (campaignId) filter.campaignId = campaignId;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [disbursements, total] = await Promise.all([
+      Disbursement.find(filter).sort({ disbursedAt: -1, createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      Disbursement.countDocuments(filter)
+    ]);
+
+    const list = disbursements.map((d) => ({
+      id: d._id,
+      campaignId: d.campaignId,
+      amount: d.amount,
+      currency: d.currency,
+      status: d.status,
+      disbursedAt: d.disbursedAt || d.createdAt,
+      description: d.notes || null,
+      transactionRef: d.transactionRef || null
+    }));
+
+    res.json({ page: Number(page), limit: Number(limit), total, disbursements: list });
   } catch (err) {
     next(err);
   }

@@ -1,7 +1,7 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
-// export const API_BASE = "https://directaid-backend.onrender.com/api";
-export const API_BASE = "http://localhost:5000/api";
+export const API_BASE = "https://directaid-backend.onrender.com/api";
+// export const API_BASE = "http://localhost:5000/api";
 
 import type { AdminMetrics } from "../types";
 
@@ -39,6 +39,14 @@ async function fetchWrapper(
 
     if (data && (method === "POST" || method === "PUT" || method === "PATCH")) {
       options.body = JSON.stringify(data);
+    }
+
+    // Debug logging for authentication
+    if (options.headers && 'Authorization' in options.headers) {
+      const authHeader = (options.headers as any).Authorization;
+      console.log(`[API] ${method} ${url} - Auth header:`, authHeader ? authHeader.substring(0, 30) + "..." : "MISSING");
+    } else {
+      console.warn(`[API] ${method} ${url} - No Authorization header found`);
     }
 
     const res = await fetch(fullUrl, options);

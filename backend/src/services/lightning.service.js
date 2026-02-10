@@ -26,11 +26,14 @@ import crypto from "crypto";
  * Lightning service abstraction
  * Expects sats already calculated & stored on Donation
  */
-export const createLightningInvoice = async ({ amountSats, memo }) => {
+export const createLightningInvoice = async ({ amountFiat, amountSats, memo }) => {
+  // Use provided sats or convert from fiat (rough conversion: $1 = 2500 sats)
+  const sats = amountSats || Math.round(parseFloat(amountFiat) * 2500);
+
   return {
-    invoice: `lnbc${amountSats}${crypto.randomBytes(8).toString("hex")}`,
-    paymentHash: crypto.randomBytes(32).toString("hex"),
-    amountSats,
+    bolt11: `lnbc${sats}${crypto.randomBytes(8).toString("hex")}`,
+    payment_hash: crypto.randomBytes(32).toString("hex"),
+    amountSats: sats,
     memo
   };
 };

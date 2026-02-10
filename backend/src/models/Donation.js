@@ -29,13 +29,13 @@ const DonationSchema = new Schema({
   network: { type: String, default: null },    // 'bitcoin', 'lightning', 'ethereum', etc.
 
   // ---- Provider & reconciliation ----
-  paymentMethod: { 
-    type: String, 
-    required: true, 
-    enum: ["MPESA","BTC_ONCHAIN","BTC_LIGHTNING"], 
-    index: true 
+  paymentMethod: {
+    type: String,
+    required: true,
+    enum: ["MPESA", "BTC_ONCHAIN", "BTC_LIGHTNING"],
+    index: true
   },
-  
+
   //provider: { type: String, default: null },     // e.g., 'mpesa', 'stripe', 'opennode'
   paymentReference: { type: String }, // provider reference (Mpesa ref, bank ref)
   externalId: { type: String },       // provider-side ID (for idempotency)
@@ -60,7 +60,7 @@ const DonationSchema = new Schema({
   // ---- Life-cycle & bookkeeping ----
   status: {
     type: String,
-    enum: ["PENDING","COMPLETED","FAILED","REFUNDED"],
+    enum: ["PENDING", "COMPLETED", "FAILED", "REFUNDED"],
     default: "PENDING",
     index: true
   },
@@ -95,7 +95,7 @@ DonationSchema.index({ provider: 1, paymentReference: 1 }, { unique: true, spars
 /**
  * Pre-save: update updatedAt
  */
-DonationSchema.pre("save", function(next) {
+DonationSchema.pre("save", function (next) {
   this.updatedAt = new Date();
   next();
 });
@@ -103,7 +103,7 @@ DonationSchema.pre("save", function(next) {
 /**
  * Helper: convert Decimal128 fields to Number for JSON responses
  */
-DonationSchema.methods.toClient = function() {
+DonationSchema.methods.toClient = function () {
   const obj = this.toObject({ getters: true, virtuals: false });
 
   const convertDecimal = (d) => {
@@ -150,14 +150,14 @@ And we do both operations inside one transaction:
 Increment Campaign.amountRaised
 Mark Donation.appliedToCampaign = true
  */
-DonationSchema.post("save", async function (doc, next) {
+DonationSchema.post("save", async function (doc) {
   // Only proceed if donation is completed and not yet applied
   if (
     doc.status !== "COMPLETED" ||
     !doc.campaignId ||
     doc.appliedToCampaign === true
   ) {
-    return next();
+    return;
   }
 
   const session = await mongoose.startSession();
@@ -175,8 +175,8 @@ DonationSchema.post("save", async function (doc, next) {
     // Another webhook/save may have already applied it
     if (!freshDonation) {
       await session.commitTransaction();
-      session.endSession();
-      return next();
+      await session.endSession();
+      return;
     }
 
     // Determine increment amount
@@ -196,14 +196,25 @@ DonationSchema.post("save", async function (doc, next) {
     await freshDonation.save({ session });
 
     await session.commitTransaction();
-    session.endSession();
-    return next();
-
   } catch (err) {
     await session.abortTransaction();
-    session.endSession();
     console.error("Failed to apply donation to campaign:", err);
-    return next(err);
+    // In a post-hook, throwing usually crashes the flow or is logged.
+    // If we want to ensure the save succeeds even if this fails (so we don't rollback the donation),
+    // we might catch it and just log it.
+    // BUT the requirement is atomic update. 
+    // Wait, this is a POST hook. The donation is ALREADY saved (outside this transaction).
+    // If this fails, the donation logic (status=COMPLETED) remains, but campaign isn't updated.
+    // This creates inconsistency.
+    // IDEALLY, this logic should be in the controller or a service method, not a hook.
+    // But fixing that is a larger refactor.
+    // For now, logging error is safer than crashing if we can't rollback the main donation save.
+    // However, if we throw here, does it bubble up to the `Donation.create` call?
+    // In Mongoose 5+, async post hooks errors usually bubble up.
+    // If we want to alert the user/system, we should probably throw.
+    throw err;
+  } finally {
+    await session.endSession();
   }
 });
 

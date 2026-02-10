@@ -5,34 +5,39 @@
 
 /* CSS VARIABLES (The :root block) */
 :root {
-    /* Define your custom colors here - These will be used by var() */
-    --color-primary-bg: #0B1221;
-    --color-secondary-bg: #151D2C;
-    --color-text-light: #E5E7EB;
-    --color-accent: #00FFFF;
-    --color-accent-dark: #00AABB; 
+  /* Define your custom colors here - These will be used by var() */
+  --color-primary-bg: #0B1221;
+  --color-secondary-bg: #151D2C;
+  --color-text-light: #E5E7EB;
+  --color-accent: #00FFFF;
+  --color-accent-dark: #00AABB;
 }
 
 /* BASE GLOBAL STYLES */
 
 body {
-    /* Apply the variable for the background color */
-    background-color: var(--color-secondary-bg);
-    color: var(--color-text-light);
-    @apply antialiased; 
+  /* Apply the variable for the background color */
+  background-color: var(--color-secondary-bg);
+  color: var(--color-text-light);
+  @apply antialiased;
 }
+
 @layer base {
   :root {
-    --background: 210 45% 7%;  /* #0B1221 */
-    --foreground: 220 13% 91%; /* #E5E7EB */
+    --background: 210 45% 7%;
+    /* #0B1221 */
+    --foreground: 220 13% 91%;
+    /* #E5E7EB */
 
-    --card: 210 35% 12%;       /* #151D2C */
+    --card: 210 35% 12%;
+    /* #151D2C */
     --card-foreground: 220 13% 91%;
 
     --popover: 210 35% 12%;
     --popover-foreground: 220 13% 91%;
 
-    --primary: 180 100% 50%;   /* #00FFFF */
+    --primary: 180 100% 50%;
+    /* #00FFFF */
     --primary-foreground: 210 45% 7%;
 
     --secondary: 210 35% 15%;
@@ -41,7 +46,8 @@ body {
     --muted: 210 35% 15%;
     --muted-foreground: 220 13% 70%;
 
-    --accent: 180 100% 50%;    /* #00FFFF */
+    --accent: 180 100% 50%;
+    /* #00FFFF */
     --accent-foreground: 210 45% 7%;
 
     --destructive: 0 84% 60%;
@@ -62,11 +68,16 @@ body {
     --sidebar-border: 210 30% 20%;
     --sidebar-ring: 180 100% 50%;
 
-    --chart-1: 180 100% 50%;   /* Cyan */
-    --chart-2: 160 60% 50%;    /* Teal */
-    --chart-3: 200 70% 55%;    /* Light Blue */
-    --chart-4: 140 55% 45%;    /* Green */
-    --chart-5: 220 65% 50%;    /* Blue */
+    --chart-1: 180 100% 50%;
+    /* Cyan */
+    --chart-2: 160 60% 50%;
+    /* Teal */
+    --chart-3: 200 70% 55%;
+    /* Light Blue */
+    --chart-4: 140 55% 45%;
+    /* Green */
+    --chart-5: 220 65% 50%;
+    /* Blue */
 
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -74,7 +85,7 @@ body {
     --shadow-neu: 8px 8px 16px rgba(0, 0, 0, 0.4), -8px -8px 16px rgba(0, 255, 255, 0.05);
   }
 
-   
+
 }
 
 /* Base styles */
@@ -88,7 +99,12 @@ body {
 }
 
 /* Typography Hierarchy */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: 700;
   line-height: 1.2;
   color: var(--color-text-light);
@@ -177,7 +193,8 @@ p {
 }
 
 /* Improved spacing for content sections */
-section, .section {
+section,
+.section {
   margin-bottom: 2rem;
 }
 
@@ -188,7 +205,9 @@ section, .section {
 }
 
 /* Improved card text readability */
-.card p, .card h2, .card h3 {
+.card p,
+.card h2,
+.card h3 {
   margin-bottom: 0.75rem;
 }
 
@@ -206,20 +225,135 @@ section, .section {
   box-shadow: var(--shadow-md);
   transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
+
 .card-elevated:hover {
   box-shadow: var(--shadow-lg);
 }
+
 /* CUSTOM COMPONENT CLASSES (The @apply statements remain the same!) */
 
+/* Glassmorphism Utilities */
+.glass-morphism {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-morphism-strong {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseSlow {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 3s ease-in-out infinite;
+}
+
+/* Custom Utilities */
 .btn-cta {
-    /* NOTE: We MUST use background-color: var(...) instead of @apply bg-accent here, 
-       because @apply doesn't read CSS variables directly for color utilities. */
-    background-color: var(--color-accent);
-    color: var(--color-primary-bg);
-    @apply font-bold py-3 px-6 rounded-2xl shadow-xl tracking-wider uppercase transition duration-300;
+  background-color: var(--color-accent);
+  color: var(--color-primary-bg);
+  @apply font-bold py-3 px-6 rounded-2xl shadow-xl tracking-wider uppercase transition duration-300;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
 }
 
 .btn-cta:hover {
-    background-color: var(--color-accent-dark);
+  background-color: var(--color-accent-dark);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+  transform: translateY(-1px);
 }
 
+/* Premium UI Utilities */
+.card-glow {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.card-glow:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.3);
+  transform: translateY(-8px);
+}
+
+.progress-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-glow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent);
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% {
+    left: -100%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
+
+.text-gradient-primary {
+  background: linear-gradient(135deg, #fff 0%, #00FFFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

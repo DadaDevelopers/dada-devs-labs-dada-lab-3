@@ -95,7 +95,7 @@ const BeneficiaryDashboard = () => {
     setProfileBannerDismissed(true);
     try {
       sessionStorage.setItem(BENEFICIARY_PROFILE_BANNER_DISMISSED, "1");
-    } catch {}
+    } catch { }
   };
 
   const primaryCampaign = userCampaigns[0];
@@ -109,35 +109,42 @@ const BeneficiaryDashboard = () => {
   // Delivery timeline - dynamically generated from campaign status
   const deliveryTimeline = primaryCampaign
     ? [
-        {
-          status: "Completed",
-          label: "Campaign Created",
-          date: primaryCampaign.createdAt.split("T")[0],
-        },
-        {
-          status: primaryCampaign.status !== "draft" ? "Completed" : "Upcoming",
-          label: "Campaign Approved",
-          date: "Pending",
-        },
-        {
-          status:
-            primaryCampaign.confirmationStatus === "provider_confirmed"
-              ? "Completed"
-              : "Current",
-          label: "Provider confirmed service",
-          date: primaryCampaign.providerConfirmedAt
-            ? primaryCampaign.providerConfirmedAt.split("T")[0]
+      {
+        status: "Completed",
+        label: "Campaign Created",
+        date: primaryCampaign.createdAt ? primaryCampaign.createdAt.split("T")[0] : "Pending",
+      },
+      {
+        status: primaryCampaign.status !== "draft" ? "Completed" : "Upcoming",
+        label: "Campaign Approved",
+        date: "Pending",
+      },
+      {
+        status:
+          primaryCampaign.confirmationStatus === "provider_confirmed"
+            ? "Completed"
+            : "Current",
+        label: "Provider confirmed service",
+        date: primaryCampaign.providerConfirmedAt
+          ? primaryCampaign.providerConfirmedAt.split("T")[0]
+          : "Pending",
+      },
+      {
+        status:
+          primaryCampaign.confirmationStatus === "both_confirmed" || primaryCampaign.beneficiaryReceipt
+            ? "Completed"
+            : primaryCampaign.confirmationStatus === "provider_confirmed"
+              ? "Current"
+              : "Upcoming",
+        label: "Confirm receipt & release",
+        date: primaryCampaign.beneficiaryReceipt?.confirmedAt
+          ? primaryCampaign.beneficiaryReceipt.confirmedAt.split("T")[0]
+          : primaryCampaign.confirmationStatus === "provider_confirmed"
+            ? "Awaiting your confirmation"
             : "Pending",
-        },
-        {
-          status: primaryCampaign.beneficiaryReceipt ? "Completed" : "Upcoming",
-          label: "Beneficiary confirmation",
-          date: primaryCampaign.beneficiaryReceipt?.confirmedAt
-            ? primaryCampaign.beneficiaryReceipt.confirmedAt.split("T")[0]
-            : "Awaiting action",
-        },
-        { status: "Upcoming", label: "Final Report", date: "Jan 30, 2025" },
-      ]
+      },
+      { status: "Upcoming", label: "Final Report", date: "Jan 30, 2025" },
+    ]
     : [];
 
   const fundsReceived = [
@@ -404,13 +411,12 @@ const BeneficiaryDashboard = () => {
                 <div key={index} className="flex gap-3 sm:gap-4">
                   <div className="flex flex-col items-center">
                     <div
-                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        item.status === "Completed"
-                          ? "bg-green-500 text-white"
-                          : item.status === "Current"
+                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${item.status === "Completed"
+                        ? "bg-green-500 text-white"
+                        : item.status === "Current"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground"
-                      }`}
+                        }`}
                     >
                       {item.status === "Completed" ? (
                         <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -420,11 +426,10 @@ const BeneficiaryDashboard = () => {
                     </div>
                     {index < deliveryTimeline.length - 1 && (
                       <div
-                        className={`w-0.5 h-12 sm:h-16 ${
-                          item.status === "Completed"
-                            ? "bg-green-500"
-                            : "bg-border"
-                        }`}
+                        className={`w-0.5 h-12 sm:h-16 ${item.status === "Completed"
+                          ? "bg-green-500"
+                          : "bg-border"
+                          }`}
                       />
                     )}
                   </div>
@@ -580,7 +585,7 @@ const BeneficiaryDashboard = () => {
             </div>
           </Card> */}
 
-           {/* Services */}
+          {/* Services */}
           <Card className="p-4 sm:p-6 card-elevated">
             <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">
               Service Access
@@ -588,7 +593,7 @@ const BeneficiaryDashboard = () => {
 
             <div className="space-y-4">
               {primaryCampaign &&
-              primaryCampaign.confirmationStatus === "provider_confirmed" ? (
+                primaryCampaign.confirmationStatus === "provider_confirmed" ? (
                 <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-[var(--color-accent)] mt-0.5 flex-shrink-0" />
@@ -610,7 +615,7 @@ const BeneficiaryDashboard = () => {
                     </div>
                   </div>
                 </div>
-              ) : primaryCampaign?.beneficiaryReceipt ? (
+              ) : primaryCampaign?.beneficiaryReceipt || primaryCampaign?.confirmationStatus === "both_confirmed" ? (
                 <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30">
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-[var(--color-accent)] mt-0.5 flex-shrink-0" />
@@ -619,7 +624,7 @@ const BeneficiaryDashboard = () => {
                         Service receipt confirmed
                       </h3>
                       <p className="text-xs sm:text-sm text-[var(--color-text-light)]/80">
-                        You confirmed receipt of the service. Funds have been released to the provider.
+                        You confirmed receipt of the service. Funds will be released per the disbursement process.
                       </p>
                     </div>
                   </div>
@@ -657,7 +662,7 @@ const BeneficiaryDashboard = () => {
               </div>
             </div>
           </Card>
-        </div> 
+        </div>
 
         {/* Active Campaigns */}
         {userCampaigns.length > 0 && (
@@ -680,7 +685,7 @@ const BeneficiaryDashboard = () => {
                       <p className="text-xs sm:text-sm text-muted-foreground truncate">
                         {campaign.description
                           ? campaign.description.substring(0, 120) +
-                            (campaign.description.length > 120 ? "..." : "")
+                          (campaign.description.length > 120 ? "..." : "")
                           : ""}
                       </p>
                       <p className="text-xs sm:text-sm text-muted-foreground mt-2">
@@ -695,19 +700,18 @@ const BeneficiaryDashboard = () => {
                       </p>
                     </div>
                     <span
-                      className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium self-start flex-shrink-0 ${
-                        getCampaignStatusLabel(campaign) === "Rejected"
-                          ? "bg-red-500/20 text-red-400 border border-red-500/40"
-                          : getCampaignStatusLabel(campaign) === "Pending approval"
+                      className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium self-start flex-shrink-0 ${getCampaignStatusLabel(campaign) === "Rejected"
+                        ? "bg-red-500/20 text-red-400 border border-red-500/40"
+                        : getCampaignStatusLabel(campaign) === "Pending approval"
                           ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                           : getCampaignStatusLabel(campaign) === "Draft"
-                          ? "bg-gray-600/30 text-gray-400 border border-white/10"
-                          : getCampaignStatusLabel(campaign) === "Ready"
-                          ? "bg-[var(--color-accent)]/20 text-[var(--color-accent)] border border-[var(--color-accent)]/30"
-                          : getCampaignStatusLabel(campaign) === "Service in progress" || getCampaignStatusLabel(campaign) === "Completed"
-                          ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/25"
-                          : "bg-[var(--color-accent)]/10 text-[var(--color-text-light)]/80 border border-white/10"
-                      }`}
+                            ? "bg-gray-600/30 text-gray-400 border border-white/10"
+                            : getCampaignStatusLabel(campaign) === "Ready"
+                              ? "bg-[var(--color-accent)]/20 text-[var(--color-accent)] border border-[var(--color-accent)]/30"
+                              : getCampaignStatusLabel(campaign) === "Service in progress" || getCampaignStatusLabel(campaign) === "Completed"
+                                ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/25"
+                                : "bg-[var(--color-accent)]/10 text-[var(--color-text-light)]/80 border border-white/10"
+                        }`}
                     >
                       {getCampaignStatusLabel(campaign)}
                     </span>
@@ -768,25 +772,25 @@ const BeneficiaryDashboard = () => {
                     {(campaign.status === "ACTIVE" ||
                       getCampaignStatusLabel(campaign) === "Ready" ||
                       getCampaignStatusLabel(campaign) === "Service in progress") && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full"
-                          onClick={handleShareCampaign}
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full"
-                          onClick={handleShareCampaign}
-                        >
-                          <Share2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={handleShareCampaign}
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={handleShareCampaign}
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                   </div>
                 </div>
               ))}
@@ -796,9 +800,9 @@ const BeneficiaryDashboard = () => {
 
         {/* Messages & Service Access */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          
 
-          
+
+
         </div>
 
         {/* Reporting Section */}

@@ -70,7 +70,7 @@ const DonorDashboard = () => {
   // Recommended campaigns (all active campaigns)
   const recommendedCampaigns = useMemo(() => {
     return campaigns
-      .filter((c) => c.status === "active")
+      .filter((c) => c.status?.toLowerCase() === "active")
       .slice(0, 3);
   }, [campaigns]);
 
@@ -274,13 +274,21 @@ const DonorDashboard = () => {
             {recommendedCampaigns.map((campaign) => (
               <CampaignSummaryCard
                 key={campaign.id}
+                id={campaign.id}
                 title={campaign.title}
                 description={campaign.description}
+                category={campaign.category}
+                location={campaign.location}
+                deadline={campaign.fundraisingDeadline}
                 organizerName={campaign.provider?.name || "Provider"}
                 amountRaised={campaign.amountRaised}
                 targetAmount={campaign.targetAmount}
                 donorCount={campaign.donorCount}
                 onClick={() => navigate(`/campaigns/${campaign.id}`)}
+                onDonate={(e) => {
+                  e.stopPropagation();
+                  navigate(`/donate?campaignId=${campaign.id}`);
+                }}
               />
             ))}
           </div>

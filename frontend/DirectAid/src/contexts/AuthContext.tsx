@@ -83,7 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  // Add the return type : Promise<LoginResponse>
+  // ───── Automatically attach token to Axios ─────
+  useEffect(() => {
+    if (token) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      console.log("[AuthContext] Token attached to API headers:", token.substring(0, 20) + "...");
+    } else {
+      delete api.defaults.headers.common["Authorization"];
+      console.log("[AuthContext] Token removed from API headers");
+    }
+  }, [token]);
+
+  // Login
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);

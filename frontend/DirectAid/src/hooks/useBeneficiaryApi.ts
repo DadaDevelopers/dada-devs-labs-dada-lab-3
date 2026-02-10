@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import api from "../services/api";
+import * as beneficiaryApi from "../services/beneficiaryApi";
 
 export interface BeneficiaryCampaign {
   id?: string;
@@ -15,9 +15,13 @@ export interface BeneficiaryCampaign {
   providerConfirmedAt?: string | null;
   beneficiaryConfirmedAt?: string | null;
   beneficiaryConfirmationNote?: string | null;
+  beneficiaryReceipt?: {
+    confirmedAt: string | null;
+    note: string;
+  };
   beneficiaryId?: string;
   providerId?: string | null;
-  provider?: { firstName?: string; lastName?: string; organization?: string };
+  provider?: { firstName?: string; lastName?: string; organization?: string; name?: string };
   category?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -41,12 +45,19 @@ export function useBeneficiaryCampaigns() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get("/campaigns/me");
-      const list = (res as any)?.campaigns ?? [];
+      const data = await beneficiaryApi.getMyCampaigns();
+      const list = data.campaigns || [];
       setCampaigns(
         list.map((c: BeneficiaryCampaign) => ({
           ...c,
           id: c._id || c.id || c.publicId,
+          provider: c.provider ? {
+            ...c.provider,
+            name: c.provider.organization ||
+              (c.provider.firstName || c.provider.lastName
+                ? [c.provider.firstName, c.provider.lastName].filter(Boolean).join(" ")
+                : "Provider")
+          } : undefined,
           progressPercentage:
             c.targetAmount && (c.amountRaised ?? 0) > 0
               ? Math.min(100, ((c.amountRaised ?? 0) / (typeof c.targetAmount === "number" ? c.targetAmount : 0)) * 100)
@@ -54,7 +65,7 @@ export function useBeneficiaryCampaigns() {
         }))
       );
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to load campaigns");
+      setError(err?.message || "Failed to load campaigns");
       setCampaigns([]);
     } finally {
       setLoading(false);
@@ -77,25 +88,25 @@ export function useBeneficiaryMetrics() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    api
-      .get("/users/me/metrics")
-      .then((res) => {
+    beneficiaryApi
+      .getMetrics()
+      .then((data) => {
         if (cancelled) return;
-        const m = (res as any)?.metrics ?? (res as any)?.data?.metrics;
+        const m = data.metrics;
         setMetrics(
           m
             ? {
-                totalAidReceived: typeof m.totalAidReceived === "number" ? m.totalAidReceived : 0,
-                totalDisbursements: typeof m.totalDisbursements === "number" ? m.totalDisbursements : 0,
-                campaignsSupportingYou:
-                  typeof m.campaignsSupportingYou === "number" ? m.campaignsSupportingYou : 0,
-              }
+              totalAidReceived: typeof m.totalAidReceived === "number" ? m.totalAidReceived : 0,
+              totalDisbursements: typeof m.totalDisbursements === "number" ? m.totalDisbursements : 0,
+              campaignsSupportingYou:
+                typeof m.campaignsSupportingYou === "number" ? m.campaignsSupportingYou : 0,
+            }
             : null
         );
       })
-      .catch((err: any) => {
+      .catch(() => {
         if (!cancelled) {
-          setError(err?.response?.data?.message || "Failed to load metrics");
+          setError("Failed to load metrics");
           setMetrics(null);
         }
       })
@@ -114,15 +125,50 @@ export async function confirmBeneficiaryReceipt(
   campaignId: string,
   confirmationNote?: string
 ): Promise<{ ok: boolean; error?: string }> {
-  try {
-    await api.patch(`/campaigns/${campaignId}/confirm-beneficiary`, {
-      confirmationNote: confirmationNote || undefined,
-    });
-    return { ok: true };
-  } catch (err: any) {
-    return {
-      ok: false,
-      error: err?.response?.data?.message || "Failed to confirm receipt",
+  const result = await beneficiaryApi.confirmReceipt(campaignId, confirmationNote);
+  return { ok: result.ok, error: result.error };
+}
+
+export interface BeneficiaryDisbursement {
+  id: string;
+  campaignId: string;
+  amount: number;
+  currency: string;
+  status: string;
+  disbursedAt?: string;
+  description?: string | null;
+  transactionRef?: string | null;
+}
+
+export function useBeneficiaryDisbursements() {
+  const [disbursements, setDisbursements] = useState<BeneficiaryDisbursement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    beneficiaryApi
+      .getDisbursements()
+      .then((data) => {
+        if (cancelled) return;
+        const list = data.disbursements || [];
+        setDisbursements(list.map((d: any) => ({ ...d, id: d._id ?? d.id })));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("Failed to load disbursements");
+          setDisbursements([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
-  }
+  }, []);
+
+  return { disbursements, loading, error };
 }

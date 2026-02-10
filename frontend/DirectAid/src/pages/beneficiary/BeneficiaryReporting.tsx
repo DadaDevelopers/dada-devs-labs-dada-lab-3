@@ -22,6 +22,7 @@ import {
   MapPin,
   Bell,
   Lock,
+  TrendingUp,
 } from "lucide-react";
 
 type Step = "select-campaign" | "upload-report" | "review" | "success";
