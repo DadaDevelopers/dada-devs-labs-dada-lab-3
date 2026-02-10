@@ -5,13 +5,14 @@ export const donationService = {
   // Create a new donation
   createDonation: async (data: Partial<Donation>) => {
     const response = await api.post("/donations", data);
-    return response.data;
+    const res: any = (response as any)?.data ?? response;
+    return res;
   },
 
   // Get current user's donations
   getMyDonations: async (): Promise<{ donations: Donation[] }> => {
     const response = await api.get("/donations/me");
-    const data = response.data;
+    const data: any = (response as any)?.data ?? response;
 
     // Normalize data: backend uses amountFiat, frontend expects amount (in cents/base*100)
     if (data && Array.isArray(data.donations)) {
@@ -28,7 +29,7 @@ export const donationService = {
   // Get a single donation detail
   getDonationById: async (id: string): Promise<Donation> => {
     const response = await api.get(`/donations/${id}`);
-    const d = response.data;
+    const d: any = (response as any)?.data ?? response;
     if (d) {
       return {
         ...d,
@@ -42,13 +43,15 @@ export const donationService = {
   // Get donor metrics
   getDonorMetrics: async () => {
     const response = await api.get("/donations/me/donor-metrics");
-    return response.data;
+    const res: any = (response as any)?.data ?? response;
+    return res;
   },
 
   // Get receipt Data
   getReceipt: async (id: string) => {
     const response = await api.get(`/donations/receipts/${id}`);
-    return response.data;
+    const res: any = (response as any)?.data ?? response;
+    return res;
   },
 
   // Get Receipts list (via query filters if needed, or filtering client side from getMyDonations)

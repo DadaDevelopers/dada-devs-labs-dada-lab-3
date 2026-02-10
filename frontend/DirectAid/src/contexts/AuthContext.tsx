@@ -19,6 +19,12 @@ interface User {
   [key: string]: any;
 }
 
+interface LoginResponse {
+  ok: boolean;
+  user?: any; // You can change 'any' to your 'User' type later
+  error?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   role: Role | null;
@@ -48,36 +54,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAuthenticated = !!user;
 
-  // Save and clear localStorage
   const saveToStorage = useCallback((u: User | null, t: string | null) => {
-    try {
-      if (u && t) {
-        localStorage.setItem("auth_user", JSON.stringify(u));
-        localStorage.setItem("auth_token", t);
-      } else {
-        localStorage.removeItem("auth_user");
-        localStorage.removeItem("auth_token");
-      }
-    } catch (e) {
-      console.warn("Storage error", e);
+    if (u && t) {
+      localStorage.setItem("auth_user", JSON.stringify(u));
+      localStorage.setItem("auth_token", t);
+    } else {
+      localStorage.removeItem("auth_user");
+      localStorage.removeItem("auth_token");
     }
   }, []);
 
-  // Load from localStorage on mount
+  // Initialization: Load from storage AND set initial API token
   useEffect(() => {
     const storedUser = localStorage.getItem("auth_user");
     const storedToken = localStorage.getItem("auth_token");
 
-    if (storedUser) {
+    if (storedUser && storedToken) {
       try {
-        const parsed = JSON.parse(storedUser) as User;
+        const parsed = JSON.parse(storedUser);
         setUser(parsed);
         setRole(parsed.role || null);
+        setToken(storedToken);
+        api.setAuthToken(storedToken); // Link the API header on load
       } catch (e) {
-        console.warn("Failed parsing stored user", e);
+        console.warn("Auth initialization failed", e);
       }
     }
-    if (storedToken) setToken(storedToken);
     setLoading(false);
   }, []);
 
@@ -98,26 +100,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const res = await api.post("/auth/login", { email, password });
-      console.log("[auth] login received res.data:", res.data, "user.role:", (res.data as any)?.user?.role);
+      console.log("[auth] login received res:", res); // res is already the data
+      
+      // Access data directly (no .data wrapper)
+      const u = res.user;
+      const accessToken = res.accessToken;
 
-      const { user: u, accessToken } = res.data as {
-        user: User;
-        accessToken: string;
-        refreshToken?: string;
-      };
+      if (!u || !accessToken) {
+        throw new Error("Invalid response format from server");
+      }
 
-      const tokenToStore = accessToken;
-
+      api.setAuthToken(accessToken);
       // Normalize user object - combine firstName and lastName into name
       const normalizedUser = {
         ...u,
         name: u.name || `${(u as any).firstName || ''} ${(u as any).lastName || ''}`.trim() || u.email
       };
-
       setUser(normalizedUser);
       setRole(normalizedUser.role || null);
-      setToken(tokenToStore);
-      saveToStorage(normalizedUser, tokenToStore);
+      setToken(accessToken);
+      saveToStorage(normalizedUser, accessToken);
 
       setLoading(false);
       return { ok: true, user: normalizedUser };
@@ -129,62 +131,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Signup
+  // Signup — API returns body directly (no .data wrapper)
   const signup = async (payload: any) => {
     setLoading(true);
     setError(null);
     try {
-      // Backend expects firstName / lastName / email / password at /auth/register
       const res = await api.post("/auth/register", payload);
-      const { user: u, accessToken } = res.data as {
-        user: User;
-        accessToken: string;
-      };
+      const u = (res as any).user;
+      const t = (res as any).accessToken;
+      if (!u || !t) throw new Error("Invalid response from server");
 
-      const tokenToStore = accessToken;
-
-      // Normalize user object - combine firstName and lastName into name
+      api.setAuthToken(t);
       const normalizedUser = {
         ...u,
         name: u.name || `${(u as any).firstName || ''} ${(u as any).lastName || ''}`.trim() || u.email
       };
-
       setUser(normalizedUser);
       setRole(normalizedUser.role || null);
-      setToken(tokenToStore);
-      saveToStorage(normalizedUser, tokenToStore);
+      setToken(t);
+      saveToStorage(normalizedUser, t);
 
       setLoading(false);
       return { ok: true };
     } catch (err: any) {
       const message = err?.response?.data?.message || "Signup failed";
-      setError(message);
-      setLoading(false);
-      return { ok: false, error: message };
-    }
-  };
-
-  // Update Profile — backend returns { user: ... }
-  const updateProfile = async (updates: Partial<User>) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.put("/users/me", updates);
-      const updatedUser = (res.data as { user?: User }).user ?? (res.data as User);
-
-      // Normalize user object
-      const normalizedUser = {
-        ...updatedUser,
-        name: updatedUser.name || `${(updatedUser as any).firstName || ''} ${(updatedUser as any).lastName || ''}`.trim() || updatedUser.email
-      };
-
-      setUser(normalizedUser);
-      saveToStorage(normalizedUser, token);
-
-      setLoading(false);
-      return { ok: true, user: normalizedUser };
-    } catch (err: any) {
-      const message = err?.response?.data?.message || "Update failed";
       setError(message);
       setLoading(false);
       return { ok: false, error: message };
@@ -197,9 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const res = await api.post("/auth/select-role", payload);
-      console.log("[auth] selectRole received res.data:", res.data, "res.data.user:", (res.data as any)?.user, "res.data.user.role:", (res.data as any)?.user?.role);
-
-      const { user: updatedUser, accessToken: newAccessToken } = res.data as { user: User; accessToken?: string };
+      // API returns body directly (no .data wrapper)
+      const updatedUser = (res as any).user;
+      const newAccessToken = (res as any).accessToken;
+      if (!updatedUser) throw new Error("Invalid response from server");
 
       // Normalize user object
       const normalizedUser = {
@@ -223,19 +194,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Update Profile
+  const updateProfile = async (updates: Partial<User>) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.put("/users/me", updates);
+      const updatedUser = res.user || res.data?.user || res;
+
+      setUser(updatedUser);
+      saveToStorage(updatedUser, token);
+
+      setLoading(false);
+      return { ok: true, user: updatedUser };
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Update failed";
+      setError(message);
+      setLoading(false);
+      return { ok: false, error: message };
+    }
+  };
+
   // Logout
   const logout = async () => {
     try {
-      // Call backend logout endpoint to revoke refresh token
       await api.post("/auth/logout");
     } catch (err) {
-      // Even if API call fails, clear local state
-      console.warn("Logout API call failed, clearing local state anyway", err);
+      console.warn("Logout API failed", err);
     } finally {
-      // Always clear local state
       setUser(null);
       setRole(null);
       setToken(null);
+      api.setAuthToken(null); // Clear header
       saveToStorage(null, null);
     }
   };

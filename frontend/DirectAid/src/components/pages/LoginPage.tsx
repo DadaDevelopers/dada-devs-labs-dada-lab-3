@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import FormInput from "../ui/FormInput";
 import { Button } from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
@@ -17,7 +17,6 @@ interface FormErrors {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
@@ -77,7 +76,7 @@ const LoginPage: React.FC = () => {
 
     try {
       // Use auth context to login
-      const result = await login(formData.email, formData.password);
+      const result = await login(formData.email, formData.password) as any;
 
       if (!result.ok) {
         setErrors({

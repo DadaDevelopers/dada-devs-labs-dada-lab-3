@@ -126,13 +126,20 @@ export interface BeneficiaryReceipt {
 }
 
 export interface Campaign {
-  id: string;
-  providerId: string | any;
+  // Mongo-backed APIs commonly return `_id`, but some parts of the frontend/dev mocks use `id`.
+  // Keep both to remain compatible across environments/branches.
+  _id?: string;
+  id?: string;
+
+  // May be a string ID or a populated object depending on endpoint.
+  providerId: string | Partial<Provider>;
   provider: Partial<Provider>;
-  beneficiaryId: string | any;
+  beneficiaryId: string | Partial<Beneficiary>;
   beneficiary: Partial<Beneficiary>;
   invoiceId: string;
   invoice: Invoice;
+  providerConfirmed: boolean;
+  invoices: Invoice[];
   title: string;
   description: string;
   category: "medical" | "education" | "emergency" | "business" | "other";

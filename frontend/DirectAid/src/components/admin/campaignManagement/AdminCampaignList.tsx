@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../ui/Button";
 import { getCampaigns, updateCampaignStatus } from "../../../services/api";
+import { getBeneficiaryDisplayName } from "../../../lib/utils";
 import type { FilterType } from "./AdminCampaignPage";
 
 interface AdminCampaignListProps {
@@ -60,10 +61,7 @@ export default function AdminCampaignList({ filter }: AdminCampaignListProps) {
     }
   };
 
-  const beneficiaryName = (c: CampaignRow) =>
-    c.beneficiaryId
-      ? [c.beneficiaryId.firstName, c.beneficiaryId.lastName].filter(Boolean).join(" ") || c.beneficiaryId.email
-      : "—";
+  const beneficiaryName = (c: CampaignRow) => getBeneficiaryDisplayName(c, "—");
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">

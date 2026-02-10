@@ -147,6 +147,8 @@ export const createDonation = async (req, res, next) => {
           method: "INVOICE",
           amount: ensureDecimal(amountFiat),
           currency,
+          // Use payment hash as stable external ID to satisfy provider+externalId unique index
+          externalId: invoice.payment_hash,
           lightning: {
             invoice: invoice.bolt11,
             paymentHash: invoice.payment_hash,

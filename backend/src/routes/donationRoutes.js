@@ -5,13 +5,13 @@ import { createDonation, mpesaWebhook, confirmBitcoinDonation, lightningWebhook,
 //import { stripeWebhookController } from "../controllers/stripeWebhookController.js";
 import { getDonorMetrics, getReceiptPDF, emailReceipt } from "../controllers/donorMetricsController.js";
 
-import { protect, authorize } from "../middlewares/auth.js";
+import { protect, optionalAuth, authorize } from "../middlewares/auth.js";
 import bodyParser from "body-parser";
 
 const router = express.Router();
 
 // normal JSON body routes
-router.post("/", protect, createDonation); // create donation (protected if donor logged in — can also be public)
+router.post("/", optionalAuth, createDonation); // create donation (guest or logged-in donor)
 
 /*Provider webhooks : no auth*/
 // MPESA webhook (Daraja will POST JSON)

@@ -1,28 +1,30 @@
 // src/controllers/invoiceController.js
 import Invoice from "../models/Invoice.js";
 
-// Create an invoice
+// Create an invoice (MVP: campaignId, providerId, amount, currency, paymentMethod required; donationId/donorId optional)
 export const createInvoice = async (req, res, next) => {
   try {
-    const { donorId, campaignId, providerId, amount, currency, paymentMethod, transactionHash, invoiceFileUrl } = req.body;
+    const { donorId, donationId, campaignId, providerId, amount, currency, paymentMethod, transactionHash, invoiceFileUrl } = req.body;
 
-    if (!donorId || !amount || !currency || !paymentMethod) {
-      return res.status(400).json({ message: "Missing required fields" });
+    if (!campaignId || !providerId || !amount || !currency || !paymentMethod) {
+      return res.status(400).json({ message: "Missing required fields: campaignId, providerId, amount, currency, paymentMethod" });
     }
 
-    // Generate invoice number: INV-YYYYMMDD-<random>
-    const invoiceNumber = `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const invoiceNumber = `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const netAmount = amount;
 
     const invoice = await Invoice.create({
       invoiceNumber,
-      donorId,
+      donationId: donationId || undefined,
       campaignId,
       providerId,
+      donorId: donorId || undefined,
       amount,
       currency,
+      netAmount,
       paymentMethod,
       transactionHash,
-      invoiceFileUrl
+      invoiceFileUrl: invoiceFileUrl || null
     });
 
     res.status(201).json({ invoice: invoice.toClient() });

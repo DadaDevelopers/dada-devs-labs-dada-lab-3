@@ -38,7 +38,8 @@ export interface BeneficiaryMetricsResponse {
 export async function getMetrics(): Promise<BeneficiaryMetricsResponse> {
   try {
     const res = await api.get("/users/me/metrics");
-    return res?.data ?? FALLBACK_METRICS;
+    const data = (res as any)?.data ?? res;
+    return data || FALLBACK_METRICS;
   } catch {
     return FALLBACK_METRICS;
   }
@@ -60,7 +61,8 @@ export async function getMyCampaigns(params?: { page?: number; limit?: number; s
     if (params?.confirmationStatus) query.set("confirmationStatus", params.confirmationStatus);
     const qs = query.toString();
     const res = await api.get(qs ? `/campaigns/me?${qs}` : "/campaigns/me");
-    return res?.data ?? FALLBACK_CAMPAIGNS_LIST;
+    const data = (res as any)?.data ?? res;
+    return data || FALLBACK_CAMPAIGNS_LIST;
   } catch {
     return FALLBACK_CAMPAIGNS_LIST;
   }
@@ -97,7 +99,8 @@ export async function getDisbursements(params?: { page?: number; limit?: number;
     if (params?.campaignId) query.set("campaignId", params.campaignId);
     const qs = query.toString();
     const res = await api.get(qs ? `/users/me/disbursements?${qs}` : "/users/me/disbursements");
-    return res?.data ?? FALLBACK_DISBURSEMENTS;
+    const data = (res as any)?.data ?? res;
+    return data || FALLBACK_DISBURSEMENTS;
   } catch {
     return FALLBACK_DISBURSEMENTS;
   }

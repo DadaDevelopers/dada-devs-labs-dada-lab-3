@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
+import { Input } from "../components/ui/input";
 import {
   ArrowLeft,
   MapPin,
@@ -22,29 +23,188 @@ import {
   Bell,
   Lock,
   CreditCard,
+  Pencil,
+  Send,
   ShieldCheck,
   Zap,
 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "../components/ui/sheet";
+import { CampaignTransactionsSection } from "../components/feature/CampaignTransactionsSection";
+import { getBeneficiaryDisplayName } from "../lib/utils";
+import { getCampaignById, disburseToProvider } from "../services/api";
+import api from "../services/api";
+
+function normalizeCampaign(c: any): any {
+  if (!c) return c;
+  const id = c._id ?? c.id;
+  const amountRaised = typeof c.amountRaised === "number" ? c.amountRaised : parseFloat(String(c.amountRaised ?? 0));
+  const targetAmount = typeof c.targetAmount === "number" ? c.targetAmount : parseFloat(String(c.targetAmount ?? 0));
+  return {
+    ...c,
+    id,
+    _id: id,
+    amountRaised,
+    targetAmount,
+    donorCount: c.donorCount ?? 0,
+    category: c.category ?? "",
+    createdAt: c.createdAt,
+    description: c.description ?? "",
+    title: c.title ?? "",
+    status: c.status,
+    adminStatus: c.adminStatus,
+    beneficiaryId: c.beneficiaryId,
+    providerId: c.providerId,
+    provider: c.provider,
+    metadata: c.metadata,
+  };
+}
 
 export default function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { campaigns, isLoading, selectCampaign, selectedCampaign } = useApp();
+  const { campaigns, isLoading: appLoading, selectCampaign, selectedCampaign } = useApp();
   const { user, role, logout } = useAuth();
   const [localLoading, setLocalLoading] = useState(false);
 
+  const [fetchedCampaign, setFetchedCampaign] = useState<any>(null);
+  const [loading, setLoading] = useState(!!id);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [disburseAmount, setDisburseAmount] = useState("");
+  const [disburseNotes, setDisburseNotes] = useState("");
+  const [disbursing, setDisbursing] = useState(false);
+  const [disburseError, setDisburseError] = useState<string | null>(null);
+
+  const selectedMatchesId =
+    !!selectedCampaign &&
+    String(
+      (selectedCampaign as any).id ??
+        (selectedCampaign as any)._id ??
+        (selectedCampaign as any).publicId ??
+        ""
+    ) === String(id);
+
+  const fromContext = selectedMatchesId
+    ? selectedCampaign
+    : campaigns.find((c: any) => c.id === id || c._id === id || c.publicId === id);
+
+  const campaign = fetchedCampaign
+    ? normalizeCampaign(fetchedCampaign)
+    : fromContext
+      ? normalizeCampaign(fromContext)
+      : null;
+
   useEffect(() => {
-    if (id && (!selectedCampaign || selectedCampaign.id !== id)) {
+    if (!id) return;
+    let cancelled = false;
+    setLoading(true);
+    setFetchError(null);
+    getCampaignById(id)
+      .then((res) => {
+        if (cancelled) return;
+        const body = (res as any)?.data ?? res;
+        const c = (body && typeof body === "object" && body.campaign) ? body.campaign : body;
+        if (c && (c._id || c.id || c.title)) setFetchedCampaign(c);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const status = err?.response?.status;
+        if (status === 404 && id) {
+          api.get(`/campaigns/${id}?by=public`)
+            .then((pubRes: any) => {
+              if (cancelled) return;
+              const body = pubRes?.data ?? pubRes;
+              const c = (body && body.campaign) ? body.campaign : body;
+              if (c && (c._id || c.id || c.title)) {
+                setFetchedCampaign(c);
+                setFetchError(null);
+              } else {
+                setFetchError("Campaign not found");
+              }
+            })
+            .catch(() => setFetchError(err?.message ?? "Failed to load campaign"))
+            .finally(() => { if (!cancelled) setLoading(false); });
+          return;
+        }
+        setFetchError(err?.message ?? "Failed to load campaign");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  useEffect(() => {
+    if (campaign && editOpen) {
+      setEditTitle(campaign.title ?? "");
+      setEditDescription(campaign.description ?? "");
+    }
+  }, [campaign, editOpen]);
+
+  const userId = user?.id ?? (user as any)?._id;
+  const isBeneficiaryOwner =
+    role?.toUpperCase() === "BENEFICIARY" &&
+    userId &&
+    campaign &&
+    (String((campaign.beneficiaryId as any)?._id ?? campaign.beneficiaryId) === String(userId));
+  const hasProvider = !!(campaign?.providerId || (campaign as any)?.provider);
+  const availableToDisburse = campaign ? Number(campaign.amountRaised ?? 0) : 0;
+
+  const handleSaveEdit = async () => {
+    if (!id || !campaign) return;
+    setSavingEdit(true);
+    try {
+      await api.put(`/campaigns/${id}`, { title: editTitle, description: editDescription });
+      setFetchedCampaign((prev: any) => (prev ? { ...prev, title: editTitle, description: editDescription } : null));
+      setEditOpen(false);
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? e?.message ?? "Failed to update");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDisburse = async () => {
+    if (!id) return;
+    const amount = parseFloat(disburseAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setDisburseError("Enter a valid amount");
+      return;
+    }
+    if (amount > availableToDisburse) {
+      setDisburseError(`Amount cannot exceed $${availableToDisburse.toLocaleString()}`);
+      return;
+    }
+    setDisburseError(null);
+    setDisbursing(true);
+    try {
+      await disburseToProvider(id, { amount, notes: disburseNotes || undefined });
+      setDisburseAmount("");
+      setDisburseNotes("");
+      const updated = await getCampaignById(id);
+      const c = (updated as { campaign?: any }).campaign ?? updated;
+      setFetchedCampaign(c);
+    } catch (e: any) {
+      setDisburseError(e?.response?.data?.message ?? e?.message ?? "Disbursement failed");
+    } finally {
+      setDisbursing(false);
+    }
+  };
+
+  // Sync selected campaign into context when possible
+  useEffect(() => {
+    if (id && (!selectedCampaign || String((selectedCampaign as any).id ?? (selectedCampaign as any)._id) !== String(id))) {
       setLocalLoading(true);
       selectCampaign(id).finally(() => setLocalLoading(false));
     }
   }, [id, selectedCampaign, selectCampaign]);
 
-  const campaign = selectedCampaign || campaigns.find((c: any) => c.id === id);
-
   const userName = user?.name || user?.email || "User";
   const userRole = role || "Guest";
-
+  const isCampaignLoading = !!id && !campaign && (loading || localLoading || appLoading);
   const getNavItems = () => {
     switch (role) {
       case "DONOR":
@@ -106,7 +266,7 @@ export default function CampaignDetail() {
     }
   };
 
-  if (isLoading || localLoading) {
+  if (isCampaignLoading) {
     return (
       <DashboardLayout
         navItems={getNavItems()}
@@ -127,31 +287,31 @@ export default function CampaignDetail() {
     );
   }
 
-
-
-
-
-  if (!campaign) {
+  if (!campaign || fetchError) {
     return (
       <DashboardLayout
         navItems={getNavItems()}
         userName={userName}
         userRole={userRole}
         settingsNavItems={getSettingsNavItems()}
-        onLogout={async () => {
-          await logout();
-          navigate("/");
-        }}
+        onLogout={async () => { await logout(); navigate("/"); }}
       >
         <div className="flex items-center justify-center min-h-[400px] animate-fade-in">
           <Card className="p-12 text-center max-w-md border-white/10 glass-morphism shadow-2xl rounded-3xl">
             <AlertCircle className="w-20 h-20 mx-auto mb-6 text-primary opacity-30" />
             <h2 className="text-2xl font-bold mb-4">Case Not Found</h2>
             <p className="text-muted-foreground mb-8">
-              We couldn't find the campaign implementation you're looking for.
+              {fetchError || "We couldn't find the campaign you're looking for."}
             </p>
-            <Button onClick={() => navigate("/campaigns")} className="w-full h-12 rounded-2xl btn-cta">
-              Back to Discover
+            <Button
+              onClick={() =>
+                role?.toUpperCase() === "BENEFICIARY"
+                  ? navigate("/beneficiary/campaigns")
+                  : navigate("/campaigns")
+              }
+              className="w-full h-12 rounded-2xl btn-cta"
+            >
+              Back to Campaigns
             </Button>
           </Card>
         </div>
@@ -160,7 +320,10 @@ export default function CampaignDetail() {
   }
 
   const getProgressPercentage = () => {
-    return Math.min((campaign.amountRaised / campaign.targetAmount) * 100, 100);
+    const target = Number(campaign.targetAmount ?? 0);
+    const raised = Number(campaign.amountRaised ?? 0);
+    if (!target || target <= 0) return 0;
+    return Math.min((raised / target) * 100, 100);
   };
 
   const getDeadline = () =>
@@ -175,6 +338,7 @@ export default function CampaignDetail() {
     return diff > 0 ? diff : 0;
   };
   const getStatusLabel = () => {
+    if ((campaign as any).adminStatus === "pending") return "Pending review";
     if (campaign.confirmationStatus === "provider_confirmed") return "Awaiting Beneficiary Confirmation";
     if (campaign.confirmationStatus === "both_confirmed") return "Fully Verified & Locked";
     if (campaign.confirmationStatus === "disputed") return "Audit in Progress (Disputed)";
@@ -213,16 +377,33 @@ export default function CampaignDetail() {
         {/* Navigation Bar */}
         <div className="flex items-center justify-between">
           <button
-            onClick={() => navigate("/campaigns")}
+            onClick={() =>
+              role?.toUpperCase() === "BENEFICIARY"
+                ? navigate("/beneficiary/campaigns")
+                : navigate("/campaigns")
+            }
             className="group flex items-center gap-3 text-sm font-bold text-muted-foreground hover:text-white transition-all px-4 py-2 rounded-xl bg-white/5 border border-white/5 hover:border-white/20"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             Back to Campaigns
           </button>
 
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Verified Audit Rail</span>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Verified Audit Rail</span>
+            </div>
+            {isBeneficiaryOwner && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 rounded-xl border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil className="w-4 h-4" />
+                Edit
+              </Button>
+            )}
           </div>
         </div>
 
@@ -259,14 +440,14 @@ export default function CampaignDetail() {
                     <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Location</p>
                     <div className="flex items-center gap-1.5 font-bold">
                       <MapPin className="w-4 h-4 text-primary/70" />
-                      <span>{campaign.location}</span>
+                      <span>{(campaign as any).location ?? (campaign as any).metadata?.location ?? "Global"}</span>
                     </div>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Time Remaining</p>
                     <div className="flex items-center gap-1.5 font-bold">
                       <Clock className="w-4 h-4 text-primary/70" />
-                      <span>{daysLeft()} Days</span>
+                      <span>{daysLeft() == null ? "—" : `${daysLeft()} Days`}</span>
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -313,6 +494,87 @@ export default function CampaignDetail() {
                 </p>
               </Card>
 
+              {/* Campaign Details — padded content, spacing between label and value */}
+              <Card className="mb-6 transition-all duration-200 shadow-[var(--shadow-md)]">
+                <div className="p-6 sm:p-8">
+                  <h2 className="text-xl font-bold mb-6">
+                    Campaign Details
+                  </h2>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Beneficiary
+                      </p>
+                      <p className="font-semibold">
+                        {getBeneficiaryDisplayName(campaign)}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Provider
+                      </p>
+                      <p className="font-semibold">
+                        DirectAid Provider Network
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Created
+                      </p>
+                      <p className="font-semibold">
+                        {new Date(campaign.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Category
+                      </p>
+                      <p className="font-semibold capitalize">
+                        {campaign.category}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Funding Progress — padded content */}
+              <Card className="transition-all duration-200 shadow-[var(--shadow-md)]">
+                <div className="p-6 sm:p-8">
+                  <h2 className="text-xl font-bold mb-6">
+                    Funding Progress
+                  </h2>
+                  <div className="flex items-end gap-8 mb-6">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Raised
+                      </p>
+                      <p className="text-3xl font-bold text-primary">
+                        ${campaign.amountRaised.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Goal
+                      </p>
+                      <p className="text-2xl font-bold">
+                        ${campaign.targetAmount.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full rounded-full h-3 bg-muted">
+                    <div
+                      className="h-3 rounded-full transition-all duration-300 bg-primary"
+                      style={{
+                        width: `${getProgressPercentage()}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-sm mt-4">
+                    {getProgressPercentage().toFixed(0)}% of goal reached
+                  </p>
+                </div>
+              </Card>
+
               <Card className="p-8 border-white/10 glass-morphism rounded-3xl space-y-4">
                 <div className="flex items-center gap-3 text-accent mb-2">
                   <ShieldCheck className="w-6 h-6" />
@@ -323,6 +585,44 @@ export default function CampaignDetail() {
                   Provider must submit verifiable invoices and proof of service before fund disbursement is authorized.
                 </p>
               </Card>
+
+              {/* Beneficiary: Disburse to provider (MVP) */}
+              {isBeneficiaryOwner && hasProvider && (
+                <Card className="mt-6 p-6 shadow-[var(--shadow-md)]">
+                  <h2 className="text-xl font-bold mb-4">Disburse to provider</h2>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Available: ${availableToDisburse.toLocaleString()}. Send funds to the provider for this campaign.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 max-w-md">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="Amount"
+                      value={disburseAmount}
+                      onChange={(e) => setDisburseAmount(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      type="text"
+                      placeholder="Notes (optional)"
+                      value={disburseNotes}
+                      onChange={(e) => setDisburseNotes(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleDisburse} disabled={disbursing} className="gap-2 shrink-0">
+                      <Send className="w-4 h-4" />
+                      {disbursing ? "Sending…" : "Disburse to provider"}
+                    </Button>
+                  </div>
+                  {disburseError && <p className="text-sm text-destructive mt-2">{disburseError}</p>}
+                </Card>
+              )}
+
+              {/* Transactions (donations + withdrawals) */}
+              <div className="mt-6">
+                <CampaignTransactionsSection campaignId={id ?? String(campaign.id)} />
+              </div>
             </div>
           </div>
 
@@ -420,6 +720,33 @@ export default function CampaignDetail() {
           </div>
         </div>
       </div>
+
+      {/* Edit campaign (beneficiary owner only) */}
+      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+        <SheetContent side="right" className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Edit campaign</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Title</label>
+              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Description</label>
+              <textarea
+                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <SheetFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={savingEdit}>Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </DashboardLayout>
   );
 }

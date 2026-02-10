@@ -1,12 +1,12 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
-export const API_BASE = "https://directaid-backend.onrender.com/api";
-// export const API_BASE = "http://localhost:5000/api";
+// export const API_BASE = "https://directaid-backend.onrender.com/api";
+export const API_BASE = "http://localhost:5000/api";
 
 import type { AdminMetrics } from "../types";
 
-// Create an axios-like API instance
 interface ApiInstance {
+  setAuthToken: (token: string | null) => void;
   defaults: {
     headers: {
       common: Record<string, string>;
@@ -50,7 +50,32 @@ async function fetchWrapper(
     }
 
     const res = await fetch(fullUrl, options);
-    const responseData = await res.json().catch(() => ({}));
+    
+    // Handle 204 No Content responses
+    if (res.status === 204) {
+      console.log(`✓ 204 No Content for ${url} - returning empty object`);
+      return {}; // Return empty object for 204 responses
+    }
+    
+    // Handle empty responses
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      if (res.ok) {
+        console.log(`✓ Non-JSON response for ${url} (status: ${res.status})`);
+        return {}; // Return empty object for non-JSON successful responses
+      } else {
+        throw new Error(`Request failed with status ${res.status}`);
+      }
+    }
+    
+    const responseData = await res.json().catch(() => {
+      // If JSON parsing fails but response is ok, return empty object
+      if (res.ok) {
+        console.log(`✓ Empty JSON response for ${url}`);
+        return {};
+      }
+      throw new Error(`Failed to parse JSON response (status: ${res.status})`);
+    });
 
     if (!res.ok) {
       const error: any = new Error(
@@ -60,7 +85,8 @@ async function fetchWrapper(
       throw error;
     }
 
-    return { data: responseData };
+    return responseData;
+    
   } catch (err: any) {
     // If it's already our custom error, rethrow it
     if (err.response) throw err;
@@ -78,21 +104,34 @@ async function fetchWrapper(
   }
 }
 
-// Demo fallback for when backend is not available
+// SAFE Demo fallback for when backend is not available
 async function handleDemoFallback(url: string, method: string, data?: any) {
+  console.warn("⚠️ Using demo fallback for:", url);
   await new Promise((r) => setTimeout(r, 400));
 
-  // Login endpoint — when backend is unreachable, return UNASSIGNED so user is sent to onboarding, not donor dashboard
+  // Login endpoint — CRITICAL FIX: Check localStorage first for existing users
   if (url.includes("/auth/login")) {
+    const cachedToken = localStorage.getItem("auth_token");
+    const cachedUser = localStorage.getItem("auth_user");
+    
+    // If user has existing auth, preserve their REAL role
+    if (cachedToken && cachedUser) {
+      console.warn("⚠️ Using cached credentials from localStorage");
+      const parsedUser = JSON.parse(cachedUser);
+      return {
+        accessToken: cachedToken,
+        user: parsedUser // PRESERVE ACTUAL ROLE!
+      };
+    }
+    
+    // Only use UNASSIGNED for truly new users
     return {
-      data: {
-        accessToken: "demo-token-" + Date.now(),
-        user: {
-          id: "demo-user-" + Date.now(),
-          email: data?.email || "demo@example.com",
-          firstName: "Demo",
-          role: "UNASSIGNED",
-        },
+      accessToken: "demo-token-" + Date.now(),
+      user: {
+        id: "demo-user-" + Date.now(),
+        email: data?.email || "demo@example.com",
+        firstName: "Demo",
+        role: "UNASSIGNED",
       },
     };
   }
@@ -100,53 +139,45 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
   // Register endpoint
   if (url.includes("/auth/register")) {
     return {
-      data: {
-        accessToken: "demo-access-token-" + Date.now(),
-        user: {
-          id: "demo-user-" + Date.now(),
-          email: data?.email || "demo@example.com",
-          firstName: data?.firstName || "Demo",
-          role: data?.role || "UNASSIGNED",
-        },
+      accessToken: "demo-access-token-" + Date.now(),
+      user: {
+        id: "demo-user-" + Date.now(),
+        email: data?.email || "demo@example.com",
+        firstName: data?.firstName || "Demo",
+        role: data?.role || "UNASSIGNED",
       },
     };
   }
 
   // Forgot password endpoint
   if (url.includes("/auth/forgot-password")) {
-    return {
-      data: { success: true, message: "Password reset email sent" },
-    };
+    return { success: true, message: "Password reset email sent" };
   }
 
   // User profile endpoint (both /user/me and /users/me for compatibility)
   if (url.includes("/user/me") || url.includes("/users/me")) {
     if (method === "PUT") {
       return {
-        data: {
-          user: {
-            id: "demo-user",
-            _id: "demo-user",
-            email: "demo@example.com",
-            firstName: data?.firstName ?? "Demo",
-            lastName: data?.lastName ?? "User",
-            role: "BENEFICIARY",
-            beneficiaryProfile: data?.beneficiaryProfile ?? {},
-          },
-        },
-      };
-    }
-    return {
-      data: {
         user: {
           id: "demo-user",
           _id: "demo-user",
           email: "demo@example.com",
-          firstName: "Demo",
-          lastName: "User",
+          firstName: data?.firstName ?? "Demo",
+          lastName: data?.lastName ?? "User",
           role: "BENEFICIARY",
-          beneficiaryProfile: {},
+          beneficiaryProfile: data?.beneficiaryProfile ?? {},
         },
+      };
+    }
+    return {
+      user: {
+        id: "demo-user",
+        _id: "demo-user",
+        email: "demo@example.com",
+        firstName: "Demo",
+        lastName: "User",
+        role: "BENEFICIARY",
+        beneficiaryProfile: {},
       },
     };
   }
@@ -197,37 +228,35 @@ async function handleDemoFallback(url: string, method: string, data?: any) {
   // Public providers list endpoint
   if (url.includes("/providers/public")) {
     return {
-      data: {
-        providers: [
-          {
-            id: "provider_001",
-            organizationName: "Global Relief Foundation",
-            organizationType: "other",
-            city: "Lagos",
-            country: "Nigeria",
-          },
-          {
-            id: "provider_002",
-            organizationName: "City General Hospital",
-            organizationType: "hospital",
-            city: "Nairobi",
-            country: "Kenya",
-          },
-          {
-            id: "provider_003",
-            organizationName: "Hope Education Center",
-            organizationType: "school",
-            city: "Accra",
-            country: "Ghana",
-          },
-        ],
-      },
+      providers: [
+        {
+          id: "provider_001",
+          organizationName: "Global Relief Foundation",
+          organizationType: "other",
+          city: "Lagos",
+          country: "Nigeria",
+        },
+        {
+          id: "provider_002",
+          organizationName: "City General Hospital",
+          organizationType: "hospital",
+          city: "Nairobi",
+          country: "Kenya",
+        },
+        {
+          id: "provider_003",
+          organizationName: "Hope Education Center",
+          organizationType: "school",
+          city: "Accra",
+          country: "Ghana",
+        },
+      ],
     };
   }
 
   // No mock fallback for admin endpoints — let them throw so UI shows error/retry
   // Default response
-  return { data: { success: true } };
+  return { success: true };
 }
 
 // ——— Admin API (real backend only; no mock fallback) ———
@@ -250,7 +279,7 @@ export interface AdminStatsRaw {
 /** GET /users/stats — throws on error (no mock). */
 export async function getAdminStats(): Promise<AdminStatsRaw> {
   const res = await api.get("/users/stats");
-  return res?.data as AdminStatsRaw;
+  return (res?.data ?? res) as AdminStatsRaw;
 }
 
 /** Map backend stats to AdminMetrics for Overview. Uses only real backend data. */
@@ -312,37 +341,37 @@ export async function getUsers(params?: { page?: number; limit?: number; role?: 
   if (params?.search) sp.set("search", params.search);
   const q = sp.toString();
   const res = await api.get(`/users${q ? `?${q}` : ""}`);
-  return res?.data as { page: number; limit: number; total: number; users: unknown[] };
+  return (res?.data ?? res) as { page: number; limit: number; total: number; users: unknown[] };
 }
 
 /** GET /users/:id */
 export async function getUserById(id: string) {
   const res = await api.get(`/users/${id}`);
-  return res?.data as { user: unknown };
+  return (res?.data ?? res) as { user: unknown };
 }
 
 /** POST /users/:id/verify-identity — body: { identityVerified: boolean, notes?: string } */
 export async function verifyUserIdentity(userId: string, body: { identityVerified: boolean; notes?: string }) {
   const res = await api.post(`/users/${userId}/verify-identity`, body);
-  return res?.data;
+  return res?.data ?? res;
 }
 
 /** GET /providers */
 export async function getProviders() {
   const res = await api.get("/providers");
-  return res?.data as { providers?: unknown[] };
+  return (res?.data ?? res) as { providers?: unknown[] };
 }
 
 /** GET /providers/:id */
 export async function getProviderById(id: string) {
   const res = await api.get(`/providers/${id}`);
-  return res?.data as { provider: unknown };
+  return (res?.data ?? res) as { provider: unknown };
 }
 
 /** PUT /providers/:id/kyc — body: { status: "APPROVED" | "REJECTED", notes?: string } */
 export async function approveProviderKyc(providerId: string, body: { status: "APPROVED" | "REJECTED"; notes?: string }) {
   const res = await api.put(`/providers/${providerId}/kyc`, body);
-  return res?.data;
+  return res?.data ?? res;
 }
 
 /** GET /campaigns with optional adminStatus, page, limit */
@@ -353,19 +382,31 @@ export async function getCampaigns(params?: { page?: number; limit?: number; adm
   if (params?.adminStatus) sp.set("adminStatus", params.adminStatus);
   const q = sp.toString();
   const res = await api.get(`/campaigns${q ? `?${q}` : ""}`);
-  return res?.data as { page: number; limit: number; total: number; campaigns: unknown[] };
+  return (res?.data ?? res) as { page: number; limit: number; total: number; campaigns: unknown[] };
 }
 
 /** GET /campaigns/:id */
 export async function getCampaignById(id: string) {
   const res = await api.get(`/campaigns/${id}`);
-  return res?.data as { campaign: unknown };
+  return (res?.data ?? res) as { campaign: unknown };
 }
 
 /** PATCH /campaigns/:id/status — body: { status: "approved" | "rejected" | "flagged" | "pending" } */
 export async function updateCampaignStatus(campaignId: string, status: "approved" | "rejected" | "flagged" | "pending") {
   const res = await api.patch(`/campaigns/${campaignId}/status`, { status });
-  return res?.data as { campaign: unknown };
+  return (res?.data ?? res) as { campaign: unknown };
+}
+
+/** PATCH /campaigns/:id/confirm-provider — provider confirms campaign (sets confirmationStatus to provider_confirmed) */
+export async function confirmProviderCampaign(campaignId: string) {
+  const res = await api.patch(`/campaigns/${campaignId}/confirm-provider`);
+  return (res?.data ?? res) as { campaign: unknown };
+}
+
+/** POST /campaigns/:id/disburse-to-provider — beneficiary owner sends funds to provider (MVP) */
+export async function disburseToProvider(campaignId: string, body: { amount: number; notes?: string }) {
+  const res = await api.post(`/campaigns/${campaignId}/disburse-to-provider`, body);
+  return (res?.data ?? res) as { disbursement?: unknown; campaign?: unknown };
 }
 
 // Create the axios-like API instance
@@ -374,6 +415,15 @@ const api: ApiInstance = {
     headers: {
       common: {},
     },
+  },
+  setAuthToken: (token: string | null) => {
+    if (token) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      localStorage.setItem("auth_token", token);
+    } else {
+      delete api.defaults.headers.common["Authorization"];
+      localStorage.removeItem("auth_token");
+    }
   },
   get: (url: string, config?: any) =>
     fetchWrapper(url, "GET", undefined, config?.headers),

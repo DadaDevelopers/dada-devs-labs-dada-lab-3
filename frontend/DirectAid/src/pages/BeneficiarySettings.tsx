@@ -119,7 +119,7 @@ const BeneficiarySettings = () => {
     setErrors({});
     try {
       const res = await api.get("/users/me");
-      const u = (res.data as { user?: any }).user ?? res.data;
+      const u = (res as any)?.user ?? res;
       if (!u) {
         setLoadingProfile(false);
         return;

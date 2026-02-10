@@ -1,8 +1,8 @@
+// src/pages/CampaignCreationWizard.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDataService } from "../services/mockData";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
@@ -11,14 +11,13 @@ import {
   ArrowLeft,
   CheckCircle2,
   FileText,
+  FolderKanban,
   Heart,
   MapPin,
   DollarSign,
   UploadCloud,
   Clock,
   LayoutDashboard,
-  FolderKanban,
-  Building2,
   X,
   User,
   Bell,
@@ -27,37 +26,22 @@ import {
 import { useRef, useEffect } from "react";
 import api from "../services/api";
 
-type Step = "details" | "documents" | "review" | "success";
+type Step = "details" | "documents" | "review" | "success" | "info" | "invoice";
 
 const CampaignCreationWizard = () => {
   const navigate = useNavigate();
-  const { currentUser, campaigns } = useApp();
-  const { user, role, logout } = useAuth();
+  const { createCampaign } = useApp();
+  const { user, role, logout } = useAuth(); 
+
   const [currentStep, setCurrentStep] = useState<Step>("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Beneficiary navigation items
+  // Colleague's nav & user display – kept (vital for UX)
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/beneficiary",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Campaigns",
-      href: "/campaigns",
-      icon: <FolderKanban className="w-5 h-5" />,
-    },
-    {
-      label: "Funds Received",
-      href: "/beneficiary/funds",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      label: "Reporting",
-      href: "/beneficiary/reporting",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+    { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [
@@ -70,16 +54,14 @@ const CampaignCreationWizard = () => {
   const userName = user?.name || user?.email || "User";
   const userRole = role || "Guest";
 
-  // Form state (backend: title, description, targetAmount, currency, category?, providerId?)
+  // Form state – merged version with all necessary fields
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     targetAmount: "",
-    category: "medical",
-    location: "",
-    preferredProvider: "",
-    providerLocation: "",
     fundraisingDeadline: "",
+    location: "",
+    category: "medical" as const,
   });
 
   const [invoiceData, setInvoiceData] = useState({
@@ -88,7 +70,7 @@ const CampaignCreationWizard = () => {
     invoiceDate: "",
   });
 
-  // Provider selection state
+  // Provider selection state (colleague's addition – kept, supports your matching)
   const [providerSelection, setProviderSelection] = useState<"platform" | "manual">("platform");
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [manualProvider, setManualProvider] = useState({
@@ -97,21 +79,22 @@ const CampaignCreationWizard = () => {
     email: "",
   });
   const [providers, setProviders] = useState<any[]>([]);
-  const [loadingProviders, setLoadingProviders] = useState(false);
+  const [loadingProviders, setLoadingProviders] = useState(true);
 
-  // Supporting documents state
+  // Supporting documents (colleague's addition – kept, good for proof)
   const [supportingDocs, setSupportingDocs] = useState<File[]>([]);
   const supportingDocsRef = useRef<HTMLInputElement>(null);
 
   const [newCampaign, setNewCampaign] = useState<any>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Fetch providers on mount
+  // Fetch providers on mount (colleague's addition – kept, feeds your matching)
   useEffect(() => {
     const fetchProviders = async () => {
       setLoadingProviders(true);
       try {
         const res = await api.get("/providers/public");
-        setProviders(res.data.providers || []);
+        setProviders(res?.providers ?? []);
       } catch (err) {
         console.warn("Failed to fetch providers, using empty list", err);
         setProviders([]);
@@ -129,6 +112,7 @@ const CampaignCreationWizard = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Colleague's improved canProceedToInvoice (kept – adds provider + docs check)
   const canProceedToInvoice = () => {
     const hasBasicInfo =
       formData.title.trim() &&
@@ -147,7 +131,6 @@ const CampaignCreationWizard = () => {
     return hasBasicInfo && hasProvider && hasSupportingDocs;
   };
 
-  // Handlers for Step 2: Invoice Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -155,7 +138,11 @@ const CampaignCreationWizard = () => {
     }
   };
 
-  // Handler for supporting documents
+  // Your canProceedToReview (invoice specific)
+  const canProceedToReview = () =>
+    invoiceData.invoiceFile && invoiceData.invoiceAmount && invoiceData.invoiceDate;
+
+  // Colleague's supporting docs handlers (kept – good for proof)
   const handleSupportingDocsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setSupportingDocs((prev) => [...prev, ...files]);
@@ -165,46 +152,41 @@ const CampaignCreationWizard = () => {
     setSupportingDocs((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const canProceedToReview = () => {
-    return supportingDocs.length > 0;
-  };
-
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
+  // Submit campaign as JSON so backend receives req.body (express.json() does not parse FormData)
   const handleCreateCampaign = async () => {
     setSubmitError(null);
     setIsSubmitting(true);
+
     try {
-      const payload: {
-        title: string;
-        description: string;
-        targetAmount: number | string;
-        currency: string;
-        category?: string;
-        providerId?: string;
-      } = {
-        title: formData.title.trim(),
-        description: formData.description?.trim() || "",
+      const payload: Record<string, unknown> = {
+        title: formData.title,
+        description: formData.description || "",
         targetAmount: Number(formData.targetAmount) || 0,
         currency: "USD",
-        category: formData.category || undefined,
+        category: formData.category || null,
+        metadata: {
+          location: formData.location || undefined,
+          fundraisingDeadline: formData.fundraisingDeadline ? new Date(formData.fundraisingDeadline).toISOString() : undefined,
+          manualProvider: providerSelection === "manual" ? manualProvider : undefined,
+        },
       };
+
       if (providerSelection === "platform" && selectedProviderId) {
         payload.providerId = selectedProviderId;
       }
+
       const res = await api.post("/campaigns", payload);
-      const campaign = (res.data as { campaign?: { _id?: string; id?: string; publicId?: string } }).campaign;
-      if (campaign) {
-        setNewCampaign({ id: campaign._id || campaign.id || campaign.publicId, ...campaign });
-        setCurrentStep("success");
-      } else {
-        setSubmitError("Campaign was created but we couldn’t load the details. Check your dashboard.");
-        setCurrentStep("success");
+      const serverCampaign = (res as any).campaign ?? res;
+
+      if (createCampaign) {
+        createCampaign(serverCampaign);
       }
-    } catch (err: any) {
-      const message =
-        err?.response?.data?.message || "We couldn’t create your campaign. Please try again.";
-      setSubmitError(message);
+
+      setNewCampaign(serverCampaign);
+      setCurrentStep("success");
+    } catch (error: any) {
+      console.error("Failed to create campaign:", error);
+      setSubmitError(error?.message || error?.response?.data?.message || "Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -220,15 +202,21 @@ const CampaignCreationWizard = () => {
       title: "",
       description: "",
       targetAmount: "",
-      category: "medical",
-      location: "",
-      preferredProvider: "",
-      providerLocation: "",
       fundraisingDeadline: "",
+      location: "",
+      category: "medical" as const,
+    });
+    setInvoiceData({
+      invoiceFile: null,
+      invoiceAmount: "",
+      invoiceDate: "",
     });
     setSupportingDocs([]);
     setNewCampaign(null);
     setSubmitError(null);
+    setProviderSelection("platform");
+    setSelectedProviderId("");
+    setManualProvider({ name: "", phone: "", email: "" });
   };
 
   return (
@@ -243,8 +231,8 @@ const CampaignCreationWizard = () => {
       }}
     >
       <div className="space-y-6">
-        {/* Header */}
-        <div>
+        {/* Colleague's header & progress (kept – better UI) */}
+        <div className="max-w-2xl mx-auto mb-8">
           <button
             onClick={() =>
               currentStep === "info"
@@ -273,7 +261,6 @@ const CampaignCreationWizard = () => {
                 const currentIdx = steps.indexOf(currentStep);
                 const isCompleted = currentIdx > idx;
                 const isCurrent = currentStep === step.key;
-                const isPast = currentIdx > idx;
                 return (
                   <div key={step.key} className="flex items-center flex-1 min-w-0 first:flex-initial last:flex-initial">
                     {/* Left connector: filled when we've reached this step or passed it */}
@@ -327,7 +314,7 @@ const CampaignCreationWizard = () => {
 
         {/* Content */}
         <div className="max-w-2xl mx-auto">
-          {/* Step 1: Campaign Information */}
+          {/* Step 1: Info (your version kept + colleague's styling tweaks) */}
           {currentStep === "info" && (
             <Card className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -358,15 +345,10 @@ const CampaignCreationWizard = () => {
                   </label>
                   <textarea
                     name="description"
-                    placeholder="Explain the campaign, why funds are needed, and how they'll be used..."
+                    placeholder="Explain the campaign..."
                     value={formData.description}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    className="w-full p-3 rounded-lg border border-border bg-background"
+                    onChange={handleFormChange}
+                    className="w-full p-3 rounded-lg border"
                     rows={4}
                   />
                 </div>
@@ -431,17 +413,17 @@ const CampaignCreationWizard = () => {
                     name="category"
                     value={formData.category}
                     onChange={handleFormChange}
-                    className="w-full p-2 rounded-lg border border-border bg-background"
+                    className="w-full p-3 rounded-lg border"
                   >
                     <option value="medical">Medical</option>
                     <option value="education">Education</option>
                     <option value="emergency">Emergency Relief</option>
-                    <option value="livelihood">Livelihood</option>
+                    <option value="business">Livelihood/Business</option>
                     <option value="other">Other</option>
                   </select>
                 </div>
 
-                {/* Preferred Provider Section */}
+                {/* Preferred Provider Section (colleague's addition – kept) */}
                 <div className="pt-2">
                   <label className="block text-sm font-medium mb-3">
                     Preferred Provider <span className="text-destructive">*</span>
@@ -563,7 +545,7 @@ const CampaignCreationWizard = () => {
                   )}
                 </div>
 
-                {/* Supporting Documents Section */}
+                {/* Supporting Documents Section (colleague's addition – kept) */}
                 <div className="pt-2">
                   <label className="block text-sm font-medium mb-3">
                     Upload Supporting Documents <span className="text-destructive">*</span>
@@ -633,7 +615,7 @@ const CampaignCreationWizard = () => {
             </Card>
           )}
 
-          {/* Step 2: Invoice Upload */}
+          {/* Step 2: Invoice (your version kept + colleague's styling tweaks) */}
           {currentStep === "invoice" && (
             <Card className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -647,8 +629,7 @@ const CampaignCreationWizard = () => {
                 <div className="p-4 rounded-lg border border-primary bg-primary/10">
                   <p className="text-sm text-primary">
                     Upload the invoice or receipt that validates this campaign.
-                    This ensures transparency and dual confirmation from
-                    beneficiary.
+                    This ensures transparency and dual confirmation from beneficiary.
                   </p>
                 </div>
 
@@ -743,7 +724,7 @@ const CampaignCreationWizard = () => {
             </Card>
           )}
 
-          {/* Step 3: Review */}
+          {/* Step 3: Review (colleague's improved summary – kept) */}
           {currentStep === "review" && (
             <Card className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -760,7 +741,7 @@ const CampaignCreationWizard = () => {
                   </p>
                 </div>
 
-                {/* Campaign Summary */}
+                {/* Campaign Summary (colleague's version – kept) */}
                 <div className="space-y-4">
                   <div className="border-b border-border pb-4">
                     <p className="text-sm text-muted-foreground">
@@ -849,7 +830,7 @@ const CampaignCreationWizard = () => {
                       Invoice File
                     </p>
                     <p className="font-semibold text-primary">
-                      ✓ {invoiceData.invoiceFile?.name}
+                      ✓ {invoiceData.invoiceFile?.name || "Not uploaded"}
                     </p>
                   </div>
 
@@ -858,7 +839,7 @@ const CampaignCreationWizard = () => {
                       Invoice Amount
                     </p>
                     <p className="font-semibold text-primary">
-                      ${invoiceData.invoiceAmount}
+                      ${invoiceData.invoiceAmount || "0"}
                     </p>
                   </div>
                 </div>
@@ -888,28 +869,34 @@ const CampaignCreationWizard = () => {
             </Card>
           )}
 
-          {/* Step 4: Success */}
+          {/* Step 4: Success (merged version - your provider match + colleague's improved UI) */}
           {currentStep === "success" && (
             <Card className="p-6 sm:p-8 text-center">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[var(--color-accent)]/20 border-2 border-[var(--color-accent)] mb-6">
                 <CheckCircle2 className="w-12 h-12 text-[var(--color-accent)]" />
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-[var(--color-text-light)]">
-                Campaign submitted for review
+                {newCampaign?.provider
+                  ? "Campaign Created Successfully!"
+                  : "Campaign submitted for review"}
               </h2>
               <p className="text-[var(--color-text-light)]/80 mb-4 max-w-md mx-auto text-base leading-relaxed">
-                Your campaign has been created and is now <strong>in review</strong>. The provider you selected will verify the campaign and confirm that they will deliver the service.
+                {newCampaign?.provider
+                  ? "A matching provider has been found and assigned."
+                  : "Your campaign has been created and is now in review. The provider you selected will verify the campaign and confirm that they will deliver the service."}
               </p>
-              <p className="text-sm text-[var(--color-text-light)]/70 mb-6 max-w-md mx-auto">
-                Once the provider confirms, your campaign will go live and donors can start giving. We’ll keep you updated; you can also check status from your dashboard.
-              </p>
+              {!newCampaign?.provider && (
+                <p className="text-sm text-[var(--color-text-light)]/70 mb-6 max-w-md mx-auto">
+                  Once the provider confirms, your campaign will go live and donors can start giving. We'll keep you updated; you can also check status from your dashboard.
+                </p>
+              )}
 
               <div className="p-4 rounded-xl mb-6 text-left border border-[var(--color-accent)]/30 bg-[var(--color-secondary-bg)]">
                 <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-light)]/60 mb-1">
                   Campaign reference
                 </p>
                 <p className="font-mono text-sm break-all text-[var(--color-accent)]">
-                  {newCampaign?.id}
+                  {newCampaign?.id || newCampaign?._id || "N/A"}
                 </p>
               </div>
 
@@ -922,22 +909,7 @@ const CampaignCreationWizard = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setCurrentStep("info");
-                    setFormData({
-                      title: "",
-                      description: "",
-                      targetAmount: "",
-                      fundraisingDeadline: "",
-                      location: "",
-                      category: "medical",
-                    });
-                    setInvoiceData({
-                      invoiceFile: null,
-                      invoiceAmount: "",
-                      invoiceDate: "",
-                    });
-                  }}
+                  onClick={handleStartOver}
                   className="w-full rounded-2xl border-[var(--color-accent)]/50 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 font-medium py-3"
                 >
                   Create another campaign

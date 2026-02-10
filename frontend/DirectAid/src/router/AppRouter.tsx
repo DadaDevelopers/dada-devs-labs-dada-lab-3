@@ -26,6 +26,7 @@ import DonorDonations from "../pages/donor/DonorDonations";
 import DonorReceipts from "../pages/donor/DonorReceipts";
 import BeneficiaryReporting from "../pages/beneficiary/BeneficiaryReporting";
 import BeneficiaryFunds from "../pages/beneficiary/BeneficiaryFunds";
+import BeneficiaryCampaignsPage from "../pages/beneficiary/BeneficiaryCampaignsPage";
 import BeneficiaryCampaignDetail from "../pages/beneficiary/BeneficiaryCampaignDetail";
 
 /** If user is logged in but has no role / UNASSIGNED, send them to onboarding when they hit a role-specific path. */
@@ -90,7 +91,9 @@ export default function AppRouter() {
       <Route path="/beneficiary/settings/change-password" element={<BeneficiarySettings />} />
       <Route path="/beneficiary/reporting" element={<BeneficiaryReporting />} />
       <Route path="/beneficiary/funds" element={<BeneficiaryFunds />} />
-      <Route path="/beneficiary/campaigns" element={<CampaignPage />} />
+      <Route path="/beneficiary/campaigns" element={<BeneficiaryCampaignsPage />} />
+      <Route path="/beneficiary/campaigns/:id" element={<BeneficiaryCampaignDetail />} />
+      <Route path="/beneficiary/campaigns" element={<BeneficiaryCampaignsPage />} />
       <Route path="/beneficiary/campaigns/:id" element={<BeneficiaryCampaignDetail />} />
 
       {/* Donor */}

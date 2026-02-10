@@ -1,19 +1,19 @@
+// /src/pages/providerConfirmation
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
+import { CampaignService } from "../services/apiServices";
 import { mockDataService } from "../services/mockData";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import {
   ArrowLeft,
   CheckCircle2,
-  AlertCircle,
   MapPin,
   DollarSign,
   Calendar,
   FileText,
   Clock,
-  User,
 } from "lucide-react";
 
 const ProviderConfirmation = () => {
@@ -37,24 +37,25 @@ const ProviderConfirmation = () => {
     setConfirmingId(campaignId);
     setIsSubmitting(true);
 
-    // Simulate confirmation processing
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // REAL BACKEND CALL
+      const response = await CampaignService.acceptCampaign(campaignId);
 
-    const campaign = campaigns.find((c) => c.id === campaignId);
-    if (campaign) {
-      const newConfirmationStatus =
-        campaign.confirmationStatus === "provider_confirmed"
-          ? "both_confirmed"
-          : "provider_confirmed";
-
-      updateCampaign(campaignId, {
-        confirmationStatus: newConfirmationStatus,
-        providerConfirmedAt: new Date().toISOString(),
-      });
+      if (response) {
+        // Update local state so UI updates immediately
+        updateCampaign(campaignId, {
+          confirmationStatus: "provider_confirmed",
+          providerConfirmedAt: new Date().toISOString(),
+        });
+        alert("Campaign confirmed successfully!");
+      }
+    } catch (error) {
+      console.error("Confirmation failed", error);
+      alert("Failed to confirm. Check if server is running.");
+    } finally {
+      setConfirmingId(null);
+      setIsSubmitting(false);
     }
-
-    setConfirmingId(null);
-    setIsSubmitting(false);
   };
 
   const getConfirmationStatus = (campaign: any) => {
@@ -147,11 +148,11 @@ const ProviderConfirmation = () => {
             <div className="space-y-4">
               {campaignsNeedingConfirmation.map((campaign) => {
                 const statusInfo = getConfirmationStatus(campaign);
-                const isExpanded = expandedCampaign === campaign.id;
+                const isExpanded = expandedCampaign === campaign._id;
 
                 return (
                   <Card
-                    key={campaign.id}
+                    key={campaign._id}
                     className={`overflow-hidden border-l-4 transition ${
                       campaign.confirmationStatus === "both_confirmed"
                         ? "border-l-green-500 bg-green-50"
@@ -162,7 +163,7 @@ const ProviderConfirmation = () => {
                     <div
                       className="p-6 cursor-pointer hover:bg-gray-50 transition"
                       onClick={() =>
-                        setExpandedCampaign(isExpanded ? null : campaign.id)
+                        setExpandedCampaign(isExpanded ? null : campaign._id)
                       }
                     >
                       <div className="flex items-start justify-between">
@@ -356,9 +357,7 @@ const ProviderConfirmation = () => {
                                     "provider_confirmed" ||
                                   campaign.confirmationStatus ===
                                     "both_confirmed"
-                                    ? `Confirmed on ${new Date(
-                                        campaign.providerConfirmedAt
-                                      ).toLocaleDateString()}`
+                                    ? `Confirmed on ${new Date(campaign.beneficiaryConfirmedAt || "").toLocaleDateString()}`
                                     : "Pending"}
                                 </p>
                               </div>
@@ -387,9 +386,7 @@ const ProviderConfirmation = () => {
                                 <p className="text-sm text-gray-600">
                                   {campaign.confirmationStatus ===
                                   "both_confirmed"
-                                    ? `Confirmed on ${new Date(
-                                        campaign.beneficiaryConfirmedAt
-                                      ).toLocaleDateString()}`
+                                    ? `Confirmed on ${new Date(campaign.providerConfirmedAt || "").toLocaleDateString()}`
                                     : "Pending"}
                                 </p>
                               </div>
@@ -406,13 +403,13 @@ const ProviderConfirmation = () => {
                               this campaign.
                             </p>
                             <Button
-                              onClick={() => handleConfirmService(campaign.id)}
+                              onClick={() => handleConfirmService(campaign._id)}
                               disabled={
-                                isSubmitting && confirmingId === campaign.id
+                                isSubmitting && confirmingId === campaign._id
                               }
                               className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
                             >
-                              {isSubmitting && confirmingId === campaign.id
+                              {isSubmitting && confirmingId === campaign._id
                                 ? "Confirming..."
                                 : "Confirm Service Delivery"}
                             </Button>

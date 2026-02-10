@@ -255,7 +255,7 @@ const BeneficiaryDashboard = () => {
   };
 
   const handleEditCampaign = (c: any) => {
-    navigate(`/campaigns/edit/${c.id}`);
+    navigate(`/campaigns/${c.id ?? c._id}`);
   };
 
   const handleOpenConfirmModal = (c: any) => {

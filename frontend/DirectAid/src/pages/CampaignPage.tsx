@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
@@ -6,12 +6,9 @@ import * as beneficiaryApi from "../services/beneficiaryApi";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/input";
-import { Card } from "../components/ui/card";
 import { CampaignSummaryCard } from "../components/feature/CampaignSummaryCard";
 import {
   Search,
-  MapPin,
-  Clock,
   Filter,
   AlertCircle,
   LayoutDashboard,
@@ -27,11 +24,11 @@ import {
   Lock,
   CreditCard,
   Sparkles,
-  ChevronRight,
 } from "lucide-react";
 
 type FilterCategory = "all" | "medical" | "education" | "food" | "shelter";
 type FilterStatus = "all" | "active" | "completed" | "draft";
+type ProviderCampaignTab = "all" | "to_approve" | "my";
 
 type CampaignListItem = {
   id: string;
@@ -42,9 +39,12 @@ type CampaignListItem = {
   amountRaised: number;
   targetAmount: number;
   status: string;
+  adminStatus?: string;
   confirmationStatus?: string;
   category: string;
   donorCount: number;
+  providerId?: any;
+  providerAccepted?: boolean;
   providerName: string;
 };
 
@@ -68,33 +68,17 @@ function normalizeCampaign(c: any): CampaignListItem {
     amountRaised: raised,
     targetAmount: target,
     status: (c.status ?? "active").toLowerCase(),
+    adminStatus: c.adminStatus ?? "pending",
     confirmationStatus: c.confirmationStatus,
     category: c.category ?? c.metadata?.category ?? "Other",
     donorCount: c.donorCount ?? 0,
+    providerId: c.providerId,
+    providerAccepted: c.providerAccepted,
     providerName: c.providerId?.organization ||
       (c.providerId?.firstName ? `${c.providerId.firstName} ${c.providerId.lastName || ""}`.trim() : "DirectAid Provider")
   };
 }
 
-function getCampaignStatusLabel(campaign: CampaignListItem): string {
-  if (campaign.confirmationStatus === "pending") return "Pending";
-  if (campaign.confirmationStatus === "provider_confirmed") return "Provider confirmed";
-  if (campaign.confirmationStatus === "both_confirmed") return "Confirmed";
-  if (campaign.confirmationStatus === "disputed") return "Disputed";
-  if (campaign.status === "ACTIVE") return "Active";
-  if (campaign.status === "COMPLETED") return "Completed";
-  if (campaign.status === "CANCELLED") return "Cancelled";
-  return campaign.status ? campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1).toLowerCase() : "Active";
-}
-
-function getStatusBadgeClass(campaign: CampaignListItem): string {
-  if (campaign.confirmationStatus === "pending") return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300/50";
-  if (campaign.confirmationStatus === "provider_confirmed") return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300/50";
-  if (campaign.confirmationStatus === "both_confirmed") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-300/50";
-  if (campaign.status === "COMPLETED") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-300/50";
-  if (campaign.status === "ACTIVE") return "bg-primary/15 text-primary border-primary/40";
-  return "bg-muted text-muted-foreground border-border";
-}
 
 export default function CampaignPage() {
   const navigate = useNavigate();
@@ -106,20 +90,18 @@ export default function CampaignPage() {
   const [campaignsLoading, setCampaignsLoading] = useState(true);
   const [myCampaignsLoading, setMyCampaignsLoading] = useState(false);
   const [campaignsView, setCampaignsView] = useState<"discover" | "my">("discover");
-
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] =
-    useState<FilterCategory>("all");
+  const [selectedCategory, setSelectedCategory] = useState<FilterCategory>("all");
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("all");
   const [showFilters, setShowFilters] = useState(false);
-
+  const [providerTab, setProviderTab] = useState<ProviderCampaignTab>("all");
   // Public campaign list (discover)
   useEffect(() => {
     setCampaignsLoading(true);
     api
       .get("/campaigns?limit=100")
       .then((res) => {
-        const list = (res.data as { campaigns?: any[] }).campaigns ?? [];
+        const list = (res as any)?.campaigns ?? (res as any)?.data?.campaigns ?? [];
         setCampaigns(list.map(normalizeCampaign));
       })
       .catch(() => setCampaigns([]))
@@ -140,7 +122,15 @@ export default function CampaignPage() {
       .finally(() => setMyCampaignsLoading(false));
   }, [normalizedRole]);
 
-  const displayList = normalizedRole === "BENEFICIARY" && campaignsView === "my" ? myCampaigns : campaigns;
+  const rawDisplayList = normalizedRole === "BENEFICIARY" && campaignsView === "my" ? myCampaigns : campaigns;
+  // Donor/guest discovery: only show admin-approved campaigns. Provider and beneficiary "My campaigns" see full list.
+  const isDiscoverList = !(normalizedRole === "BENEFICIARY" && campaignsView === "my") && normalizedRole !== "PROVIDER";
+  const displayList =
+    isDiscoverList
+      ? rawDisplayList.filter(
+          (c: any) => (c.adminStatus && String(c.adminStatus).toLowerCase() === "approved") || false
+        )
+      : rawDisplayList;
   const listLoading = normalizedRole === "BENEFICIARY" && campaignsView === "my" ? myCampaignsLoading : campaignsLoading;
   const isBeneficiaryMyView = normalizedRole === "BENEFICIARY" && campaignsView === "my";
 
@@ -209,6 +199,9 @@ export default function CampaignPage() {
     }
   }, [user, normalizedRole]);
 
+  const userName = user?.name || user?.email || "User";
+  const userRole = role || "Guest";
+
   const categories: { id: FilterCategory; label: string }[] = [
     { id: "all", label: "All Cases" },
     { id: "medical", label: "Medical Aid" },
@@ -222,10 +215,30 @@ export default function CampaignPage() {
     { id: "active", label: "Active Now" },
     { id: "completed", label: "Fully Funded" },
   ];
+  const currentUserId = (user as any)?.id ?? (user as any)?._id ?? "";
 
-  // Filter and search campaigns (apply to current display list)
+  const providerMatchesCurrentUser = useCallback(
+    (campaign: CampaignListItem) => {
+      const p = (campaign as any).providerId;
+      const pid = p && typeof p === "object" ? (p._id ?? p.id) : p;
+      return currentUserId && pid && String(pid) === String(currentUserId);
+    },
+    [currentUserId]
+  );
+
+  // Filter and search campaigns (apply to current display list, plus provider tabs when relevant)
   const filteredCampaigns = useMemo(() => {
-    return displayList.filter((campaign) => {
+    let list = displayList;
+
+    if (normalizedRole === "PROVIDER" && currentUserId) {
+      if (providerTab === "to_approve") {
+        list = list.filter((c) => providerMatchesCurrentUser(c) && !c.providerAccepted);
+      } else if (providerTab === "my") {
+        list = list.filter((c) => providerMatchesCurrentUser(c));
+      }
+    }
+
+    return list.filter((campaign) => {
       const matchesSearch =
         campaign.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         campaign.description
@@ -241,7 +254,16 @@ export default function CampaignPage() {
 
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [displayList, searchQuery, selectedCategory, selectedStatus]);
+  }, [
+    displayList,
+    searchQuery,
+    selectedCategory,
+    selectedStatus,
+    normalizedRole,
+    providerTab,
+    currentUserId,
+    providerMatchesCurrentUser,
+  ]);
 
   const getProgressPercentage = (campaign: CampaignListItem) => {
     if (!campaign.targetAmount || campaign.targetAmount <= 0) return 0;
@@ -266,20 +288,13 @@ export default function CampaignPage() {
     }
   };
 
-
-  const userName = user?.name || user?.email || "User";
-  const userRole = role || "Guest";
-
   return (
     <DashboardLayout
       navItems={navItems}
       userName={userName}
       userRole={userRole}
       settingsNavItems={settingsNavItems}
-      onLogout={async () => {
-        await logout();
-        navigate("/");
-      }}
+      onLogout={user ? async () => { await logout(); navigate("/"); } : undefined}
     >
       <div className="space-y-10 animate-fade-in">
         {/* Fancy Hero Header */}
@@ -303,19 +318,50 @@ export default function CampaignPage() {
 
         {/* Beneficiary: Discover vs My campaigns tabs */}
         {normalizedRole === "BENEFICIARY" && (
-          <div className="flex gap-2 border-b border-border pb-2">
+          <div className="flex gap-4 border-b border-border pb-2">
             <button
               onClick={() => setCampaignsView("discover")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${campaignsView === "discover" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              className={`pb-2 text-sm font-medium transition border-b-2 ${
+                campaignsView === "discover"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
             >
               Discover
             </button>
             <button
               onClick={() => setCampaignsView("my")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${campaignsView === "my" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              className={`pb-2 text-sm font-medium transition border-b-2 ${
+                campaignsView === "my"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
             >
               My campaigns
             </button>
+          </div>
+        )}
+
+        {/* Provider-only tabs: All / To approve / My campaigns */}
+        {normalizedRole === "PROVIDER" && (
+          <div className="flex gap-4 border-b border-border pb-2">
+            {[
+              { id: "all" as const, label: "All campaigns" },
+              { id: "to_approve" as const, label: "To approve" },
+              { id: "my" as const, label: "My campaigns" },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setProviderTab(id)}
+                className={`pb-2 text-sm font-medium transition border-b-2 ${
+                  providerTab === id
+                    ? "border-primary text-primary bg-primary/10"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border hover:bg-muted/20"
+                } px-4 rounded-t-md`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         )}
 
@@ -342,7 +388,7 @@ export default function CampaignPage() {
               <Filter className="w-4 h-4" />
               <span className="font-bold">Filters</span>
             </Button>
-            {role === "PROVIDER" && (
+            {normalizedRole === "BENEFICIARY" && (
               <Button
                 className="h-14 px-8 rounded-2xl btn-cta"
                 onClick={() => navigate("/campaigns/create")}
@@ -374,7 +420,6 @@ export default function CampaignPage() {
                   ))}
                 </div>
               </div>
-
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-6">Execution Status</h3>
                 <div className="flex flex-wrap gap-2.5">
@@ -393,7 +438,6 @@ export default function CampaignPage() {
                 </div>
               </div>
             </div>
-
             <div className="mt-10 pt-6 border-t border-white/5 flex justify-end">
               <button
                 onClick={() => {

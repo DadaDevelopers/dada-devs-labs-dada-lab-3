@@ -60,10 +60,10 @@ export const getAdminStats = async (req, res, next) => {
       // 7. pending KYC (quick count)
       User.countDocuments({ role: "PROVIDER", kycStatus: "PENDING", isDeleted: false }),
 
-      // 8. total donations sum (exclude refunded if model has flag)
+      // 8. total donations sum (Donation model uses amountFiat)
       Donation.aggregate([
-        { $match: { status: "COMPLETED" } }, // adjust as per your schema
-        { $group: { _id: null, total: { $sum: "$amount" } } }
+        { $match: { status: "COMPLETED" } },
+        { $group: { _id: null, total: { $sum: "$amountFiat" } } }
       ]),
 
       // 9. donations by month for the last `months` months
@@ -72,7 +72,7 @@ export const getAdminStats = async (req, res, next) => {
         {
           $group: {
             _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-            total: { $sum: "$amount" }
+            total: { $sum: "$amountFiat" }
           }
         },
         { $sort: { "_id.year": 1, "_id.month": 1 } }
@@ -84,7 +84,7 @@ export const getAdminStats = async (req, res, next) => {
       // 11. top donors (top 5 by sum)
       Donation.aggregate([
         { $match: { status: "COMPLETED" } },
-        { $group: { _id: "$donorId", total: { $sum: "$amount" } } },
+        { $group: { _id: "$donorId", total: { $sum: "$amountFiat" } } },
         { $sort: { total: -1 } },
         { $limit: 5 },
         {
