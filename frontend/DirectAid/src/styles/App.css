@@ -298,7 +298,7 @@ section,
 }
 
 /* Custom Utilities */
-.btn-cta {
+/*.btn-cta {
   background-color: var(--color-accent);
   color: var(--color-primary-bg);
   @apply font-bold py-3 px-6 rounded-2xl shadow-xl tracking-wider uppercase transition duration-300;
@@ -309,7 +309,7 @@ section,
   background-color: var(--color-accent-dark);
   box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
   transform: translateY(-1px);
-}
+}*/
 
 /* Premium UI Utilities */
 .card-glow {

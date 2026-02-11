@@ -89,4 +89,34 @@ body {
     color: transparent;
   }
 
+  .btn-cta {
+  background-color: var(--color-accent);
+  color: var(--color-primary-bg);
+  /* expanded @apply to avoid using @apply for unknown custom classes */
+  font-weight: 700; /* font-bold */
+  padding-top: 0.75rem; /* py-3 */
+  padding-bottom: 0.75rem;
+  padding-left: 1.5rem; /* px-6 */
+  padding-right: 1.5rem;
+  border-radius: 1.25rem; /* rounded-2xl */
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  letter-spacing: 0.08em; /* tracking-wider approximation */
+  text-transform: uppercase;
+  transition: all 0.3s;
+}
+
+.btn-cta:hover {
+  background-color: var(--color-accent-dark);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+/* glass-morphism, card-glow, etc. — move into index.css as well */
+.glass-morphism {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 }
