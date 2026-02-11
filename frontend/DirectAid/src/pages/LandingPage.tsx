@@ -1,9 +1,9 @@
 import Header from '../components/layout/Header';
 import HeroSection from '../components/layout/HeroSection';
-import ImpactMetrics from '../components/layout/ImpactMetrics';
+//import ImpactMetrics from '../components/layout/ImpactMetrics';
 import Footer from '../components/layout/Footer';
 import CampaignsSection from '../components/layout/CampaignsSection';
-import CallToActionSection from '../components/layout/CallToActionSection';
+//import CallToActionSection from '../components/layout/CallToActionSection';
 import HowItWorks from '../components/layout/HowItWorks';
 import CoreValues from '../components/layout/CoreValues';
 import ProviderOnboarding from '../components/layout/ProviderOnboarding';
@@ -41,9 +41,8 @@ export default function LandingPage() {
           <ImpactStories />
           <FAQ />
           <CTASection />
-            <ImpactMetrics />
-            <CallToActionSection />
-            <Footer />
+            {/* <ImpactMetrics /> */}
+            {/* <CallToActionSection /> */}
         </main>
         <Footer />
       </div>

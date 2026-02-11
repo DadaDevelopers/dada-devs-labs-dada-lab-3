@@ -119,4 +119,62 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* Footer glass + helpers*/
+
+/* glass container */
+.footer-glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(8,10,12,0.03));
+  @apply border border-white/8 rounded-3xl;
+  box-shadow: 0 10px 40px rgba(2,185,229,0.06), inset 0 1px 0 rgba(255,255,255,0.02);
+  backface-visibility: hidden;
+}
+/* Update these in your @layer components section */
+
+.footer-glass {
+  background: linear-gradient(
+    180deg, 
+    rgba(255, 255, 255, 0.04) 0%, 
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  /* This creates the sharp high-end edge */
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Make the neon-filled button a bit more technical */
+.btn-neon-filled {
+  @apply inline-flex items-center justify-center font-black transition-all duration-300;
+  background: linear-gradient(135deg, #00d4ff, #00b37e);
+  color: #04121a;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-neon-filled:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+}
+
+/* small pulsing glow for the brand badge */
+.shadow-glow {
+  box-shadow: 0 8px 30px rgba(0,212,255,0.12), 0 2px 8px rgba(0,0,0,0.6);
+}
+
+/* neon filled button fallback */
+.btn-neon-filled {
+  @apply inline-flex items-center justify-center font-black transition-all;
+  background: linear-gradient(180deg, #00d4ff, #02b9e5);
+  color: #04121a; /* dark text */
+  box-shadow: 0 12px 40px rgba(2,185,229,0.18), inset 0 -3px 0 rgba(0,0,0,0.12);
+}
+
+/* small responsive tweaks */
+@media (max-width: 640px) {
+  .footer-glass {
+    padding: 1rem;
+  }
+}
+
+
 }
