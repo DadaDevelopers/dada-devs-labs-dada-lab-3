@@ -7,9 +7,9 @@ import Payment from "../models/Payment.js";
 import { initiateStkPush } from "../services/mpesa.js";
 import { createBtcAddress, checkBtcTransaction } from "../services/bitcoin.service.js";
 import { createLightningInvoice } from "../services/lightning.service.js";
+import * as exchangeRateService from "../services/exchangeRate.service.js";
 
 /* ---------------- Helpers ---------------- */
-
 const ensureDecimal = (val) => {
   if (val === undefined || val === null) return null;
   if (typeof val === "string") return val;
@@ -18,12 +18,9 @@ const ensureDecimal = (val) => {
 };
 
 const donationToClient = (donation) =>
-  typeof donation?.toClient === "function"
-    ? donation.toClient()
-    : donation;
+  typeof donation?.toClient === "function" ? donation.toClient() : donation;
 
 /* ---------------- CREATE DONATION ---------------- */
-
 export const createDonation = async (req, res, next) => {
   try {
     const {
@@ -48,7 +45,13 @@ export const createDonation = async (req, res, next) => {
       return res.status(404).json({ message: "Campaign unavailable" });
     }
 
-    // ---- Idempotency (donation-level) ----
+    // Normalize payment method
+    const normalizedMethod = (paymentMethod || "").toString().toLowerCase();
+    if (!["mpesa","onchain","lightning"].includes(normalizedMethod)) {
+      return res.status(400).json({ message: "Invalid paymentMethod. Allowed: mpesa, onchain, lightning" });
+    }
+
+    // Idempotency
     if (idempotencyKey) {
       const existing = await Donation.findOne({ idempotencyKey });
       if (existing) {
@@ -56,15 +59,24 @@ export const createDonation = async (req, res, next) => {
       }
     }
 
-    // ---- Create Donation (INTENT) ----
+    // Compute sats safely
+    let computedSats = null;
+    if (amountSats) {
+      computedSats = String(amountSats);
+    } else if (exchangeRateService?.getSatsPerFiat) {
+      const satsPerUnit = await exchangeRateService.getSatsPerFiat(currency);
+      computedSats = String(Math.round(Number(amountFiat) * satsPerUnit));
+    }
+
+    // Create donation
     const donation = await Donation.create({
       donorId: req.user?.userId,
       campaignId,
       amountFiat: ensureDecimal(amountFiat),
       currency,
-      amountSats: amountSats ? String(amountSats) : null,
+      amountSats: computedSats,
       network: network || null,
-      paymentMethod,
+      paymentMethod: normalizedMethod,
       payer: payer || null,
       fees: ensureDecimal(req.body.fees ?? 0),
       exchangeRate: ensureDecimal(req.body.exchangeRate ?? 1),
@@ -74,15 +86,11 @@ export const createDonation = async (req, res, next) => {
       notes: notes || null
     });
 
-    /* ---------------- PAYMENT EXECUTION ---------------- */
-
-    switch (paymentMethod) {
-      /* -------- MPESA -------- */
-      case "MPESA": {
+    // ---------------- PAYMENT EXECUTION ----------------
+    switch (normalizedMethod) {
+      case "mpesa": {
         const msisdn = phone || payer?.phone;
-        if (!msisdn) {
-          return res.status(400).json({ message: "Phone required for MPESA" });
-        }
+        if (!msisdn) return res.status(400).json({ message: "Phone required for MPESA" });
 
         const stk = await initiateStkPush({
           phone: msisdn,
@@ -98,11 +106,7 @@ export const createDonation = async (req, res, next) => {
           amount: ensureDecimal(amountFiat),
           currency,
           externalId: stk.CheckoutRequestID,
-          mpesa: {
-            phone: msisdn,
-            checkoutRequestId: stk.CheckoutRequestID,
-            merchantRequestId: stk.MerchantRequestID
-          },
+          mpesa: { phone: msisdn, checkoutRequestId: stk.CheckoutRequestID, merchantRequestId: stk.MerchantRequestID },
           processorResponse: stk
         });
 
@@ -112,32 +116,30 @@ export const createDonation = async (req, res, next) => {
         });
       }
 
-      /* -------- BTC ON-CHAIN -------- */
-      case "BTC_ONCHAIN": {
-        const btc = await createBtcAddress();
-
+      case "onchain": {
+        const btc = await createBtcAddress({ donationId: donation._id });
         await Payment.create({
           donationId: donation._id,
           provider: "BITCOIN",
           method: "ONCHAIN",
           amount: ensureDecimal(amountFiat),
           currency,
-          bitcoin: {
-            address: btc.address
-          }
+          bitcoin: { address: btc.address }
         });
 
         return res.status(201).json({
           donationId: donation._id,
           btcAddress: btc.address,
-          network: "bitcoin"
+          network: "bitcoin",
+          amountSats: donation.amountSats,
+          amountBTC: donation.amountSats ? (Number(donation.amountSats)/1e8).toString() : null
         });
       }
 
-      /* -------- LIGHTNING -------- */
-      case "BTC_LIGHTNING": {
+      case "lightning": {
         const invoice = await createLightningInvoice({
           amountFiat,
+          amountSats: computedSats,
           memo: `Donation ${donation._id}`
         });
 
@@ -147,48 +149,34 @@ export const createDonation = async (req, res, next) => {
           method: "INVOICE",
           amount: ensureDecimal(amountFiat),
           currency,
-          lightning: {
-            invoice: invoice.bolt11,
-            paymentHash: invoice.payment_hash,
-            settled: false
-          }
+          lightning: { invoice: invoice.bolt11, paymentHash: invoice.payment_hash, settled: false }
         });
 
         return res.status(201).json({
           donationId: donation._id,
-          invoice: invoice.bolt11
+          invoice: invoice.bolt11,
+          amountSats: invoice.amountSats || donation.amountSats,
+          expiresAt: invoice.expiresAt || null
         });
       }
 
       default:
         return res.status(400).json({ message: "Invalid payment method" });
     }
-
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 /* ---------------- MPESA WEBHOOK ---------------- */
-
 export const mpesaWebhook = async (req, res, next) => {
   try {
     const { CheckoutRequestID, ResultCode, CallbackMetadata } = req.body;
 
-    const payment = await Payment.findOne({
-      provider: "MPESA",
-      externalId: CheckoutRequestID
-    }).populate("donationId");
-
+    const payment = await Payment.findOne({ provider: "MPESA", externalId: CheckoutRequestID }).populate("donationId");
     if (!payment) return res.json({ ResultCode: 0 });
-
-    if (payment.status === "SUCCESS") {
-      return res.json({ ResultCode: 0 });
-    }
+    if (payment.status === "SUCCESS") return res.json({ ResultCode: 0 });
 
     if (ResultCode === 0) {
       const receiptItem = CallbackMetadata?.Item?.find(i => i.Name === "MpesaReceiptNumber");
-
       payment.status = "SUCCESS";
       payment.paymentReference = receiptItem?.Value || null;
       payment.mpesa.receiptNumber = receiptItem?.Value || null;
@@ -206,30 +194,20 @@ export const mpesaWebhook = async (req, res, next) => {
     }
 
     res.json({ ResultCode: 0 });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 /* ---------------- BITCOIN CONFIRMATION ---------------- */
-
 export const confirmBitcoinDonation = async (req, res, next) => {
   try {
     const { donationId, txHash } = req.body;
 
-    const payment = await Payment.findOne({
-      donationId,
-      provider: "BITCOIN"
-    }).populate("donationId");
-
-    if (!payment) {
-      return res.status(404).json({ message: "Payment not found" });
-    }
+    const payment = await Payment.findOne({ donationId, provider: "BITCOIN" }).populate("donationId");
+    if (!payment) return res.status(404).json({ message: "Payment not found" });
 
     const tx = await checkBtcTransaction(txHash, payment.bitcoin.address);
-
     payment.bitcoin.txHash = txHash;
-    payment.bitcoin.confirmations = tx.confirmations;
+    payment.bitcoin.confirmations = tx.confirmations || 0;
 
     if (tx.confirmations >= 2 && payment.status !== "SUCCESS") {
       payment.status = "SUCCESS";
@@ -239,24 +217,15 @@ export const confirmBitcoinDonation = async (req, res, next) => {
 
     await payment.save();
     await payment.donationId.save();
-
     res.json({ status: payment.status, confirmations: tx.confirmations });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 /* ---------------- LIGHTNING WEBHOOK ---------------- */
-
 export const lightningWebhook = async (req, res, next) => {
   try {
     const { payment_hash } = req.body;
-
-    const payment = await Payment.findOne({
-      provider: "LIGHTNING",
-      "lightning.paymentHash": payment_hash
-    }).populate("donationId");
-
+    const payment = await Payment.findOne({ provider: "LIGHTNING", "lightning.paymentHash": payment_hash }).populate("donationId");
     if (!payment) return res.sendStatus(200);
     if (payment.status === "SUCCESS") return res.sendStatus(200);
 
@@ -266,89 +235,59 @@ export const lightningWebhook = async (req, res, next) => {
 
     await payment.save();
     await payment.donationId.save();
-
     res.sendStatus(200);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
-
-/**
- * Get a single donation by id (public/admin/owner)
- */
+/* ---------------- GET DONATION ---------------- */
 export const getDonation = async (req, res, next) => {
   try {
     const id = req.params.id;
     const donation = await Donation.findById(id).populate("donorId", "firstName lastName email").populate("campaignId");
     if (!donation) return res.status(404).json({ message: "Donation not found" });
 
-    // If not admin, ensure owner or related
-    if (req.user && req.user.role !== "ADMIN") {
-      if (donation.donorId && donation.donorId._id.toString() !== req.user.userId && req.user.role !== "ADMIN") {
-        return res.status(403).json({ message: "Forbidden" });
-      }
+    if (req.user?.role !== "ADMIN" && donation.donorId?._id.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "Forbidden" });
     }
 
     return res.json({ donation: donationToClient(donation) });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
-/**
- * List donations for a campaign (admin or campaign owner)
- */
+/* ---------------- GET DONATIONS BY CAMPAIGN ---------------- */
 export const getDonationsByCampaign = async (req, res, next) => {
   try {
     const { campaignId } = req.params;
     const campaign = await Campaign.findById(campaignId);
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
-    // Only allow beneficiary/owner or admin
     if (req.user.role !== "ADMIN" && campaign.beneficiaryId.toString() !== req.user.userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
     const donations = await Donation.find({ campaignId }).sort({ createdAt: -1 });
     return res.json({ donations: donations.map(donationToClient) });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
-/**
- * List donations made by currently logged-in user
- */
+/* ---------------- GET DONATIONS BY USER ---------------- */
 export const getDonationsByUser = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
-    const donations = await Donation.find({ donorId: userId }).sort({ createdAt: -1 });
+    const donations = await Donation.find({ donorId: req.user.userId }).sort({ createdAt: -1 });
     return res.json({ donations: donations.map(donationToClient) });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
-/**
- * GET /api/donors/receipts/:id
- * Returns a donation receipt (JSON)
- */
+/* ---------------- GET DONATION RECEIPT ---------------- */
 export const getDonationReceipt = async (req, res, next) => {
   try {
     const donation = await Donation.findById(req.params.id)
       .populate("donorId", "firstName lastName email")
       .populate("campaignId", "title");
 
-    if (!donation) {
-      return res.status(404).json({ message: "Donation not found" });
-    }
+    if (!donation) return res.status(404).json({ message: "Donation not found" });
 
-    // Donor can only see own receipt, admin can see all
-    if (
-      req.user.role !== "ADMIN" &&
-      donation.donorId._id.toString() !== req.user.userId
-    ) {
+    if (req.user.role !== "ADMIN" && donation.donorId._id.toString() !== req.user.userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -365,20 +304,15 @@ export const getDonationReceipt = async (req, res, next) => {
         issuer: "DirectAid"
       }
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
-/**
- * Admin: list donations with optional filters
- */
+/* ---------------- LIST DONATIONS (ADMIN) ---------------- */
 export const listDonations = async (req, res, next) => {
   try {
-    // filters: status, paymentMethod, provider, dateFrom, dateTo, campaignId
     const q = {};
     if (req.query.status) q.status = req.query.status;
-    if (req.query.paymentMethod) q.paymentMethod = req.query.paymentMethod;
+    if (req.query.paymentMethod) q.paymentMethod = req.query.paymentMethod.toLowerCase();
     if (req.query.provider) q.provider = req.query.provider;
     if (req.query.campaignId) q.campaignId = req.query.campaignId;
     if (req.query.donorId) q.donorId = req.query.donorId;
@@ -391,7 +325,27 @@ export const listDonations = async (req, res, next) => {
 
     const donations = await Donation.find(q).sort({ createdAt: -1 }).limit(1000);
     return res.json({ donations: donations.map(donationToClient) });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
+};
+
+/* ---------------- GET DONATION STATUS ---------------- */
+export const getDonationStatus = async (req, res, next) => {
+  try {
+    const donation = await Donation.findById(req.params.id);
+    if (!donation) return res.status(404).json({ message: "Donation not found" });
+
+    const payment = await Payment.findOne({ donationId: donation._id });
+
+    res.json({
+      donationId: donation._id,
+      status: donation.status,
+      payment: payment ? {
+        provider: payment.provider,
+        method: payment.method,
+        status: payment.status,
+        lightning: payment.lightning,
+        bitcoin: payment.bitcoin
+      } : null
+    });
+  } catch (err) { next(err); }
 };

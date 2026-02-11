@@ -53,10 +53,18 @@ export const createBtcAddress = async ({ donationId }) => {
   };
 };*/
 
-export const checkBtcTransaction = async (txHash) => {
+/*export const checkBtcTransaction = async (txHash) => {
   // Replace with node / block explorer call
   return {
     confirmations: Math.floor(Math.random() * 6),
     status: "CONFIRMED"
+  };
+};*/
+
+export const checkBtcTransaction = async (txHash, expectedAddress) => {
+  return {
+    confirmations: 3,
+    amountSats: "15000",
+    toAddress: expectedAddress
   };
 };

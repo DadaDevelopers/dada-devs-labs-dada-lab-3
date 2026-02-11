@@ -1,44 +1,45 @@
-// src/routes/donationRoutes.js
 import express from "express";
-import { createDonation, mpesaWebhook, confirmBitcoinDonation, lightningWebhook, getDonation, getDonationsByCampaign, getDonationsByUser, getDonationReceipt, listDonations } from "../controllers/donationController.js";
-//import { mpesaCallbackController } from "../controllers/mpesaCallbackController.js";
-//import { stripeWebhookController } from "../controllers/stripeWebhookController.js";
-import { getDonorMetrics, getReceiptPDF, emailReceipt } from "../controllers/donorMetricsController.js";
+import {
+  createDonation,
+  mpesaWebhook,
+  lightningWebhook,
+  confirmBitcoinDonation,
+  getDonation,
+  getDonationsByCampaign,
+  getDonationsByUser,
+  getDonationReceipt,
+  listDonations,
+  getDonationStatus
+} from "../controllers/donationController.js";
 
+import { getDonorMetrics, getReceiptPDF, emailReceipt } from "../controllers/donorMetricsController.js";
 import { protect, authorize } from "../middlewares/auth.js";
-import bodyParser from "body-parser";
 
 const router = express.Router();
 
-// normal JSON body routes
-router.post("/", protect, createDonation); // create donation (protected if donor logged in — can also be public)
+// Normal JSON body routes
+router.post("/", protect, createDonation);
 
-/*Provider webhooks : no auth*/
-// MPESA webhook (Daraja will POST JSON)
-router.post("/webhooks/mpesa", protect, mpesaWebhook);
-//router.post("/webhooks/mpesa", express.json(), mpesaCallbackController);
-router.post("/webhooks/lightning", protect, lightningWebhook);
+// ----------------- Webhooks (public, provider verifies) -----------------
+router.post("/webhooks/mpesa", express.json(), mpesaWebhook);
+router.post("/webhooks/lightning", express.json(), lightningWebhook);
 
-// ---- Crypto confirmation ----
+// ----------------- Crypto confirmation -----------------
 router.post("/bitcoin/confirm", protect, confirmBitcoinDonation);
 
-// user routes - queries
+// ----------------- User routes -----------------
 router.get("/me", protect, getDonationsByUser);
 router.get("/:id", protect, getDonation);
+router.get("/:id/status", protect, getDonationStatus); // NEW: status polling
 router.get("/campaign/:campaignId", protect, getDonationsByCampaign);
 
-// Admin list
+// ----------------- Admin -----------------
 router.get("/", protect, authorize("ADMIN"), listDonations);
 
-// Stripe webhook: must use raw body for signature verification
-//router.post("/webhooks/stripe", bodyParser.raw({ type: "application/json" }), stripeWebhookController);
-
-//Donor data(metrics)
+// ----------------- Donor data / receipts -----------------
 router.get("/me/donor-metrics", protect, authorize("DONOR"), getDonorMetrics);
-
-// Donor receipt
 router.get("/receipts/:id", protect, authorize("DONOR", "ADMIN"), getDonationReceipt);
-
 router.get("/donors/receipts/:id/pdf", protect, getReceiptPDF);
 router.post("/donors/receipts/:id/email", protect, emailReceipt);
+
 export default router;

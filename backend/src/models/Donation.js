@@ -1,5 +1,4 @@
 // src/models/Donation.js
-//intent, totals, final status
 import mongoose from "mongoose";
 import Campaign from "./Campaign.js"; // used to update campaign.amountRaised on completion (optional)
 const { Schema } = mongoose;
@@ -9,7 +8,6 @@ const { Schema } = mongoose;
  *
  * - Stores both fiat (Decimal128) and crypto (sats as string to avoid JS integer overflow)
  * - Tracks payment provider info, idempotency keys, processor responses for reconciliation
- * - Sparse unique indexes for tx hashes / payment refs (only enforced when present)
  * - Post-save hook optionally increments Campaign.amountRaised when status transitions to COMPLETED
  */
 
@@ -20,11 +18,10 @@ const DonationSchema = new Schema({
   campaignId: { type: Schema.Types.ObjectId, ref: "Campaign", index: true },
 
   // ---- Amounts ----
-  // Always store a fiat value for bookkeeping (donor-facing amount).
   amountFiat: { type: Schema.Types.Decimal128, required: true },
   currency: { type: String, required: true }, // e.g. "KES", "USD"
 
-  // On-chain / crypto specifics (store sats as string to avoid overflow)
+  // On-chain / crypto specifics
   amountSats: { type: String, default: null }, // e.g. "12345" sats
   network: { type: String, default: null },    // 'bitcoin', 'lightning', 'ethereum', etc.
 
@@ -32,20 +29,14 @@ const DonationSchema = new Schema({
   paymentMethod: {
     type: String,
     required: true,
-    enum: ["MPESA", "BTC_ONCHAIN", "BTC_LIGHTNING"],
+    enum: ["mpesa", "onchain", "lightning"],
     index: true
   },
 
-  //provider: { type: String, default: null },     // e.g., 'mpesa', 'stripe', 'opennode'
-  paymentReference: { type: String }, // provider reference (Mpesa ref, bank ref)
+  paymentReference: { type: String }, // provider reference (Mpesa ref, txHash)
   externalId: { type: String },       // provider-side ID (for idempotency)
-  //transactionHash: { type: String },  // on-chain tx hash if available
-  ///confirmations: { type: Number, default: 0 },
 
-  // Processor raw response (webhook payload etc.) - helpful for troubleshooting/reconciliation
-  //processorResponse: { type: Schema.Types.Mixed },
-
-  // Payer info (optional, convenient snapshot at time of donation)
+  // Payer info (optional snapshot at time of donation)
   payer: {
     name: String,
     email: String,
@@ -53,9 +44,9 @@ const DonationSchema = new Schema({
   },
 
   // Fees & conversions
-  fees: { type: Schema.Types.Decimal128, default: 0 },          // fees charged
-  exchangeRate: { type: Schema.Types.Decimal128, default: 1 }, // rate used when converting BTC→fiat etc.
-  amountBase: { type: Schema.Types.Decimal128, default: null },// normalized base amount (optional)
+  fees: { type: Schema.Types.Decimal128, default: 0 },
+  exchangeRate: { type: Schema.Types.Decimal128, default: 1 },
+  amountBase: { type: Schema.Types.Decimal128, default: null },
 
   // ---- Life-cycle & bookkeeping ----
   status: {
@@ -65,18 +56,15 @@ const DonationSchema = new Schema({
     index: true
   },
 
-  /*This field guarantees Campaign.amountRaised is incremented exactly once, even if:
-  Webhooks retry, Saves happen twice, Server restarts mid-flow */
   appliedToCampaign: {
     type: Boolean,
     default: false,
     index: true
   },
 
-  // Use idempotencyKey to prevent double-credit on retries (webhooks)
   idempotencyKey: { type: String, sparse: true, index: true },
 
-  // Optional receipt URL, notes, audit fields
+  // Optional receipt URL, notes
   receiptUrl: { type: String, default: null },
   notes: { type: String, default: null },
 
@@ -85,20 +73,20 @@ const DonationSchema = new Schema({
 });
 
 /**
- * Indexes
- * - transactionHash, externalId, paymentReference are sparse so uniqueness isn't required when absent.
- */
-DonationSchema.index({ transactionHash: 1 }, { unique: true, sparse: true });
-DonationSchema.index({ provider: 1, externalId: 1 }, { unique: true, sparse: true });
-DonationSchema.index({ provider: 1, paymentReference: 1 }, { unique: true, sparse: true });
-
-/**
  * Pre-save: update updatedAt
  */
-DonationSchema.pre("save", function (next) {
+/*DonationSchema.pre("save", function (next) {
   this.updatedAt = new Date();
   next();
+});*/
+DonationSchema.pre("save", async function () {
+  if (!this.reference) {
+    this.reference = `DON-${Date.now()}-${Math.floor(
+      Math.random() * 1000
+    )}`;
+  }
 });
+
 
 /**
  * Helper: convert Decimal128 fields to Number for JSON responses
@@ -108,11 +96,7 @@ DonationSchema.methods.toClient = function () {
 
   const convertDecimal = (d) => {
     if (d === null || d === undefined) return d;
-    try {
-      return parseFloat(d.toString());
-    } catch (e) {
-      return d;
-    }
+    try { return parseFloat(d.toString()); } catch { return d; }
   };
 
   obj.amountFiat = convertDecimal(obj.amountFiat);
@@ -120,78 +104,42 @@ DonationSchema.methods.toClient = function () {
   obj.exchangeRate = convertDecimal(obj.exchangeRate);
   obj.amountBase = convertDecimal(obj.amountBase);
 
-  // amountSats kept as string (safe)
+  // amountSats kept as string
   return obj;
 };
 
 /**
- * Post-save hook: when donation status transitions to COMPLETED we atomically increment Campaign.amountRaised.
- *
- * Important:
- * - This attempts a transaction using mongoose sessions if available.
- * - If your MongoDB deployment / driver supports transactions (replica set), this will update both documents atomically.
- * - If transactions are unavailable, we fall back to a best-effort single update.
- *
- * NOTE: to avoid double-crediting ensure you:
- *  - create Donation with status PENDING first
- *  - only mark as COMPLETED in a webhook/controlled path that checks idempotency/externalId/paymentReference
- * 
- * 2️⃣ Replace your current post-save logic
-Your existing post-save hook does not know if the increment already happened. We’ll replace it with a transaction-safe + atomic guard.
-
-3️⃣ Safe Transaction Logic (Correct Pattern)
-🔒 Rules
-We only increment the campaign if ALL are true:
-status === "COMPLETED"
-campaignId exists
-appliedToCampaign === false
-
-And we do both operations inside one transaction:
-Increment Campaign.amountRaised
-Mark Donation.appliedToCampaign = true
+ * Post-save hook: increment Campaign.amountRaised if COMPLETED
  */
 DonationSchema.post("save", async function (doc) {
-  // Only proceed if donation is completed and not yet applied
-  if (
-    doc.status !== "COMPLETED" ||
-    !doc.campaignId ||
-    doc.appliedToCampaign === true
-  ) {
-    return;
-  }
+  if (doc.status !== "COMPLETED" || !doc.campaignId || doc.appliedToCampaign === true) return;
 
   const session = await mongoose.startSession();
-
   try {
     session.startTransaction();
 
-    // Re-fetch inside transaction with a lock-like guarantee
     const freshDonation = await mongoose.model("Donation").findOne(
       { _id: doc._id, appliedToCampaign: false },
       null,
       { session }
     );
 
-    // Another webhook/save may have already applied it
     if (!freshDonation) {
       await session.commitTransaction();
       await session.endSession();
       return;
     }
 
-    // Determine increment amount
     const incrementValue = freshDonation.amountBase
       ? mongoose.Types.Decimal128.fromString(freshDonation.amountBase.toString())
       : mongoose.Types.Decimal128.fromString(freshDonation.amountFiat.toString());
 
-    // Increment campaign
     await mongoose.model("Campaign").findByIdAndUpdate(
       freshDonation.campaignId,
       { $inc: { amountRaised: incrementValue } },
       { session }
     );
 
-    // Mark donation as applied
     freshDonation.appliedToCampaign = true;
     await freshDonation.save({ session });
 
@@ -199,24 +147,9 @@ DonationSchema.post("save", async function (doc) {
   } catch (err) {
     await session.abortTransaction();
     console.error("Failed to apply donation to campaign:", err);
-    // In a post-hook, throwing usually crashes the flow or is logged.
-    // If we want to ensure the save succeeds even if this fails (so we don't rollback the donation),
-    // we might catch it and just log it.
-    // BUT the requirement is atomic update. 
-    // Wait, this is a POST hook. The donation is ALREADY saved (outside this transaction).
-    // If this fails, the donation logic (status=COMPLETED) remains, but campaign isn't updated.
-    // This creates inconsistency.
-    // IDEALLY, this logic should be in the controller or a service method, not a hook.
-    // But fixing that is a larger refactor.
-    // For now, logging error is safer than crashing if we can't rollback the main donation save.
-    // However, if we throw here, does it bubble up to the `Donation.create` call?
-    // In Mongoose 5+, async post hooks errors usually bubble up.
-    // If we want to alert the user/system, we should probably throw.
-    throw err;
   } finally {
     await session.endSession();
   }
 });
-
 
 export default mongoose.model("Donation", DonationSchema);

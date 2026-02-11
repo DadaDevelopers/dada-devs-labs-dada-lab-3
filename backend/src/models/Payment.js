@@ -11,7 +11,7 @@ const paymentSchema = new mongoose.Schema(
 
     provider: {
       type: String,
-      enum: ["MPESA", "BITCOIN", "LIGHTNING"],
+      //enum: ["MPESA", "BITCOIN", "LIGHTNING"],
       required: true
     },
 
@@ -62,7 +62,9 @@ const paymentSchema = new mongoose.Schema(
   lightning: {
     invoice: String,
     paymentHash: String,
-    settled: Boolean
+    //settled: Boolean
+    settled: { type: Boolean, default: false },
+    expiresAt: Date
   },
     
     processorResponse: Object, // raw payload
@@ -73,7 +75,16 @@ const paymentSchema = new mongoose.Schema(
 
 // After schema definition, before export - Adding a compound unique sparse index for provider + externalId to prevent duplicates
 /*Rationale: externalId alone may not be globally unique across providers. Compound index prevents duplicate Payments from the same provider. */
-paymentSchema.index({ provider: 1, externalId: 1 }, { unique: true, sparse: true });
+//paymentSchema.index({ provider: 1, externalId: 1 }, { unique: true, sparse: true });
+
+paymentSchema.index(
+  { provider: 1, externalId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { externalId: { $exists: true, $ne: null } }
+  }
+);
+
 
 export default mongoose.model("Payment", paymentSchema);
 

@@ -239,31 +239,7 @@ const DonationFlow = () => {
     return true;
   };
 
-  // const handleMpesaPayment = async () => {
-  //   if (!requireAuth() || !requireValidCampaign()) return;
-  //   setPaymentStatus("sending");
-  //   const payload = {
-  //     campaignId: campaign.id,
-  //     amountFiat: donationAmountUSD,
-  //     currency: "USD",
-  //     paymentMethod: "MPESA" as any,
-  //     payer: {
-  //       email: formData.donorEmail,
-  //       name: formData.donorName,
-  //       phoneNumber: formData.donorPhone,
-  //     },
-  //   };
-
-  //   const res: any = await createDonation(payload as any);
-
-  //   if (res && res.status === "pending") {
-  //     setDonation(res);
-  //     setCurrentStep("processing");
-  //     setPaymentStatus("waiting");
-  //   } else {
-  //     setPaymentStatus("failed");
-  //   }
-  // };
+  
 
   const handleLightningPayment = async () => {
     if (!requireAuth() || !requireValidCampaign()) return;
