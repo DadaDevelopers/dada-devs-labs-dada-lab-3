@@ -10,7 +10,7 @@ export default function CoreValues() {
   ];
 
   return (
-    <section id="values" className="py-12">
+    <section id="values" className="py-8">
       <h2 className="text-3xl font-bold">Why DirectAid</h2>
       <p className="mt-3 max-w-2xl text-slate-300">A modern aid rail built with the same rigor as global fintech infrastructure.</p>
       <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">

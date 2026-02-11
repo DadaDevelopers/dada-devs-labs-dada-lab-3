@@ -12,7 +12,7 @@ export default function ProviderOnboarding() {
     navigate("/signup?role=provider"); 
   }
   return (
-    <section id="provider" className="py-8 lg:py-12 relative overflow-hidden">
+    <section id="provider" className="py-8 lg:py-8 relative overflow-hidden">
       {/* Background Architectural Element */}
       <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-yellow-500/5 to-transparent pointer-events-none" />
       
