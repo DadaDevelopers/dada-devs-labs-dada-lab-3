@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 const PayoutMethodSchema = new Schema({
   type: {
     type: String,
-    enum: ["LIGHTNING", "BANK", "MPESA", "STRIPE"],
+    enum: ["LIGHTNING", "BANK", "MPESA", "STRIPE", "BITCOIN"],
     required: true
   },
   details: { type: Schema.Types.Mixed }, // method-specific, tokenized

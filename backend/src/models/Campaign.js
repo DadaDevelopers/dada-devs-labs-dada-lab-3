@@ -60,7 +60,16 @@ const CampaignSchema = new Schema(
     category: { type: String, index: true },
 
     // optional metadata
-    metadata: { type: Schema.Types.Mixed, default: {} }
+    metadata: { type: Schema.Types.Mixed, default: {} },
+
+    // campaign reports (array of subdocuments)
+    reports: [
+      {
+        report: { type: String, required: true },
+        submittedBy: { type: Schema.Types.ObjectId, ref: "User" },
+        submittedAt: { type: Date, default: Date.now }
+      }
+    ]
   },
   { timestamps: true } // createdAt, updatedAt auto
 );

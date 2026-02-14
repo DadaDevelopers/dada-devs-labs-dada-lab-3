@@ -2,7 +2,7 @@
 import express from "express";
 import { createDonation, getDonation, getDonationsByCampaign, getDonationsByUser, listDonations } from "../controllers/donationController.js";
 import { mpesaCallbackController } from "../controllers/mpesaCallbackController.js";
-import { stripeWebhookController } from "../controllers/stripeWebhookController.js";
+// import { stripeWebhookController } from "../controllers/stripeWebhookController.js";
 import { protect, authorize } from "../middlewares/auth.js";
 import bodyParser from "body-parser";
 
@@ -22,7 +22,6 @@ router.get("/", protect, authorize("ADMIN"), listDonations);
 // MPESA webhook (Daraja will POST JSON)
 router.post("/webhooks/mpesa", express.json(), mpesaCallbackController);
 
-// Stripe webhook: must use raw body for signature verification
-router.post("/webhooks/stripe", bodyParser.raw({ type: "application/json" }), stripeWebhookController);
+// Stripe webhook removed
 
 export default router;

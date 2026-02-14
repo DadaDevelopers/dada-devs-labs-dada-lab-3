@@ -214,25 +214,44 @@ export const updateProvider = async (req, res, next) => {
 // --------------------------
 export const addPayoutMethod = async (req, res, next) => {
   try {
-    const { method, mpesaPhone, bankName, accountName, accountNumber } = req.body;
+    const { type, nodePubKey, lnurlWithdraw, lnAddress, currency, payoutName, address } = req.body;
 
     const provider = await Provider.findOne({ userId: req.user.userId });
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }
 
-    if (method === "MPESA" && !mpesaPhone) {
-      return res.status(400).json({ message: "Mpesa phone required" });
+    let payoutMethod = {};
+
+  if (type === "LIGHTNING") {
+      if (!nodePubKey) {
+        return res.status(400).json({ message: "Lightning node public key required" });
+      }
+
+      payoutMethod = {
+        type: "LIGHTNING",
+        nodePubKey,
+        lnurlWithdraw,
+        lnAddress,
+        currency,
+        payoutName
+      };
+    } else if (type === "BITCOIN") {
+      if (!address) {
+        return res.status(400).json({ message: "Bitcoin address required" });
+      }
+
+      payoutMethod = {
+        type: "BITCOIN",
+        address,
+        currency,
+        payoutName
+      };
+    } else {
+      return res.status(400).json({ message: "Unsupported payout method" });
     }
 
-    provider.payoutMethods.push({
-      method,
-      mpesaPhone,
-      bankName,
-      accountName,
-      accountNumber
-    });
-
+    provider.payoutMethods.push(payoutMethod);
     await provider.save();
 
     res.json({ provider: provider.toClient() });
@@ -240,7 +259,6 @@ export const addPayoutMethod = async (req, res, next) => {
     next(err);
   }
 };
-
 // --------------------------
 // Request payout (mock)
 // --------------------------
@@ -257,7 +275,7 @@ export const requestPayout = async (req, res, next) => {
       return res.status(404).json({ message: "Provider not found" });
     }
 
-    if (provider.kycStatus !== "APPROVED") {
+    if (!provider.kyc || provider.kyc.status !== "APPROVED") {
       return res.status(403).json({ message: "KYC not approved" });
     }
 

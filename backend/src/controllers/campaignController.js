@@ -264,3 +264,35 @@ export const deleteCampaign = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Beneficiary confirms campaign completion
+ */
+export const confirmCampaignCompletion = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const campaign = await Campaign.findById(id);
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+    // Only beneficiary can confirm
+    if (!campaign.beneficiaryId.equals(req.user.userId)) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+    if (campaign.status !== "FUNDED" && campaign.status !== "ACTIVE") {
+      return res.status(400).json({ message: "Campaign is not eligible for completion" });
+    }
+    campaign.status = "COMPLETED";
+    await campaign.save();
+    await logActivity({
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      actionType: "CONFIRM_CAMPAIGN_COMPLETION",
+      entityType: "Campaign",
+      entityId: campaign._id,
+      description: `Campaign marked as completed by beneficiary`,
+      req
+    });
+    res.json({ message: "Campaign marked as completed", campaign: formatCampaign(campaign) });
+  } catch (err) {
+    next(err);
+  }
+};
