@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDataService } from "../services/mockData";
 import api from "../services/api";
+import { CampaignService } from "../services/apiServices";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
@@ -22,22 +22,63 @@ import {
   Bell,
   Lock,
 } from "lucide-react";
+import { getBeneficiaryDisplayName } from "../lib/utils";
 
 type Step = "select-campaign" | "confirm-withdrawal" | "processing" | "success";
+
+function campaignAmountRaised(c: any): number {
+  const v = c?.amountRaised;
+  if (v == null) return 0;
+  const n = typeof v === "string" ? parseFloat(v) : Number(v);
+  return n > 0 && n < 1000 ? n * 100 : n;
+}
 
 const ProviderWithdrawal = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const campaignId = searchParams.get("campaignId");
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
-  const provider = mockDataService.getProviderUser();
-  const campaigns = mockDataService.getCampaigns();
+  const [provider, setProvider] = useState<any>(null);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get the campaign if passed via URL
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [campRes, provRes] = await Promise.all([
+          CampaignService.getAll(),
+          api.get("/providers/me"),
+        ]);
+        const list = (campRes as any)?.campaigns ?? campRes ?? [];
+        setCampaigns(Array.isArray(list) ? list : []);
+        const p = (provRes as any)?.provider ?? provRes;
+        setProvider(p || null);
+      } catch (e) {
+        console.error("Failed to load provider/campaigns", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const userId = (user as any)?.id ?? (user as any)?._id ?? (provider as any)?.userId;
+  const eligibleCampaigns = campaigns.filter(
+    (c) =>
+      (String((c as any).providerId?._id ?? (c as any).providerId) === userId ||
+        String((c as any).providerId) === userId) &&
+      (c as any).providerAccepted === true
+  );
+
   const selectedCampaignId = campaignId || null;
   const selectedCampaign = selectedCampaignId
-    ? campaigns.find((c) => c.id === selectedCampaignId)
+    ? eligibleCampaigns.find(
+        (c) =>
+          String((c as any)._id ?? (c as any).id) === selectedCampaignId
+      ) ?? campaigns.find(
+        (c) => String((c as any)._id ?? (c as any).id) === selectedCampaignId
+      )
     : null;
 
   const [currentStep, setCurrentStep] = useState<Step>(
@@ -48,22 +89,21 @@ const ProviderWithdrawal = () => {
   );
   const [withdrawAmount, setWithdrawAmount] = useState<string>(
     selectedCampaign
-      ? `${(selectedCampaign.amountRaised / 100).toFixed(2)}`
+      ? `${(campaignAmountRaised(selectedCampaign) / 100).toFixed(2)}`
       : ""
   );
-  const [selectedPayoutId, setSelectedPayoutId] = useState<string | null>(
-    provider.payoutMethods?.find((p) => p.isDefault)?.id ||
-      provider.payoutMethods?.[0]?.id ||
-      null
-  );
+  const [selectedPayoutId, setSelectedPayoutId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get eligible campaigns (dual confirmed + invoice uploaded)
-  const eligibleCampaigns = campaigns.filter(
-    (c) =>
-      c.providerId === provider.id && c.confirmationStatus === "both_confirmed"
-  );
+  const payoutMethods = (provider?.payoutMethods ?? []) as { id?: string; isDefault?: boolean; type?: string; details?: Record<string, string> }[];
+  useEffect(() => {
+    const methods = provider?.payoutMethods ?? [];
+    if (methods.length > 0) {
+      const defaultId = methods.find((p: any) => p.isDefault)?.id ?? methods[0]?.id ?? null;
+      setSelectedPayoutId((prev) => prev ?? defaultId ?? null);
+    }
+  }, [provider]);
 
   const navItems = [
     {
@@ -102,7 +142,7 @@ const ProviderWithdrawal = () => {
 
   const handleCampaignSelect = (campaign: any) => {
     setChosenCampaign(campaign);
-    setWithdrawAmount(`${(campaign.amountRaised / 100).toFixed(2)}`);
+    setWithdrawAmount(`${(campaignAmountRaised(campaign) / 100).toFixed(2)}`);
     setError(null);
     setCurrentStep("confirm-withdrawal");
   };
@@ -122,7 +162,7 @@ const ProviderWithdrawal = () => {
       return;
     }
 
-    if (amount > chosenCampaign.amountRaised / 100) {
+    if (amount > campaignAmountRaised(chosenCampaign) / 100) {
       setError("Amount exceeds available funds");
       return;
     }
@@ -134,22 +174,15 @@ const ProviderWithdrawal = () => {
 
     setIsProcessing(true);
     try {
-      // Comment out API call for demo
-      // const cents = Math.round(amount * 100);
-      // await api.post("/payouts", {
-      //   providerId: provider.id,
-      //   amount: cents,
-      //   currency: "USD",
-      //   campaignId: chosenCampaign.id,
-      //   payoutMethodId: selectedPayoutId,
-      // });
-
-      // Simulate processing delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
+      const cId = (chosenCampaign as any)._id || chosenCampaign.id;
+      await api.post("/providers/me/withdraw", {
+        amount,
+        currency: "USD",
+        campaignId: cId || undefined,
+      });
       setCurrentStep("success");
     } catch (err: any) {
-      setError("Failed to process withdrawal");
+      setError(err?.message || err?.response?.data?.message || "Failed to process withdrawal");
     } finally {
       setIsProcessing(false);
     }
@@ -166,10 +199,32 @@ const ProviderWithdrawal = () => {
     setCurrentStep("select-campaign");
   };
 
+  const providerName =
+    (provider as any)?.businessName ??
+    (user as any)?.name ??
+    (user as any)?.firstName
+      ? `${(user as any).firstName ?? ""} ${(user as any).lastName ?? ""}`.trim()
+      : (user as any)?.email ??
+    "Provider";
+
+  if (loading) {
+    return (
+      <DashboardLayout
+        navItems={navItems}
+        userName={providerName}
+        userRole="Aid Provider"
+        settingsNavItems={settingsNavItems}
+        onLogout={async () => { await logout(); navigate("/"); }}
+      >
+        <div className="p-10 text-center">Loading...</div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       navItems={navItems}
-      userName={provider.name}
+      userName={providerName}
       userRole="Aid Provider"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -191,10 +246,15 @@ const ProviderWithdrawal = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {eligibleCampaigns.length > 0 ? (
-                eligibleCampaigns.map((campaign) => (
+                eligibleCampaigns.map((campaign) => {
+                  const cId = (campaign as any)._id ?? (campaign as any).id;
+                  const raised = campaignAmountRaised(campaign);
+                  const target = Number((campaign as any).targetAmount ?? 1) || 1;
+                  const donorCount = (campaign as any).donorCount ?? 0;
+                  return (
                   <Card
-                    key={campaign.id}
-                    className="p-4 sm:p-6 card-elevated cursor-pointer hover:border-primary transition"
+                    key={cId}
+                    className="p-4 sm:p-6 card-elevated cursor-pointer hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)] transition-all duration-200"
                     onClick={() => handleCampaignSelect(campaign)}
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -205,7 +265,7 @@ const ProviderWithdrawal = () => {
                         <p className="text-sm text-muted-foreground mb-3">
                           Beneficiary:{" "}
                           <span className="font-semibold">
-                            {campaign.beneficiary?.name}
+                            {getBeneficiaryDisplayName(campaign)}
                           </span>
                         </p>
                       </div>
@@ -218,23 +278,19 @@ const ProviderWithdrawal = () => {
                           Amount Available
                         </span>
                         <span className="font-bold text-lg">
-                          ${(campaign.amountRaised / 100).toFixed(2)}
+                          ${(raised / 100).toFixed(2)}
                         </span>
                       </div>
                       <div className="w-full bg-secondary/50 rounded-full h-2">
                         <div
                           className="h-full bg-linear-to-r from-primary to-purple-500 rounded-full"
                           style={{
-                            width: `${Math.min(
-                              (campaign.amountRaised / campaign.targetAmount) *
-                                100,
-                              100
-                            )}%`,
+                            width: `${Math.min((raised / (target * 100 || 1)) * 100, 100)}%`,
                           }}
                         ></div>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {campaign.donorCount} donors
+                        {donorCount} donors
                       </p>
                     </div>
 
@@ -248,7 +304,8 @@ const ProviderWithdrawal = () => {
                       Withdraw Funds
                     </Button>
                   </Card>
-                ))
+                  );
+                })
               ) : (
                 <div className="col-span-full">
                   <Card className="p-8 card-elevated text-center">
@@ -285,7 +342,7 @@ const ProviderWithdrawal = () => {
                 <p className="text-sm text-muted-foreground mb-2">Campaign</p>
                 <h3 className="font-bold text-lg">{chosenCampaign.title}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Beneficiary: {chosenCampaign.beneficiary?.name}
+                  Beneficiary: {getBeneficiaryDisplayName(chosenCampaign)}
                 </p>
               </div>
 
@@ -305,14 +362,14 @@ const ProviderWithdrawal = () => {
                         setError(null);
                       }}
                       min="0"
-                      max={(chosenCampaign.amountRaised / 100).toFixed(2)}
+                      max={(campaignAmountRaised(chosenCampaign) / 100).toFixed(2)}
                       className="text-lg font-semibold"
                     />
                     <Button
                       variant="outline"
                       onClick={() =>
                         setWithdrawAmount(
-                          `${(chosenCampaign.amountRaised / 100).toFixed(2)}`
+                          `${(campaignAmountRaised(chosenCampaign) / 100).toFixed(2)}`
                         )
                       }
                       className="rounded-lg"
@@ -321,7 +378,7 @@ const ProviderWithdrawal = () => {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Available: ${(chosenCampaign.amountRaised / 100).toFixed(2)}
+                    Available: ${(campaignAmountRaised(chosenCampaign) / 100).toFixed(2)}
                   </p>
                 </div>
 
@@ -335,15 +392,20 @@ const ProviderWithdrawal = () => {
                     onChange={(e) => setSelectedPayoutId(e.target.value)}
                   >
                     <option value="">Select a payout method</option>
-                    {(provider.payoutMethods || []).map((pm) => (
-                      <option key={pm.id} value={pm.id}>
-                        {pm.type.toUpperCase()} -{" "}
-                        {pm.details?.bankName ||
-                          pm.details?.provider ||
-                          pm.details?.walletAddress ||
-                          pm.id}
-                      </option>
-                    ))}
+                    {payoutMethods.map((pm) => {
+                      const pid = (pm as any).id ?? (pm as any)._id ?? "";
+                      return (
+                        <option key={pid} value={pid}>
+                          {((pm as any).type ?? "payout").toString().toUpperCase()} -{" "}
+                          {(pm as any).details?.bankName ||
+                            (pm as any).details?.provider ||
+                            (pm as any).details?.walletAddress ||
+                            (pm as any).bankName ||
+                            (pm as any).accountName ||
+                            pid}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>

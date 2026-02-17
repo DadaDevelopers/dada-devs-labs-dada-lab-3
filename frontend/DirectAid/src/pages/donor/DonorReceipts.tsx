@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { mockDataService } from "../../services/mockData";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
@@ -16,7 +15,6 @@ import {
   Download,
   Calendar,
   FileText,
-  Filter,
   User,
   CreditCard,
   Bell,
@@ -27,15 +25,16 @@ import {
 const DonorReceipts = () => {
   const navigate = useNavigate();
   const { campaigns, donations } = useApp();
-  const { logout } = useAuth();
-  const donor = mockDataService.getDonorUser();
-  const metrics = mockDataService.getDonorMetrics();
-  
+  const { logout, user } = useAuth();
+  const donor = user || { name: "Guest", id: "guest" };
+  // const metrics = mockDataService.getDonorMetrics(); // unused
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedYear, setSelectedYear] = useState("2024");
 
-  // Get donations for this donor with receipts
-  const donorDonations = donations.filter((d) => d.donorId === donor.id && d.receiptUrl);
+  // Get donations for this donor (Context already filters for logged in user usually)
+  // And ensure status is completed/confirmed for receipts
+  const donorDonations = donations.filter((d) => d.status === 'completed' || d.status === 'locked');
 
   const filteredReceipts = donorDonations.filter((donation) => {
     const campaign = campaigns.find((c) => c.id === donation.campaignId);
@@ -45,6 +44,63 @@ const DonorReceipts = () => {
   });
 
   const totalForYear = filteredReceipts.reduce((sum, donation) => sum + donation.amount, 0);
+
+  const handleDownloadReceipt = (donation: any) => {
+    const campaign = campaigns.find((c) => c.id === donation.campaignId);
+    const receiptContent = `
+═══════════════════════════════════════════════════════════
+                    DONATION RECEIPT
+═══════════════════════════════════════════════════════════
+
+Thank you for your generous donation!
+
+───────────────────────────────────────────────────────────
+DONATION DETAILS
+───────────────────────────────────────────────────────────
+
+Donation ID:        ${donation?.id || 'N/A'}
+Transaction Hash:   ${donation?.transactionHash || 'Pending'}
+Date & Time:        ${new Date(donation.createdAt).toLocaleString()}
+
+───────────────────────────────────────────────────────────
+CAMPAIGN INFORMATION
+───────────────────────────────────────────────────────────
+
+Campaign:           ${campaign?.title || 'N/A'}
+Category:           ${campaign?.category || 'N/A'}
+Location:           ${campaign?.location || 'N/A'}
+
+───────────────────────────────────────────────────────────
+PAYMENT DETAILS
+───────────────────────────────────────────────────────────
+
+Amount:             $${(donation.amount / 100).toFixed(2)} USD
+Payment Method:     ${donation.paymentMethod}
+
+───────────────────────────────────────────────────────────
+DONOR INFORMATION
+───────────────────────────────────────────────────────────
+
+Name:               ${user?.name || 'N/A'}
+Email:              ${user?.email || 'N/A'}
+
+───────────────────────────────────────────────────────────
+
+This receipt confirms your donation has been successfully
+processed and is now awaiting dual confirmation.
+
+Generated on ${new Date().toLocaleString()}
+═══════════════════════════════════════════════════════════
+    `.trim();
+
+    const blob = new Blob([receiptContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `donation-receipt-${donation.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const navItems = [
     {
@@ -77,9 +133,9 @@ const DonorReceipts = () => {
   ];
 
   return (
-    <DashboardLayout 
-      navItems={navItems} 
-      userName={donor.name} 
+    <DashboardLayout
+      navItems={navItems}
+      userName={donor.name || "Guest"}
       userRole="Donor"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -109,23 +165,23 @@ const DonorReceipts = () => {
         </div>
 
         {/* Tax Summary */}
-        <Card className="p-4 sm:p-6 card-elevated">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-              <p className="text-sm text-green-700 mb-2">{selectedYear} Tax Year</p>
-              <p className="text-2xl font-bold text-green-900 mb-1">
+        <Card className="p-4 sm:p-6 card-elevated" style={{ backgroundColor: "var(--color-secondary-bg)", borderColor: "rgba(0, 255, 255, 0.2)" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 ">
+            <div className="p-4 rounded-lg border" style={{ backgroundColor: "rgba(34, 197, 94, 0.1)", borderColor: "rgba(34, 197, 94, 0.2)" }}>
+              <p className="text-sm font-medium mb-2" style={{ color: "rgba(74, 222, 128, 0.9)" }}>{selectedYear} Tax Year</p>
+              <p className="text-2xl font-bold mb-1" style={{ color: "#ffffff" }}>
                 ${(totalForYear / 100).toFixed(0)}
               </p>
-              <p className="text-xs text-green-600">
+              <p className="text-xs opacity-70" style={{ color: "rgba(74, 222, 128, 0.8)" }}>
                 Total tax-deductible donations
               </p>
             </div>
-            <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
-              <p className="text-sm text-blue-700 mb-2">Receipts Available</p>
-              <p className="text-2xl font-bold text-blue-900 mb-1">
+            <div className="p-4 rounded-lg border" style={{ backgroundColor: "rgba(59, 130, 246, 0.1)", borderColor: "rgba(59, 130, 246, 0.2)" }}>
+              <p className="text-sm font-medium mb-2" style={{ color: "rgba(96, 165, 250, 0.9)" }}>Receipts Available</p>
+              <p className="text-2xl font-bold mb-1" style={{ color: "#ffffff" }}>
                 {filteredReceipts.length}
               </p>
-              <p className="text-xs text-blue-600">
+              <p className="text-xs opacity-70" style={{ color: "rgba(96, 165, 250, 0.8)" }}>
                 For {selectedYear}
               </p>
             </div>
@@ -165,10 +221,10 @@ const DonorReceipts = () => {
         {/* Receipts List */}
         <div className="space-y-4">
           {filteredReceipts.length > 0 ? (
-            filteredReceipts.map((donation) => {
+            filteredReceipts.map((donation, index) => {
               const campaign = campaigns.find((c) => c.id === donation.campaignId);
               return (
-                <Card key={donation.id} className="p-4 sm:p-6 card-elevated">
+                <Card key={donation.id || index} className="p-4 sm:p-6 card-elevated">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-3">
                       <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
@@ -179,7 +235,7 @@ const DonorReceipts = () => {
                           {campaign?.title || "Campaign"}
                         </h3>
                         <p className="text-sm text-muted-foreground mb-2">
-                          Receipt #{donation.id.slice(-8).toUpperCase()}
+                          Receipt #{donation.id ? donation.id.slice(-8).toUpperCase() : 'N/A'}
                         </p>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -208,6 +264,7 @@ const DonorReceipts = () => {
                         variant="outline"
                         size="sm"
                         className="rounded-full gap-2"
+                        onClick={() => handleDownloadReceipt(donation)}
                       >
                         <Download className="w-4 h-4" />
                         Download
@@ -222,7 +279,7 @@ const DonorReceipts = () => {
               <Receipt className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="font-semibold text-lg mb-2">No receipts found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm 
+                {searchTerm
                   ? "Try adjusting your search"
                   : `No tax receipts available for ${selectedYear}`
                 }

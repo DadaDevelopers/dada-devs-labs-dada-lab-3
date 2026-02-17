@@ -1,93 +1,67 @@
+// src/contexts/AppContext.tsx
 import React, {
   createContext,
   useContext,
   useState,
   type ReactNode,
+  useEffect,
 } from "react";
 import type {
   User,
   Campaign,
   Donation,
-  Invoice,
-  Provider,
-  Beneficiary,
   Notification,
 } from "../types";
 import {
-  mockDataService,
   mockProviderUser,
   mockBeneficiaryUser,
   mockDonorUser,
+  mockDataService,
 } from "../services/mockData";
+import { donationService } from "../services/donationService";
+import { campaignService } from "../services/campaignService";
 
 // ============================================================================
 // CONTEXT TYPE DEFINITION
 // ============================================================================
 
 interface AppContextType {
-  // Authentication
   currentUser: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string, role: string) => Promise<void>;
   logout: () => void;
-
-  // Campaigns
   campaigns: Campaign[];
   selectedCampaign: Campaign | null;
-  selectCampaign: (campaignId: string) => void;
+  selectCampaign: (campaignId: string) => Promise<void>;
   createCampaign: (campaign: Campaign) => void;
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
-
-  // Donations
+  updateCampaignStatus: (campaignId: string, status: "approved" | "rejected" | "flagged") => void;
   donations: Donation[];
-  createDonation: (donation: Donation) => void;
+  createDonation: (donation: Partial<Donation>) => Promise<Donation | undefined>;
   updateDonation: (id: string, updates: Partial<Donation>) => void;
-
-  // Notifications
   notifications: Notification[];
   markNotificationAsRead: (id: string) => void;
   unreadCount: number;
-
-  // UI State
   isLoading: boolean;
   error: string | null;
   setError: (error: string | null) => void;
 }
 
-// ============================================================================
-// CREATE CONTEXT
-// ============================================================================
-
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-// ============================================================================
-// PROVIDER COMPONENT
-// ============================================================================
 
 interface AppProviderProps {
   children: ReactNode;
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  // Start with no user required - everything is public access for now
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  // Data State
-  const [campaigns, setCampaigns] = useState<Campaign[]>(
-    mockDataService.getCampaigns()
-  );
-  const [donations, setDonations] = useState<Donation[]>(
-    mockDataService.getDonations()
-  );
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [donations, setDonations] = useState<Donation[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>(
     mockDataService.getNotifications()
   );
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(
-    null
-  );
-
-  // UI State
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,10 +74,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setError(null);
 
     try {
-      // Simulate API call delay
       await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Mock authentication based on role
       let user: User;
       switch (role.toLowerCase()) {
         case "provider":
@@ -121,8 +92,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       setCurrentUser(user);
       setIsAuthenticated(true);
-
-      // Store in localStorage for persistence
       localStorage.setItem("currentUser", JSON.stringify(user));
       localStorage.setItem("isAuthenticated", "true");
     } catch (err) {
@@ -146,72 +115,67 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // CAMPAIGN FUNCTIONS
   // ============================================================================
 
-  const selectCampaign = (campaignId: string) => {
-    const campaign = mockDataService.getCampaignById(campaignId);
+  const selectCampaign = async (campaignId: string) => {
+    const campaign = campaigns.find(c => c.id === campaignId || (c as any)._id === campaignId);
     if (campaign) {
       setSelectedCampaign(campaign);
+    } else {
+      try {
+        const fetchedCampaign = await campaignService.getCampaignById(campaignId);
+        setSelectedCampaign(fetchedCampaign);
+      } catch (err) {
+        console.error("Failed to fetch selected campaign", err);
+      }
     }
   };
 
   const createCampaign = (campaign: Campaign) => {
-    setCampaigns([campaign, ...campaigns]);
+    setCampaigns(prev => [campaign, ...prev]);
   };
 
   const updateCampaign = (id: string, updates: Partial<Campaign>) => {
-    setCampaigns(
-      campaigns.map((campaign) =>
-        campaign.id === id
-          ? { ...campaign, ...updates, updatedAt: new Date().toISOString() }
-          : campaign
-      )
-    );
+    setCampaigns(prev => prev.map(c => c._id === id ? { ...c, ...updates } : c));
+  };
 
-    // Update selected campaign if it's the one being updated
-    if (selectedCampaign?.id === id) {
-      setSelectedCampaign((prev) =>
-        prev
-          ? { ...prev, ...updates, updatedAt: new Date().toISOString() }
-          : null
-      );
-    }
+  const updateCampaignStatus = (campaignId: string, status: "approved" | "rejected" | "flagged") => {
+    setCampaigns(prev => prev.map(c => c._id === campaignId ? { ...c, adminStatus: status } : c));
   };
 
   // ============================================================================
   // DONATION FUNCTIONS
   // ============================================================================
 
-  const createDonation = (donation: Donation) => {
-    setDonations([donation, ...donations]);
-
-    // Update campaign amount raised
-    updateCampaign(donation.campaignId, {
-      amountRaised:
-        (campaigns.find((c) => c.id === donation.campaignId)?.amountRaised ||
-          0) + donation.amount,
-    });
+  const createDonation = async (donation: Partial<Donation>) => {
+    try {
+      const newDonation = await donationService.createDonation(donation);
+      setDonations([newDonation, ...donations]);
+      if (donation.campaignId) {
+        const cid = donation.campaignId;
+        updateCampaign(cid, {
+          amountRaised:
+            (campaigns.find((c) => (c as any).id === cid || (c as any)._id === cid)?.amountRaised ||
+              0) + (donation.amount || 0),
+        });
+      }
+      return newDonation;
+    } catch (err) {
+      console.error("Failed to create donation", err);
+      setError("Failed to process donation");
+      return undefined;
+    }
   };
 
   const updateDonation = (id: string, updates: Partial<Donation>) => {
-    setDonations(
-      donations.map((donation) =>
-        donation.id === id ? { ...donation, ...updates } : donation
-      )
+    setDonations(prev =>
+      prev.map(d => ((d as any).id === id || (d as any)._id === id) ? { ...d, ...updates } : d)
     );
   };
-
-  // ============================================================================
-  // NOTIFICATION FUNCTIONS
-  // ============================================================================
 
   const markNotificationAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((notif) =>
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    );
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   // ============================================================================
   // CONTEXT VALUE
@@ -227,6 +191,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     selectCampaign,
     createCampaign,
     updateCampaign,
+    updateCampaignStatus,
     donations,
     createDonation,
     updateDonation,
@@ -238,19 +203,78 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setError,
   };
 
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      setIsLoading(true);
+      try {
+        const data = await campaignService.getAllCampaigns();
+        const normalizedCampaigns = (data || []).map((c: any) => {
+          const target = c.targetAmount != null ? (typeof c.targetAmount === "number" ? c.targetAmount : parseFloat(String(c.targetAmount))) : 0;
+          const raised = c.amountRaised != null ? (typeof c.amountRaised === "number" ? c.amountRaised : parseFloat(String(c.amountRaised))) : 0;
+          const rawDeadline = c.fundraisingDeadline ?? c.metadata?.fundraisingDeadline;
+
+          return {
+            ...c,
+            id: c.id || c._id || c.publicId || "",
+            status: c.status?.toLowerCase() || "active",
+            adminStatus: c.adminStatus?.toLowerCase() || "pending",
+            location: c.location || c.metadata?.location || "Global",
+            category: c.category || "Other",
+            targetAmount: target,
+            amountRaised: raised,
+            fundraisingDeadline: rawDeadline ? new Date(rawDeadline).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // fallback to 30 days if missing
+            beneficiary: {
+              ...c.beneficiary,
+              name: c.beneficiaryId ? `${c.beneficiaryId.firstName} ${c.beneficiaryId.lastName || ""}`.trim() : "Beneficiary"
+            },
+            provider: {
+              ...c.provider,
+              name: c.providerId?.organization ||
+                (c.providerId?.firstName ? `${c.providerId.firstName} ${c.providerId.lastName || ""}`.trim() : "DirectAid Provider")
+            },
+            beneficiaryReceipt: c.beneficiaryReceipt || null
+          };
+        });
+        setCampaigns(normalizedCampaigns);
+      } catch (err) {
+        console.error("Failed to fetch campaigns", err);
+        setError("Failed to load campaigns");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCampaigns();
+  }, []);
+
+  useEffect(() => {
+    const fetchDonations = async () => {
+      try {
+        if (isAuthenticated) {
+          const res = await donationService.getMyDonations();
+          const rawDonations = res.donations || [];
+          const normalizedDonations = rawDonations.map((d: any) => ({
+            ...d,
+            status: d.status?.toLowerCase() || "pending",
+            campaign: d.campaignId ? {
+              ...d.campaignId,
+              title: d.campaignId.title || "Campaign",
+              status: d.campaignId.status?.toLowerCase() || "active"
+            } : d.campaign
+          }));
+          setDonations(normalizedDonations);
+        }
+      } catch (err) {
+        console.error("Failed to fetch donations", err);
+      }
+    };
+    fetchDonations();
+  }, [isAuthenticated]);
+
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
-// ============================================================================
-// CUSTOM HOOK TO USE CONTEXT
-// ============================================================================
-
-export const useApp = (): AppContextType => {
+export const useApp = () => {
   const context = useContext(AppContext);
-
-  if (!context) {
-    throw new Error("useApp must be used within an AppProvider");
-  }
-
+  if (!context) throw new Error("useApp must be used within an AppProvider");
   return context;
 };

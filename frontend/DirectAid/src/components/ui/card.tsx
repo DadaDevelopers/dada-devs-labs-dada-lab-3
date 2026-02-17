@@ -1,17 +1,18 @@
 import * as React from "react";
 import { cn } from "../../lib/utils";
 
+// Depth and card feel: default shadow-md (--shadow-md), smooth transition for hover/focus states
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "rounded-2xl border-0 bg-card text-card-foreground shadow-2xl  ",
+        "rounded-2xl border border-border bg-card text-card-foreground transition-all duration-200",
+        "shadow-[var(--shadow-md)]",
         className
-        
       )}
+      style={{ backgroundColor: "var(--color-secondary-bg)" }}
       {...props}
-      style={{ backgroundColor: 'var(--color-secondary-bg)' }}
     />
   )
 );

@@ -1,3 +1,4 @@
+//Campaign.js
 import mongoose from "mongoose";
 import crypto from "crypto";
 const { Schema } = mongoose;
@@ -8,45 +9,28 @@ function cryptoRandomId() {
 
 const CampaignSchema = new Schema(
   {
-  providerVerificationStatus: { type: String, enum: ["NONE", "REQUESTED", "VERIFIED", "DECLINED", "NEEDS_INFO"], default: "NONE" },
-  providerVerificationRecords: [{ type: Schema.Types.ObjectId, ref: "ProviderVerification" }],
     publicId: { type: String, unique: true, default: cryptoRandomId, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
 
+    providerAccepted: { type: Boolean, default: false },
+    providerAcceptedAt: { type: Date },
+    providerNotes: { type: String },
+    submittedForReview: { type: Boolean, default: false },
+    submittedAt: { type: Date },
+
     // beneficiary/provider point to User model (role-based)
     beneficiaryId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-  providerId: { type: Schema.Types.ObjectId, ref: "Provider", default: null, index: true },
-  providerAccepted: { type: Boolean, default: false },
+    providerId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
 
-  // money fields stored as Decimal128 for precision
-  goalSats: { type: Number },
-  raisedSats: { type: Number, default: 0 },
-  targetAmount: { type: Schema.Types.Decimal128, required: true },
-  amountRaised: { type: Schema.Types.Decimal128, default: mongoose.Types.Decimal128.fromString("0") },
+    // money fields stored as Decimal128 for precision
+    targetAmount: { type: Schema.Types.Decimal128, required: true },
+    amountRaised: { type: Schema.Types.Decimal128, default: mongoose.Types.Decimal128.fromString("0") },
 
     currency: { type: String, required: true, default: "USD" },
 
-  // lifecycle vs admin moderation
-  status: { type: String, enum: ["DRAFT", "ACTIVE", "FUNDED", "COMPLETED"], default: "DRAFT", index: true },
-    // Allocations ledger
-    allocations: [
-      {
-        donationId: { type: Schema.Types.ObjectId, ref: "Donation" },
-        satsAllocated: { type: Number },
-        released: { type: Boolean, default: false },
-        releasedAt: { type: Date }
-      }
-    ],
-    // Donations (Lightning events)
-    donations: [
-      {
-        paymentHash: { type: String },
-        sats: { type: Number },
-        timestamp: { type: Date },
-        settled: { type: Boolean, default: false }
-      }
-    ],
+    // lifecycle vs admin moderation
+    status: { type: String, enum: ["ACTIVE", "COMPLETED", "CANCELLED"], default: "ACTIVE", index: true },
 
     // admin moderation status (what admin sees/sets)
     adminStatus: {
@@ -59,17 +43,45 @@ const CampaignSchema = new Schema(
     // optional category or tags for filtering
     category: { type: String, index: true },
 
-    // optional metadata
-    metadata: { type: Schema.Types.Mixed, default: {} },
+    // confirmation flow: provider confirms; beneficiary confirms receipt of service
+    confirmationStatus: {
+      type: String,
+      enum: ["pending", "provider_confirmed", "both_confirmed", "disputed"],
+      default: "pending",
+      index: true
+    },
+    providerConfirmedAt: { type: Date, default: null },
+    beneficiaryConfirmedAt: { type: Date, default: null },
+    beneficiaryReceipt: {
+      confirmedAt: { type: Date, default: null },
+      note: { type: String, default: "" }
+    },
 
-    // campaign reports (array of subdocuments)
-    reports: [
-      {
-        report: { type: String, required: true },
-        submittedBy: { type: Schema.Types.ObjectId, ref: "User" },
-        submittedAt: { type: Date, default: Date.now }
-      }
-    ]
+    // optional metadata
+    /*metadata: { 
+      type: Schema.Types.Mixed, 
+      default: {} 
+    }*/
+
+    metadata: {
+      location: String,
+      fundraisingDeadline: Date,
+      manualProvider: {
+        name: String,
+        phone: String,
+        email: String
+      },
+      supportingDocUploadIds: [{ type: Schema.Types.ObjectId, ref: "Upload" }]
+    },
+
+    // Campaign.js
+    disbursementStatus: {
+      type: String,
+      enum: ["none", "pending", "completed"],
+      default: "none"
+    },
+    disbursedAt: Date
+
   },
   { timestamps: true } // createdAt, updatedAt auto
 );

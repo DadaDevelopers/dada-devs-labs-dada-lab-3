@@ -103,6 +103,8 @@ export interface AidRequest {
 // CAMPAIGN TYPES
 // ============================================================================
 
+// src/types/index.ts — FINAL CLEAN VERSION
+
 export type CampaignStatus =
   | "draft"
   | "pending_approval"
@@ -111,20 +113,33 @@ export type CampaignStatus =
   | "cancelled"
   | "in_progress"
   | "paused";
+
 export type ConfirmationStatus =
   | "pending"
   | "provider_confirmed"
   | "both_confirmed"
   | "disputed";
 
+export interface BeneficiaryReceipt {
+  confirmedAt: string | null;
+  note: string;
+}
+
 export interface Campaign {
-  id: string;
-  providerId: string;
+  // Mongo-backed APIs commonly return `_id`, but some parts of the frontend/dev mocks use `id`.
+  // Keep both to remain compatible across environments/branches.
+  _id?: string;
+  id?: string;
+
+  // May be a string ID or a populated object depending on endpoint.
+  providerId: string | Partial<Provider>;
   provider: Partial<Provider>;
-  beneficiaryId: string;
+  beneficiaryId: string | Partial<Beneficiary>;
   beneficiary: Partial<Beneficiary>;
   invoiceId: string;
   invoice: Invoice;
+  providerConfirmed: boolean;
+  invoices: Invoice[];
   title: string;
   description: string;
   category: "medical" | "education" | "emergency" | "business" | "other";
@@ -134,10 +149,14 @@ export interface Campaign {
   donorCount: number;
   status: CampaignStatus;
 
-  // Confirmation Model
+  // ADMIN APPROVAL FLOW — NEW
+  adminStatus: "pending" | "approved" | "rejected" | "flagged";
+
+  // CONFIRMATION FLOW (Provider + Beneficiary) — KEEP ONLY ONE
   confirmationStatus: ConfirmationStatus;
   providerConfirmedAt?: string;
   beneficiaryConfirmedAt?: string;
+  beneficiaryReceipt?: BeneficiaryReceipt;
 
   // Proofs & Documents
   proofDocuments: Document[];
@@ -202,7 +221,11 @@ export type DonationStatus =
   | "released"
   | "withdrawn"
   | "refunded"
-  | "disputed";
+  | "disputed"
+  | "completed"
+  | "COMPLETED"
+  | "FAILED"
+  | "PENDING";
 export type PaymentMethod =
   | "lightning"
   | "card"
@@ -230,6 +253,7 @@ export interface Donation {
   // Donor preferences
   isAnonymous: boolean;
   coversPlatformFees: boolean;
+  isRecurring?: boolean;
 
   // Receipt
   receiptUrl?: string;
@@ -349,6 +373,7 @@ export interface DonationFormData {
   paymentMethod: PaymentMethod;
   isAnonymous?: boolean;
   coversPlatformFees?: boolean;
+  isRecurring?: boolean;
   donorName?: string;
   donorEmail?: string;
 }
@@ -412,6 +437,217 @@ export interface DonorMetrics {
   campaignsSupportedd: number;
   livesImpacted: number;
   countriesHelped: number;
+}
+
+// ============================================================================
+// ADMIN DASHBOARD TYPES (metrics + queues from backend contract)
+// ============================================================================
+
+export type PlatformHealthStatus = "OPERATIONAL" | "DEGRADED" | "OUTAGE";
+
+export interface AdminPlatformHealth {
+  status: PlatformHealthStatus;
+  uptimePercent30d: number;
+  lastIncident: {
+    occurredAt: string;
+    resolvedAt: string;
+    summary: string;
+  };
+}
+
+export interface AdminUsersMetrics {
+  totalUsers: number;
+  donors: number;
+  beneficiaries: number;
+  providers: number;
+  admins: number;
+  newUsersToday: number;
+  verifiedUsersPercent: number;
+  flaggedUsers: number;
+  suspendedUsers: number;
+}
+
+export interface AdminCampaignsMetrics {
+  totalCampaigns: number;
+  activeCampaigns: number;
+  completedCampaigns: number;
+  pausedCampaigns: number;
+  rejectedCampaigns: number;
+  campaignsCreatedToday: number;
+  verificationQueueCount: number;
+  highRiskCampaigns: number;
+}
+
+export interface AdminDonationsLightning {
+  totalSatsReceived: number;
+  totalDonations: number;
+  avgDonationSats: number;
+  successRatePercent: number;
+  failedInvoices24h: number;
+}
+
+export interface AdminDonationsMpesa {
+  totalKesReceived: number;
+  totalDonations: number;
+  avgDonationKes: number;
+  pendingPayments: number;
+  reversedPayments: number;
+}
+
+export interface AdminDonationsToday {
+  count: number;
+  sats: number;
+  kes: number;
+}
+
+export interface AdminDonationsMetrics {
+  totalDonationsCount: number;
+  lightning: AdminDonationsLightning;
+  mpesa: AdminDonationsMpesa;
+  donationsToday: AdminDonationsToday;
+}
+
+export interface AdminAllocationsMetrics {
+  allocatedToBeneficiariesSats: number;
+  allocatedToProvidersSats: number;
+  platformFeesSats: number;
+  pendingAllocations: number;
+  disputedAllocations: number;
+}
+
+export interface AdminComplianceMetrics {
+  kycPending: number;
+  kycRejected: number;
+  amlAlerts: number;
+  fraudInvestigationsOpen: number;
+  suspiciousDonationsLast30d: number;
+}
+
+export interface AdminRefunds {
+  totalRefunds: number;
+  satsRefunded: number;
+  kesRefunded: number;
+}
+
+export interface AdminFinancialsMetrics {
+  platformRevenueSats: number;
+  avgFeePercent: number;
+  refunds: AdminRefunds;
+}
+
+export interface AdminSystemQueuesMetrics {
+  donationWebhooksBacklog: number;
+  lightningSettlementLagSecondsAvg: number;
+  mpesaReconciliationLagMinutesAvg: number;
+}
+
+export interface AdminMetrics {
+  generatedAt: string;
+  platformHealth: AdminPlatformHealth;
+  users: AdminUsersMetrics;
+  campaigns: AdminCampaignsMetrics;
+  donations: AdminDonationsMetrics;
+  allocations: AdminAllocationsMetrics;
+  compliance: AdminComplianceMetrics;
+  financials: AdminFinancialsMetrics;
+  systemQueues: AdminSystemQueuesMetrics;
+}
+
+// Queue item types for admin queues
+export interface AdminCampaignVerificationItem {
+  campaignId: string;
+  title: string;
+  beneficiaryName: string;
+  country: string;
+  requestedAmountSats: number;
+  createdAt: string;
+  riskScore: number;
+  status: string;
+  flags: string[];
+}
+
+export interface AdminUserVerificationItem {
+  userId: string;
+  role: string;
+  fullName?: string;
+  organizationName?: string;
+  country: string;
+  submittedAt: string;
+  documents: string[];
+  status: string;
+  flags?: string[];
+}
+
+export interface AdminPaymentIssueItem {
+  paymentId: string;
+  method: string;
+  amountSats?: number;
+  amountKes?: number;
+  campaignId: string;
+  issue: string;
+  detectedAt: string;
+  status: string;
+}
+
+export interface AdminRefundRequestItem {
+  refundId: string;
+  donorId: string;
+  donationId: string;
+  amountSats: number;
+  reason: string;
+  requestedAt: string;
+  status: string;
+}
+
+export interface AdminFraudCaseItem {
+  caseId: string;
+  entityType: string;
+  entityId: string;
+  reason: string;
+  riskScore: number;
+  detectedAt: string;
+  status: string;
+}
+
+export interface AdminProviderPayoutItem {
+  payoutId: string;
+  providerName: string;
+  country: string;
+  amountSats: number;
+  linkedCampaigns: string[];
+  scheduledAt: string;
+  status: string;
+}
+
+export interface AdminContentModerationItem {
+  contentId: string;
+  type: string;
+  campaignId: string;
+  reportedBy: string;
+  reason: string;
+  createdAt: string;
+  status: string;
+}
+
+export interface AdminSystemAlertItem {
+  alertId: string;
+  severity: string;
+  component: string;
+  message: string;
+  triggeredAt: string;
+  acknowledged: boolean;
+}
+
+export interface AdminQueues {
+  generatedAt: string;
+  campaignVerificationQueue: AdminCampaignVerificationItem[];
+  userVerificationQueue: AdminUserVerificationItem[];
+  paymentIssuesQueue: AdminPaymentIssueItem[];
+  refundRequestsQueue: AdminRefundRequestItem[];
+  fraudAndAbuseQueue: AdminFraudCaseItem[];
+  providerPayoutQueue: AdminProviderPayoutItem[];
+  contentModerationQueue: AdminContentModerationItem[];
+  systemAlertsQueue: AdminSystemAlertItem[];
 }
 
 // ============================================================================

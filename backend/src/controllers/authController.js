@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import config from "../config/config.js";
-//import User from "../models/User.js";
 import { User, RefreshToken, VerificationToken, PasswordResetToken } from "../models/User.js";
+import Provider from "../models/Provider.js";
 import { generateRandomToken, hashToken, signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/token.js";
 import { sendVerificationEmail, sendResetPasswordEmail } from "../utils/mailer.js";
 
@@ -32,7 +32,7 @@ export async function register(req, res, next) {
       email,
       passwordHash,
       role: "UNASSIGNED",
-      isDeleted:false,
+      isDeleted: false,
       isActive: true,
       acceptedTerms: {
         accepted: true,
@@ -60,7 +60,15 @@ export async function register(req, res, next) {
     await RefreshToken.create({ userId: user._id, tokenHash: refreshHash, expiresAt: refreshExpiry });
 
     setRefreshCookie(res, refreshToken);
-    res.status(201).json({ accessToken, user: { id: user._id, email: user.email, firstName: user.firstName, role: user.role } });
+    const userPayload = {
+      id: user._id,
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName ?? "",
+      role: user.role,
+    };
+    res.status(201).json({ accessToken, user: userPayload });
   } catch (err) { next(err); }
 }
 
@@ -96,11 +104,14 @@ export async function login(req, res, next) {
     await RefreshToken.create({ userId: user._id, tokenHash: refreshHash, expiresAt: refreshExpiry });
 
     setRefreshCookie(res, refreshToken);
-    
+
+    const loginPayload = { id: user._id, email: user.email, firstName: user.firstName, role: user.role, isDeleted: user.isDeleted };
+    console.log("[auth] login response — user.role:", user.role, "payload.user:", loginPayload);
+
     res.json({
       accessToken,
       refreshToken,
-      user: { id: user._id, email: user.email, firstName: user.firstName, role: user.role, isDeleted: user.isDeleted }
+      user: loginPayload
     });
   } catch (err) { next(err); }
 }
@@ -174,7 +185,7 @@ export async function resendVerification(req, res, next) {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
     const raw = generateRandomToken(32);
-    await VerificationToken.create({ userId: user._id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 60*60*1000) });
+    await VerificationToken.create({ userId: user._id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
     await sendVerificationEmail(user.email, raw);
     res.json({ message: "Verification email sent" });
   } catch (err) { next(err); }
@@ -189,13 +200,26 @@ export async function selectRole(req, res, next) {
     const { role, phoneNumber, country, city, organization } = req.body;
     const allowed = ["DONOR", "BENEFICIARY", "PROVIDER"];
 
+    // If role already set, return 200 with existing user so frontend can proceed to next step/profile
     if (req.user.role !== "UNASSIGNED") {
-  return res.status(400).json({ message: "Role already set" });
-}
+      const existingUser = await User.findById(req.user.userId).select("-passwordHash").lean();
+      if (!existingUser) return res.status(401).json({ message: "User not found" });
+      const accessToken = signAccessToken({
+        userId: existingUser._id.toString(),
+        role: existingUser.role,
+        isDeleted: existingUser.isDeleted
+      });
+      return res.json({
+        message: "Role already set",
+        role: existingUser.role,
+        user: existingUser,
+        accessToken
+      });
+    }
 
-if (!role || !allowed.includes(role)) {
-  return res.status(400).json({ message: "Invalid role" });
-}
+    if (!role || !allowed.includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
 
     const { userId } = req.user; // provided by requireAuth
 
@@ -211,21 +235,34 @@ if (!role || !allowed.includes(role)) {
       updates.city = city;
     }
 
-    // For providers: organization required and set KYC status
+    // For providers: organization required and set KYC status (User model uses kyc.status)
     if (role === "PROVIDER") {
       if (!organization) {
         return res.status(400).json({ message: "organization is required for providers" });
       }
       updates.organization = organization;
-      updates.kycStatus = "PENDING";
+      updates["kyc.status"] = "PENDING";
+      updates["kyc.submittedAt"] = new Date();
     } else {
-      // For donors and beneficiaries (default)
-      updates.kycStatus = "NOT_REQUIRED";
+      updates["kyc.status"] = "NOT_REQUIRED";
     }
 
     const user = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true }).select("-passwordHash");
 
-    res.json({ message: "Role updated", role: user.role, user });
+    // When role is PROVIDER, ensure a Provider document exists so GET /providers/me works
+    if (role === "PROVIDER") {
+      await Provider.findOneAndUpdate(
+        { userId: user._id },
+        { $setOnInsert: { userId: user._id, businessName: organization || user.organization || "My Organization", email: user.email, phone: user.phoneNumber } },
+        { upsert: true }
+      );
+    }
+
+    const accessToken = signAccessToken({ userId: user._id.toString(), role: user.role, isDeleted: user.isDeleted });
+
+    console.log("[auth] selectRole response — requested role:", role, "updated user.role:", user?.role, "user.id:", user?._id);
+
+    res.json({ message: "Role updated", role: user.role, user, accessToken });
   } catch (err) { next(err); }
 }
 
@@ -238,7 +275,7 @@ export async function forgotPassword(req, res, next) {
     const user = await User.findOne({ email });
     if (!user) return res.json({ message: "If that email exists, a reset was sent" });
     const raw = generateRandomToken(32);
-    await PasswordResetToken.create({ userId: user._id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 60*60*1000) });
+    await PasswordResetToken.create({ userId: user._id, tokenHash: hashToken(raw), expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
     await sendResetPasswordEmail(user.email, raw);
     res.json({ message: "If that email exists, a reset was sent" });
   } catch (err) { next(err); }

@@ -1,0 +1,180 @@
+/* src/index.css */
+@import "tailwindcss";
+
+/* -------------------------
+   Design tokens
+------------------------- */
+:root {
+  --accent: #00d4ff;
+  --accent-2: #00b37e;
+  --muted: #9aa6b2;
+}
+
+/* -------------------------
+   Base
+------------------------- */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-900 text-slate-100 antialiased;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+/* -------------------------
+   Components
+------------------------- */
+@layer components {
+
+  /* Glass card */
+  .glass-card {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.07),
+      rgba(255, 255, 255, 0.03)
+    );
+    @apply backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl;
+  }
+
+  /* Neon button (outline) */
+  .btn-neon {
+    @apply inline-flex items-center justify-center rounded-lg font-semibold transition-all;
+    padding: 0.75rem 1.25rem;
+    color: #d7f6ff;
+
+    border: 1px solid rgba(0, 212, 255, 0.35);
+    background: linear-gradient(
+      180deg,
+      rgba(0, 212, 255, 0.10),
+      rgba(255, 255, 255, 0.02)
+    );
+
+    box-shadow:
+      0 0 18px rgba(0, 212, 255, 0.35),
+      inset 0 0 12px rgba(0, 212, 255, 0.15);
+  }
+
+  .btn-neon:hover {
+    box-shadow:
+      0 0 32px rgba(0, 212, 255, 0.65),
+      inset 0 0 18px rgba(0, 212, 255, 0.25);
+    transform: translateY(-1px);
+  }
+
+  /* Neon filled button */
+  .btn-neon-filled {
+    @apply inline-flex items-center justify-center rounded-lg font-semibold transition-all text-slate-900;
+    padding: 0.75rem 1.25rem;
+
+    background: linear-gradient(180deg, #00d4ff, #02b9e5);
+    box-shadow:
+      0 0 35px rgba(0, 212, 255, 0.65),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+  }
+
+  .btn-neon-filled:hover {
+    box-shadow:
+      0 0 55px rgba(0, 212, 255, 0.9);
+    transform: translateY(-1px);
+  }
+
+  /* Hero title */
+  .hero-title {
+    @apply tracking-tight pb-2;
+    background: linear-gradient(to bottom right, #fff 30%, #9ef0ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .btn-cta {
+  background-color: var(--color-accent);
+  color: var(--color-primary-bg);
+  /* expanded @apply to avoid using @apply for unknown custom classes */
+  font-weight: 700; /* font-bold */
+  padding-top: 0.75rem; /* py-3 */
+  padding-bottom: 0.75rem;
+  padding-left: 1.5rem; /* px-6 */
+  padding-right: 1.5rem;
+  border-radius: 1.25rem; /* rounded-2xl */
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  letter-spacing: 0.08em; /* tracking-wider approximation */
+  text-transform: uppercase;
+  transition: all 0.3s;
+}
+
+.btn-cta:hover {
+  background-color: var(--color-accent-dark);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+/* glass-morphism, card-glow, etc. — move into index.css as well */
+.glass-morphism {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Footer glass + helpers*/
+
+/* glass container */
+.footer-glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(8,10,12,0.03));
+  @apply border border-white/8 rounded-3xl;
+  box-shadow: 0 10px 40px rgba(2,185,229,0.06), inset 0 1px 0 rgba(255,255,255,0.02);
+  backface-visibility: hidden;
+}
+/* Update these in your @layer components section */
+
+.footer-glass {
+  background: linear-gradient(
+    180deg, 
+    rgba(255, 255, 255, 0.04) 0%, 
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  /* This creates the sharp high-end edge */
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Make the neon-filled button a bit more technical */
+.btn-neon-filled {
+  @apply inline-flex items-center justify-center font-black transition-all duration-300;
+  background: linear-gradient(135deg, #00d4ff, #00b37e);
+  color: #04121a;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-neon-filled:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+}
+
+/* small pulsing glow for the brand badge */
+.shadow-glow {
+  box-shadow: 0 8px 30px rgba(0,212,255,0.12), 0 2px 8px rgba(0,0,0,0.6);
+}
+
+/* neon filled button fallback */
+.btn-neon-filled {
+  @apply inline-flex items-center justify-center font-black transition-all;
+  background: linear-gradient(180deg, #00d4ff, #02b9e5);
+  color: #04121a; /* dark text */
+  box-shadow: 0 12px 40px rgba(2,185,229,0.18), inset 0 -3px 0 rgba(0,0,0,0.12);
+}
+
+/* small responsive tweaks */
+@media (max-width: 640px) {
+  .footer-glass {
+    padding: 1rem;
+  }
+}
+
+
+}

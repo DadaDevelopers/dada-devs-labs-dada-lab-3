@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { mockDataService } from "../../services/mockData";
+import api from "../../services/api";
+import {
+  useBeneficiaryCampaigns,
+  useBeneficiaryMetrics,
+  confirmBeneficiaryReceipt,
+} from "../../hooks/useBeneficiaryApi";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
 import { Button } from "../../components/ui/Button";
@@ -37,6 +41,7 @@ import {
   MapPin,
   Bell,
   Lock,
+  X,
 } from "lucide-react";
 import {
   AreaChart,
@@ -50,21 +55,52 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+const BENEFICIARY_PROFILE_BANNER_DISMISSED = "beneficiary_profile_banner_dismissed";
+
 const BeneficiaryDashboard = () => {
   const navigate = useNavigate();
-  const { campaigns, updateCampaign } = useApp();
-  const { logout } = useAuth();
-  const beneficiary = mockDataService.getBeneficiaryUser();
-  const metrics = mockDataService.getBeneficiaryMetrics();
+  const { user, logout } = useAuth();
+  const { campaigns: userCampaigns, loading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useBeneficiaryCampaigns();
+  const { metrics, loading: metricsLoading, error: metricsError } = useBeneficiaryMetrics();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedCampaignForConfirm, setSelectedCampaignForConfirm] =
     useState<any>(null);
-
-  // Get campaigns for this beneficiary
-  const userCampaigns = campaigns.filter(
-    (c) => c.beneficiaryId === beneficiary.id
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [profileIncomplete, setProfileIncomplete] = useState<boolean | null>(null);
+  const [profileBannerDismissed, setProfileBannerDismissed] = useState(() =>
+    typeof sessionStorage !== "undefined" ? sessionStorage.getItem(BENEFICIARY_PROFILE_BANNER_DISMISSED) === "1" : false
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get("/users/me")
+      .then((res) => {
+        if (cancelled) return;
+        const u = (res.data as { user?: any }).user ?? res.data;
+        const bp = u?.beneficiaryProfile;
+        const missingNationalId = !bp?.nationalIdHash && !bp?.nationalId;
+        const missingPreferredProvider = !bp?.preferredProvider || (typeof bp.preferredProvider === "string" && !bp.preferredProvider.trim());
+        setProfileIncomplete(!!(missingNationalId || missingPreferredProvider));
+      })
+      .catch(() => {
+        if (!cancelled) setProfileIncomplete(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dismissProfileBanner = () => {
+    setProfileBannerDismissed(true);
+    try {
+      sessionStorage.setItem(BENEFICIARY_PROFILE_BANNER_DISMISSED, "1");
+    } catch { }
+  };
+
   const primaryCampaign = userCampaigns[0];
+  const beneficiaryName = user?.firstName || user?.name || user?.email || "User";
+  const showProfileBanner = profileIncomplete === true && !profileBannerDismissed;
 
   const handleCreateCampaign = () => {
     navigate("/campaigns/create");
@@ -73,39 +109,42 @@ const BeneficiaryDashboard = () => {
   // Delivery timeline - dynamically generated from campaign status
   const deliveryTimeline = primaryCampaign
     ? [
-        {
-          status: "Completed",
-          label: "Campaign Created",
-          date: primaryCampaign.createdAt.split("T")[0],
-        },
-        {
-          status: primaryCampaign.status !== "draft" ? "Completed" : "Upcoming",
-          label: "Campaign Approved",
-          date: "Pending",
-        },
-        {
-          status:
-            primaryCampaign.confirmationStatus === "provider_confirmed" ||
-            primaryCampaign.confirmationStatus === "both_confirmed"
-              ? "Completed"
-              : "Current",
-          label: "Provider Confirmed Service",
-          date: primaryCampaign.providerConfirmedAt
-            ? primaryCampaign.providerConfirmedAt.split("T")[0]
-            : "Pending",
-        },
-        {
-          status:
-            primaryCampaign.confirmationStatus === "both_confirmed"
-              ? "Completed"
+      {
+        status: "Completed",
+        label: "Campaign Created",
+        date: primaryCampaign.createdAt ? primaryCampaign.createdAt.split("T")[0] : "Pending",
+      },
+      {
+        status: primaryCampaign.status !== "draft" ? "Completed" : "Upcoming",
+        label: "Campaign Approved",
+        date: "Pending",
+      },
+      {
+        status:
+          primaryCampaign.confirmationStatus === "provider_confirmed"
+            ? "Completed"
+            : "Current",
+        label: "Provider confirmed service",
+        date: primaryCampaign.providerConfirmedAt
+          ? primaryCampaign.providerConfirmedAt.split("T")[0]
+          : "Pending",
+      },
+      {
+        status:
+          primaryCampaign.confirmationStatus === "both_confirmed" || primaryCampaign.beneficiaryReceipt
+            ? "Completed"
+            : primaryCampaign.confirmationStatus === "provider_confirmed"
+              ? "Current"
               : "Upcoming",
-          label: "Beneficiary Confirmation",
-          date: primaryCampaign.beneficiaryConfirmedAt
-            ? primaryCampaign.beneficiaryConfirmedAt.split("T")[0]
-            : "Awaiting action",
-        },
-        { status: "Upcoming", label: "Final Report", date: "Jan 30, 2025" },
-      ]
+        label: "Confirm receipt & release",
+        date: primaryCampaign.beneficiaryReceipt?.confirmedAt
+          ? primaryCampaign.beneficiaryReceipt.confirmedAt.split("T")[0]
+          : primaryCampaign.confirmationStatus === "provider_confirmed"
+            ? "Awaiting your confirmation"
+            : "Pending",
+      },
+      { status: "Upcoming", label: "Final Report", date: "Jan 30, 2025" },
+    ]
     : [];
 
   const fundsReceived = [
@@ -143,21 +182,10 @@ const BeneficiaryDashboard = () => {
   ];
 
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/beneficiary",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Funds Received",
-      href: "/beneficiary/funds",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      label: "Reporting",
-      href: "/beneficiary/reporting",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+    { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [
@@ -167,14 +195,23 @@ const BeneficiaryDashboard = () => {
     { id: "change-password", label: "Change Password", href: "/beneficiary/settings/change-password", icon: <Lock className="w-5 h-5" /> },
   ];
 
-  const handleConfirmServiceAccess = () => {
+  const handleConfirmServiceAccess = async () => {
     if (
       primaryCampaign &&
       primaryCampaign.confirmationStatus === "provider_confirmed"
     ) {
-      alert(
-        "✓ Service access confirmed! Funds will be released to the provider."
-      );
+      const id = primaryCampaign.id || primaryCampaign._id;
+      if (!id) return;
+      setConfirmingId(id);
+      const result = await confirmBeneficiaryReceipt(id);
+      setConfirmingId(null);
+      if (result.ok) {
+        refetchCampaigns();
+        setIsConfirmModalOpen(false);
+        setSelectedCampaignForConfirm(null);
+      } else {
+        alert(result.error || "Failed to confirm");
+      }
     }
   };
 
@@ -197,16 +234,16 @@ const BeneficiaryDashboard = () => {
   // Helpers for campaign UI
   const getCampaignStatusLabel = (c: any) => {
     if (c.status === "draft") return "Draft";
-    if (c.status === "pending_approval") return "Pending Confirmation";
+    if (c.confirmationStatus === "disputed") return "Rejected";
+    if (c.confirmationStatus !== "provider_confirmed") return "Pending approval";
+    if (c.beneficiaryReceipt) return c.status === "COMPLETED" ? "Completed" : "Service in progress";
     if (c.confirmationStatus === "provider_confirmed") return "Ready";
-    if (c.confirmationStatus === "both_confirmed")
-      return c.status === "completed" ? "Completed" : "Service In Progress";
-    if (c.status === "completed") return "Completed";
-    return c.status.charAt(0).toUpperCase() + c.status.slice(1);
+    if (c.status === "COMPLETED") return "Completed";
+    return c.status?.charAt?.(0)?.toUpperCase() + (c.status?.slice?.(1) ?? "") || "Active";
   };
 
   const canEditCampaign = (c: any) => {
-    return c.status === "draft" || c.status === "pending_approval";
+    return c.status === "draft" || (c.confirmationStatus !== "provider_confirmed" && c.confirmationStatus !== "disputed");
   };
 
   const canConfirmReadiness = (c: any) => {
@@ -214,15 +251,11 @@ const BeneficiaryDashboard = () => {
   };
 
   const canViewProof = (c: any) => {
-    return (
-      c.confirmationStatus === "both_confirmed" ||
-      c.status === "in_progress" ||
-      c.status === "completed"
-    );
+    return !!c.beneficiaryReceipt || c.status === "COMPLETED";
   };
 
   const handleEditCampaign = (c: any) => {
-    navigate(`/campaigns/edit/${c.id}`);
+    navigate(`/campaigns/${c.id ?? c._id}`);
   };
 
   const handleOpenConfirmModal = (c: any) => {
@@ -230,14 +263,20 @@ const BeneficiaryDashboard = () => {
     setIsConfirmModalOpen(true);
   };
 
-  const handleConfirmReadiness = () => {
+  const handleConfirmReadiness = async () => {
     if (!selectedCampaignForConfirm) return;
-    updateCampaign(selectedCampaignForConfirm.id, {
-      confirmationStatus: "both_confirmed",
-      status: "in_progress",
-    });
-    setIsConfirmModalOpen(false);
-    setSelectedCampaignForConfirm(null);
+    const id = selectedCampaignForConfirm.id || selectedCampaignForConfirm._id;
+    if (!id) return;
+    setConfirmingId(id);
+    const result = await confirmBeneficiaryReceipt(id);
+    setConfirmingId(null);
+    if (result.ok) {
+      refetchCampaigns();
+      setIsConfirmModalOpen(false);
+      setSelectedCampaignForConfirm(null);
+    } else {
+      alert(result.error || "Failed to confirm");
+    }
   };
 
   const handleCancelConfirm = () => {
@@ -252,7 +291,7 @@ const BeneficiaryDashboard = () => {
   return (
     <DashboardLayout
       navItems={navItems}
-      userName={beneficiary.name}
+      userName={beneficiaryName}
       userRole="Aid Beneficiary"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -261,6 +300,48 @@ const BeneficiaryDashboard = () => {
       }}
     >
       <div className="space-y-6 sm:space-y-8">
+        {/* Incomplete profile banner — top of page, not overlay */}
+        {showProfileBanner && (
+          <div
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 sm:px-5 sm:py-4 flex flex-wrap items-center justify-between gap-3"
+            role="region"
+            aria-label="Complete your profile"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <User className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground text-sm sm:text-base">
+                  Complete your profile
+                </p>
+                <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
+                  Add your national ID and preferred provider in Settings so we can verify your account and match you with providers.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full border-amber-500/50 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                onClick={() => navigate("/beneficiary/settings/profile")}
+              >
+                Go to profile
+              </Button>
+              <button
+                type="button"
+                onClick={dismissProfileBanner}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition"
+                aria-label="Dismiss"
+              >
+                <span className="sr-only">Dismiss</span>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -282,30 +363,39 @@ const BeneficiaryDashboard = () => {
         </div>
 
         {/* Metrics Grid */}
+        {(campaignsError || metricsError) && (
+          <p className="text-sm text-destructive" role="alert">
+            {campaignsError || metricsError}
+          </p>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <MetricCard
             title="Total Amount Received"
-            value={`$${(metrics.totalAidReceived / 100).toFixed(0)}`}
+            value={
+              metricsLoading
+                ? "…"
+                : `$${Number(metrics?.totalAidReceived ?? 0).toFixed(0)}`
+            }
             icon={DollarSign}
-            trend={`+$${(metrics.totalAidReceived / 100 - 6000).toFixed(
-              0
-            )} this month`}
-            trendUp
+            trend={metrics ? `Across ${metrics.campaignsSupportingYou} campaign(s)` : ""}
+            trendUp={false}
           />
           <MetricCard
-            title="Last Disbursement"
-            value={`$${(metrics.totalDisbursements / 100).toFixed(0)}`}
+            title="Disbursements"
+            value={
+              metricsLoading
+                ? "…"
+                : `$${Number(metrics?.totalDisbursements ?? 0).toFixed(0)}`
+            }
             icon={Calendar}
-            trend="Nov 8, 2024"
+            trend="Total disbursed"
           />
           <MetricCard
             title="Campaign Supporters"
-            value={primaryCampaign?.donorCount.toString() || "0"}
+            value={primaryCampaign?.donorCount?.toString() ?? "0"}
             icon={TrendingUp}
-            trend={`From ${Math.ceil(
-              (primaryCampaign?.donorCount || 0) / 20
-            )} donors`}
-            trendUp
+            trend={`${userCampaigns.length} campaign(s)`}
+            trendUp={false}
           />
         </div>
 
@@ -321,13 +411,12 @@ const BeneficiaryDashboard = () => {
                 <div key={index} className="flex gap-3 sm:gap-4">
                   <div className="flex flex-col items-center">
                     <div
-                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        item.status === "Completed"
-                          ? "bg-green-500 text-white"
-                          : item.status === "Current"
+                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${item.status === "Completed"
+                        ? "bg-green-500 text-white"
+                        : item.status === "Current"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground"
-                      }`}
+                        }`}
                     >
                       {item.status === "Completed" ? (
                         <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -337,11 +426,10 @@ const BeneficiaryDashboard = () => {
                     </div>
                     {index < deliveryTimeline.length - 1 && (
                       <div
-                        className={`w-0.5 h-12 sm:h-16 ${
-                          item.status === "Completed"
-                            ? "bg-green-500"
-                            : "bg-border"
-                        }`}
+                        className={`w-0.5 h-12 sm:h-16 ${item.status === "Completed"
+                          ? "bg-green-500"
+                          : "bg-border"
+                          }`}
                       />
                     )}
                   </div>
@@ -497,7 +585,7 @@ const BeneficiaryDashboard = () => {
             </div>
           </Card> */}
 
-           {/* Services */}
+          {/* Services */}
           <Card className="p-4 sm:p-6 card-elevated">
             <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">
               Service Access
@@ -505,83 +593,76 @@ const BeneficiaryDashboard = () => {
 
             <div className="space-y-4">
               {primaryCampaign &&
-              primaryCampaign.confirmationStatus === "provider_confirmed" ? (
-                <div className="p-3 sm:p-4 rounded-2xl bg-green-50 border border-green-200">
+                primaryCampaign.confirmationStatus === "provider_confirmed" ? (
+                <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-[var(--color-accent)] mt-0.5 flex-shrink-0" />
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-green-900 text-sm sm:text-base mb-1">
-                        Provider Confirmed
+                      <h3 className="font-semibold text-[var(--color-text-light)] text-sm sm:text-base mb-1">
+                        Provider confirmed
                       </h3>
-                      <p className="text-xs sm:text-sm text-green-700 mb-3">
-                        {primaryCampaign.provider?.name || "Provider"} has
-                        confirmed service delivery. Please confirm receipt to
-                        unlock next disbursement.
+                      <p className="text-xs sm:text-sm text-[var(--color-text-light)]/80 mb-3">
+                        {primaryCampaign.provider?.organization || primaryCampaign.provider?.firstName || "Provider"} has confirmed service delivery. Confirm receipt once you receive the service.
                       </p>
                       <Button
                         size="sm"
-                        className="gap-2 rounded-full bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                        className="gap-2 rounded-full btn-cta w-full sm:w-auto"
                         onClick={handleConfirmServiceAccess}
                       >
                         <CheckCircle2 className="w-4 h-4" />
-                        Confirm Service Access
+                        Confirm service receipt
                       </Button>
                     </div>
                   </div>
                 </div>
-              ) : primaryCampaign &&
-                primaryCampaign.confirmationStatus === "both_confirmed" ? (
-                <div className="p-3 sm:p-4 rounded-2xl bg-green-50 border border-green-200">
+              ) : primaryCampaign?.beneficiaryReceipt || primaryCampaign?.confirmationStatus === "both_confirmed" ? (
+                <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30">
                   <div className="flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                    <CheckCircle2 className="w-5 h-5 text-[var(--color-accent)] mt-0.5 flex-shrink-0" />
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-green-900 text-sm sm:text-base mb-1">
-                        Service Access Confirmed
+                      <h3 className="font-semibold text-[var(--color-text-light)] text-sm sm:text-base mb-1">
+                        Service receipt confirmed
                       </h3>
-                      <p className="text-xs sm:text-sm text-green-700">
-                        You have confirmed service receipt. Funds have been
-                        released to the provider.
+                      <p className="text-xs sm:text-sm text-[var(--color-text-light)]/80">
+                        You confirmed receipt of the service. Funds will be released per the disbursement process.
                       </p>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="p-3 sm:p-4 rounded-2xl bg-yellow-50 border border-yellow-200">
+                <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-secondary-bg)] border border-white/10">
                   <div className="flex items-start gap-3">
-                    <Clock className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <Clock className="w-5 h-5 text-[var(--color-accent)] mt-0.5 flex-shrink-0" />
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-yellow-900 text-sm sm:text-base mb-1">
-                        Awaiting Provider Confirmation
+                      <h3 className="font-semibold text-[var(--color-text-light)] text-sm sm:text-base mb-1">
+                        Pending provider confirmation
                       </h3>
-                      <p className="text-xs sm:text-sm text-yellow-700">
-                        The service provider is reviewing your request and will
-                        confirm when ready.
+                      <p className="text-xs sm:text-sm text-[var(--color-text-light)]/70">
+                        The provider is reviewing your campaign and will confirm when ready. You’ll see updates here.
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="p-3 sm:p-4 rounded-2xl bg-[#0B1221]/50">
-                <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-2">
-                  Last Confirmation
+              <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-secondary-bg)] border border-white/10">
+                <p className="text-xs sm:text-sm text-[var(--color-text-light)]/60 mb-1 sm:mb-2">
+                  Last confirmation
                 </p>
-                <p className="font-semibold text-sm sm:text-base">
-                  {primaryCampaign?.beneficiaryConfirmedAt
-                    ? new Date(
-                        primaryCampaign.beneficiaryConfirmedAt
-                      ).toLocaleDateString()
+                <p className="font-semibold text-sm sm:text-base text-[var(--color-text-light)]">
+                  {primaryCampaign?.beneficiaryReceipt?.confirmedAt
+                    ? new Date(primaryCampaign.beneficiaryReceipt.confirmedAt).toLocaleDateString()
                     : "Not yet confirmed"}
                 </p>
-                {primaryCampaign?.confirmationStatus === "both_confirmed" && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                {primaryCampaign?.beneficiaryReceipt && (
+                  <p className="text-xs text-[var(--color-text-light)]/60 mt-1">
                     {primaryCampaign.title}
                   </p>
                 )}
               </div>
             </div>
           </Card>
-        </div> 
+        </div>
 
         {/* Active Campaigns */}
         {userCampaigns.length > 0 && (
@@ -604,30 +685,33 @@ const BeneficiaryDashboard = () => {
                       <p className="text-xs sm:text-sm text-muted-foreground truncate">
                         {campaign.description
                           ? campaign.description.substring(0, 120) +
-                            (campaign.description.length > 120 ? "..." : "")
+                          (campaign.description.length > 120 ? "..." : "")
                           : ""}
                       </p>
                       <p className="text-xs sm:text-sm text-muted-foreground mt-2">
                         Provider:{" "}
                         <span className="font-medium">
-                          {campaign.provider?.name || "Unmatched"}
+                          {campaign.provider?.organization ||
+                            (campaign.provider?.firstName || campaign.provider?.lastName
+                              ? [campaign.provider.firstName, campaign.provider.lastName].filter(Boolean).join(" ")
+                              : null) ||
+                            "Unmatched"}
                         </span>
                       </p>
                     </div>
                     <span
-                      className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium self-start flex-shrink-0 ${
-                        getCampaignStatusLabel(campaign) === "Draft"
-                          ? "bg-gray-700 text-white"
-                          : getCampaignStatusLabel(campaign) ===
-                            "Pending Confirmation"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : getCampaignStatusLabel(campaign) === "Ready"
-                          ? "bg-blue-100 text-blue-700"
-                          : getCampaignStatusLabel(campaign) ===
-                            "Service In Progress"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-green-100 text-green-700"
-                      }`}
+                      className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium self-start flex-shrink-0 ${getCampaignStatusLabel(campaign) === "Rejected"
+                        ? "bg-red-500/20 text-red-400 border border-red-500/40"
+                        : getCampaignStatusLabel(campaign) === "Pending approval"
+                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                          : getCampaignStatusLabel(campaign) === "Draft"
+                            ? "bg-gray-600/30 text-gray-400 border border-white/10"
+                            : getCampaignStatusLabel(campaign) === "Ready"
+                              ? "bg-[var(--color-accent)]/20 text-[var(--color-accent)] border border-[var(--color-accent)]/30"
+                              : getCampaignStatusLabel(campaign) === "Service in progress" || getCampaignStatusLabel(campaign) === "Completed"
+                                ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/25"
+                                : "bg-[var(--color-accent)]/10 text-[var(--color-text-light)]/80 border border-white/10"
+                        }`}
                     >
                       {getCampaignStatusLabel(campaign)}
                     </span>
@@ -636,14 +720,14 @@ const BeneficiaryDashboard = () => {
                   <div className="mb-3">
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">
-                        ${(campaign.amountRaised / 100).toFixed(0)} raised
+                        ${Number(campaign.amountRaised ?? 0).toFixed(0)} raised
                       </span>
                       <span className="font-semibold">
-                        ${(campaign.targetAmount / 100).toFixed(0)}
+                        ${Number(campaign.targetAmount ?? 0).toFixed(0)}
                       </span>
                     </div>
                     <Progress
-                      value={campaign.progressPercentage}
+                      value={campaign.progressPercentage ?? campaign.percentRaised ?? 0}
                       className="h-2 mb-3"
                     />
                   </div>
@@ -664,9 +748,12 @@ const BeneficiaryDashboard = () => {
                       <Button
                         size="sm"
                         className="flex-1 btn-cta"
+                        disabled={confirmingId === (campaign.id || campaign._id)}
                         onClick={() => handleOpenConfirmModal(campaign)}
                       >
-                        Confirm Readiness
+                        {confirmingId === (campaign.id || campaign._id)
+                          ? "Confirming…"
+                          : "Confirm Readiness"}
                       </Button>
                     )}
 
@@ -681,28 +768,29 @@ const BeneficiaryDashboard = () => {
                       </Button>
                     )}
 
-                    {/* Share actions for active/ready campaigns */}
-                    {(campaign.status === "active" ||
-                      getCampaignStatusLabel(campaign) === "Ready") && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full"
-                          onClick={handleShareCampaign}
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full"
-                          onClick={handleShareCampaign}
-                        >
-                          <Share2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
+                    {/* Share actions for active/ready campaigns (shown as active to others) */}
+                    {(campaign.status === "ACTIVE" ||
+                      getCampaignStatusLabel(campaign) === "Ready" ||
+                      getCampaignStatusLabel(campaign) === "Service in progress") && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={handleShareCampaign}
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={handleShareCampaign}
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                   </div>
                 </div>
               ))}
@@ -712,9 +800,9 @@ const BeneficiaryDashboard = () => {
 
         {/* Messages & Service Access */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          
 
-          
+
+
         </div>
 
         {/* Reporting Section */}
@@ -725,51 +813,50 @@ const BeneficiaryDashboard = () => {
             </h2>
 
             <div className="space-y-4">
-              <div className="p-3 sm:p-4 rounded-2xl bg-yellow-50 border border-yellow-200">
+              <div className="p-3 sm:p-4 rounded-2xl bg-[var(--color-secondary-bg)] border border-[var(--color-accent)]/20">
                 <div className="flex items-start gap-3">
-                  <FileText className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <FileText className="w-5 h-5 text-[var(--color-accent)] mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-yellow-900 text-sm sm:text-base mb-1">
-                      Mid-Term Report Due
+                    <h3 className="font-semibold text-[var(--color-text-light)] text-sm sm:text-base mb-1">
+                      Progress reporting
                     </h3>
-                    <p className="text-xs sm:text-sm text-yellow-700 mb-3">
-                      Submit your progress report by December 29, 2024
+                    <p className="text-xs sm:text-sm text-[var(--color-text-light)]/70 mb-3">
+                      Submit interim or final reports for your campaigns from the Reporting page.
                     </p>
                     <Button
                       size="sm"
                       className="gap-2 rounded-full w-full sm:w-auto btn-cta"
-                      // onClick={handleUploadReport}
                       onClick={() => navigate("/beneficiary/reporting")}
                     >
                       <Upload className="w-4 h-4" />
-                      Upload Report
+                      Go to Reporting
                     </Button>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[#0B1221]/50 gap-2">
-                  <span className="text-xs sm:text-sm font-medium">
-                    Campaign Approval
+                <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[var(--color-secondary-bg)] border border-white/10 gap-2">
+                  <span className="text-xs sm:text-sm font-medium text-[var(--color-text-light)]">
+                    Campaign approval
                   </span>
-                  <span className="text-xs text-green-600 font-medium flex-shrink-0">
+                  <span className="text-xs text-[var(--color-accent)] font-medium flex-shrink-0">
                     ✓ Approved
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[#0B1221]/50 gap-2">
-                  <span className="text-xs sm:text-sm font-medium">
-                    Document Verification
+                <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[var(--color-secondary-bg)] border border-white/10 gap-2">
+                  <span className="text-xs sm:text-sm font-medium text-[var(--color-text-light)]">
+                    Document verification
                   </span>
-                  <span className="text-xs text-green-600 font-medium flex-shrink-0">
+                  <span className="text-xs text-[var(--color-accent)] font-medium flex-shrink-0">
                     ✓ Verified
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[#0B1221]/50 gap-2">
-                  <span className="text-xs sm:text-sm font-medium">
-                    Compliance Check
+                <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[var(--color-secondary-bg)] border border-white/10 gap-2">
+                  <span className="text-xs sm:text-sm font-medium text-[var(--color-text-light)]">
+                    Compliance check
                   </span>
-                  <span className="text-xs text-green-600 font-medium flex-shrink-0">
+                  <span className="text-xs text-[var(--color-accent)] font-medium flex-shrink-0">
                     ✓ Passed
                   </span>
                 </div>
@@ -814,13 +901,13 @@ const BeneficiaryDashboard = () => {
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Amount Raised</p>
                       <p className="text-lg sm:text-xl font-bold">
-                        ${(primaryCampaign.amountRaised / 100).toFixed(0)}
+                        ${Number(primaryCampaign.amountRaised ?? 0).toFixed(0)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Target Amount</p>
                       <p className="text-lg sm:text-xl font-bold">
-                        ${(primaryCampaign.targetAmount / 100).toFixed(0)}
+                        ${Number(primaryCampaign.targetAmount ?? 0).toFixed(0)}
                       </p>
                     </div>
                   </div>
@@ -828,11 +915,11 @@ const BeneficiaryDashboard = () => {
                     <div className="flex justify-between text-xs mb-1">
                       <span>Progress</span>
                       <span className="font-semibold">
-                        {primaryCampaign.progressPercentage}%
+                        {(primaryCampaign.progressPercentage ?? primaryCampaign.percentRaised ?? 0).toFixed(0)}%
                       </span>
                     </div>
                     <Progress
-                      value={primaryCampaign.progressPercentage}
+                      value={primaryCampaign.progressPercentage ?? primaryCampaign.percentRaised ?? 0}
                       className="h-2"
                     />
                   </div>
@@ -845,7 +932,7 @@ const BeneficiaryDashboard = () => {
                 <Button
                   variant="outline"
                   className="w-full rounded-full btn-cta"
-                  onClick={() => navigate(`/campaigns/${primaryCampaign.id}`)}
+                  onClick={() => navigate(`/campaigns/${primaryCampaign.id ?? primaryCampaign._id}`)}
                 >
                   View Full Details
                 </Button>
@@ -886,7 +973,7 @@ const BeneficiaryDashboard = () => {
                   </p>
                   <p className="text-lg font-bold">
                     $
-                    {(selectedCampaignForConfirm.targetAmount / 100).toFixed(0)}
+                    {Number(selectedCampaignForConfirm.targetAmount ?? 0).toFixed(0)}
                   </p>
                 </div>
               </div>
@@ -897,14 +984,16 @@ const BeneficiaryDashboard = () => {
                 variant="outline"
                 className="flex-1"
                 onClick={handleCancelConfirm}
+                disabled={!!confirmingId}
               >
                 Cancel
               </Button>
               <Button
                 className="flex-1 btn-cta"
                 onClick={handleConfirmReadiness}
+                disabled={!!confirmingId}
               >
-                Confirm Readiness
+                {confirmingId ? "Confirming…" : "Confirm Readiness"}
               </Button>
             </SheetFooter>
           </SheetContent>

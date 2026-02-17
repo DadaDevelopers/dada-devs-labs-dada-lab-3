@@ -1,7 +1,8 @@
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { mockDataService } from "../../services/mockData";
+import { donationService } from "../../services/donationService";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
 import { CampaignSummaryCard } from "../../components/feature/CampaignSummaryCard";
@@ -13,7 +14,6 @@ import {
   Receipt,
   DollarSign,
   TrendingUp,
-  Calendar,
   Download,
   ExternalLink,
   Zap,
@@ -43,40 +43,97 @@ import {
 const DonorDashboard = () => {
   const navigate = useNavigate();
   const { campaigns, donations } = useApp();
-  const { logout } = useAuth();
-  const donor = mockDataService.getDonorUser();
-  const metrics = mockDataService.getDonorMetrics();
+  const { logout, user } = useAuth();
+  const [metrics, setMetrics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Get donations for this donor
-  const donorDonations = donations.filter((d) => d.donorId === donor.id);
+  const donor = user || { id: "guest", name: "Guest", email: "" };
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const data = await donationService.getDonorMetrics();
+        setMetrics(data.metrics);
+      } catch (err) {
+        console.error("Failed to fetch donor metrics", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMetrics();
+  }, []);
+
+  // Filter donations for this donor (though Backend already filters /me, this is safety)
+  // Backend returns all donations for "me", so we use the whole list
+  const donorDonations = donations;
 
   // Recommended campaigns (all active campaigns)
-  const recommendedCampaigns = campaigns
-    .filter((c) => c.status === "active")
-    .slice(0, 3);
+  const recommendedCampaigns = useMemo(() => {
+    return campaigns
+      .filter((c) => c.status?.toLowerCase() === "active")
+      .slice(0, 3);
+  }, [campaigns]);
 
-  const donationTrends = [
-    { month: "Jun", amount: 450 },
-    { month: "Jul", amount: 620 },
-    { month: "Aug", amount: 580 },
-    { month: "Sep", amount: 720 },
-    { month: "Oct", amount: 890 },
-    { month: "Nov", amount: 990 },
-  ];
+  // Generate Donation Trends from real data
+  const donationTrends = useMemo(() => {
+    if (donorDonations.length === 0) return [];
 
-  const categoryDistribution = [
-    { name: "Emergency Relief", value: 1500, color: "hsl(var(--primary))" },
-    { name: "Education", value: 950, color: "hsl(var(--chart-2))" },
-    { name: "Healthcare", value: 800, color: "hsl(var(--chart-3))" },
-    { name: "Infrastructure", value: 1000, color: "hsl(var(--chart-4))" },
-  ];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const now = new Date();
+    const last6Months: any[] = [];
 
-  const impactByCategory = [
-    { category: "Food Aid", lives: 127 },
-    { category: "Medical", lives: 89 },
-    { category: "Education", lives: 76 },
-    { category: "Water", lives: 55 },
-  ];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      last6Months.push({
+        month: months[d.getMonth()],
+        monthIndex: d.getMonth(),
+        year: d.getFullYear(),
+        amount: 0
+      });
+    }
+
+    donorDonations.forEach(d => {
+      if (d.status !== "completed" && d.status !== "released") return;
+      const date = new Date(d.createdAt);
+      const trendMonth = last6Months.find(m => m.monthIndex === date.getMonth() && m.year === date.getFullYear());
+      if (trendMonth) {
+        trendMonth.amount += (d.amount / 100);
+      }
+    });
+
+    return last6Months;
+  }, [donorDonations]);
+
+  // Generate Category Distribution from real data
+  const categoryDistribution = useMemo(() => {
+    const dist: Record<string, number> = {};
+    const colors = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+
+    donorDonations.forEach(d => {
+      const cat = d.campaign?.category || "Other";
+      dist[cat] = (dist[cat] || 0) + (d.amount / 100);
+    });
+
+    return Object.entries(dist).map(([name, value], index) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+      color: colors[index % colors.length]
+    }));
+  }, [donorDonations]);
+
+  // Impact calculations (Simplified live impact estimate: 1 life per $50 for now, or use backend)
+  const impactByCategory = useMemo(() => {
+    const impact: Record<string, number> = {};
+    donorDonations.forEach(d => {
+      const cat = d.campaign?.category || "Other";
+      // Mock logic: $50 = 1 life impact
+      impact[cat] = (impact[cat] || 0) + Math.floor(d.amount / 5000);
+    });
+    return Object.entries(impact).map(([category, lives]) => ({
+      category: category.charAt(0).toUpperCase() + category.slice(1),
+      lives
+    }));
+  }, [donorDonations]);
 
   const watchlist = [
     { name: "Rural Education Project", status: "Active", saved: "2 weeks ago" },
@@ -115,17 +172,36 @@ const DonorDashboard = () => {
   ];
 
   const handleQuickDonate = () => {
-    navigate("/donate");
+    navigate("/campaigns");
   };
 
   const handleBrowseAll = () => {
     navigate("/campaigns");
   };
 
+  if (loading) {
+    return (
+      <DashboardLayout
+        navItems={navItems}
+        userName={donor.name || "Guest"}
+        userRole="Donor"
+        settingsNavItems={settingsNavItems}
+        onLogout={async () => {
+          await logout();
+          navigate("/");
+        }}
+      >
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
-    <DashboardLayout 
-      navItems={navItems} 
-      userName={donor.name} 
+    <DashboardLayout
+      navItems={navItems}
+      userName={donor.name || "Guest"}
       userRole="Donor"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -158,24 +234,22 @@ const DonorDashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <MetricCard
             title="Total Donated"
-            value={`$${(metrics.totalDonated / 100).toFixed(0)}`}
+            value={loading || !metrics ? "$0" : `$${(metrics.totalDonatedFiat || 0).toFixed(0)}`}
             icon={DollarSign}
-            trend={`+$${(metrics.totalDonated / 100 - 3000).toFixed(
-              0
-            )} this month`}
+            trend={loading || !metrics ? "" : `Across ${metrics.donationsCount} donations`}
             trendUp
           />
           <MetricCard
-            title="Active Recurring"
-            value={metrics.activeRecurrings.toString()}
-            icon={Calendar}
-            trend="Monthly donations"
+            title="Sats Donated"
+            value={loading || !metrics ? "0" : Number(metrics.totalDonatedSats || 0).toLocaleString()}
+            icon={Zap}
+            trend="Bitcoin total"
           />
           <MetricCard
             title="Campaigns Supported"
-            value={metrics.campaignsSupportedd.toString()}
+            value={loading || !metrics ? "0" : metrics.campaignsSupported.toString()}
             icon={Heart}
-            trend="+2 this month"
+            trend="Active impact"
             trendUp
           />
         </div>
@@ -200,13 +274,21 @@ const DonorDashboard = () => {
             {recommendedCampaigns.map((campaign) => (
               <CampaignSummaryCard
                 key={campaign.id}
+                id={campaign.id}
                 title={campaign.title}
                 description={campaign.description}
+                category={campaign.category}
+                location={campaign.location}
+                deadline={campaign.fundraisingDeadline}
                 organizerName={campaign.provider?.name || "Provider"}
-                amountRaised={campaign.amountRaised / 100}
-                targetAmount={campaign.targetAmount / 100}
+                amountRaised={campaign.amountRaised}
+                targetAmount={campaign.targetAmount}
                 donorCount={campaign.donorCount}
                 onClick={() => navigate(`/campaigns/${campaign.id}`)}
+                onDonate={(e) => {
+                  e.stopPropagation();
+                  navigate(`/donate?campaignId=${campaign.id}`);
+                }}
               />
             ))}
           </div>
@@ -410,14 +492,14 @@ const DonorDashboard = () => {
                 <div className="flex items-center gap-3 mb-3">
                   <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                   <h3 className="font-semibold text-sm sm:text-base">
-                    Total Lives Impacted
+                    Total Donations
                   </h3>
                 </div>
                 <p className="text-3xl sm:text-4xl font-bold mb-2">
-                  {metrics.livesImpacted}
+                  {loading || !metrics ? "0" : metrics.donationsCount}
                 </p>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  People directly helped by your contributions
+                  Contributions made to campaigns
                 </p>
               </div>
 
@@ -427,15 +509,15 @@ const DonorDashboard = () => {
                     Campaigns
                   </p>
                   <p className="text-xl sm:text-2xl font-bold">
-                    {metrics.campaignsSupportedd}
+                    {loading || !metrics ? "0" : metrics.campaignsSupported}
                   </p>
                 </div>
                 <div className="p-3 sm:p-4 rounded-xl bg-[#0B1221]/50">
                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">
-                    Countries
+                    Total $
                   </p>
                   <p className="text-xl sm:text-2xl font-bold">
-                    {metrics.countriesHelped}
+                    ${loading || !metrics ? "0" : (metrics.totalDonatedFiat || 0).toFixed(0)}
                   </p>
                 </div>
               </div>
@@ -468,11 +550,10 @@ const DonorDashboard = () => {
                     </p>
                   </div>
                   <span
-                    className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                      item.status === "Urgent"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-green-100 text-green-700"
-                    }`}
+                    className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 ${item.status === "Urgent"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-green-100 text-green-700"
+                      }`}
                   >
                     {item.status}
                   </span>
@@ -492,7 +573,7 @@ const DonorDashboard = () => {
                   Email for Receipts
                 </p>
                 <p className="font-semibold text-sm sm:text-base truncate">
-                  james.wilson@email.com
+                  {donor.email || "No email set"}
                 </p>
               </div>
 

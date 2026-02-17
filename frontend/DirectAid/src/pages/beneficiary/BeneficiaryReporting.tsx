@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { mockDataService } from "../../services/mockData";
+import { useBeneficiaryCampaigns } from "../../hooks/useBeneficiaryApi";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
@@ -11,6 +10,7 @@ import {
   LayoutDashboard,
   DollarSign,
   FileText,
+  FolderKanban,
   ArrowLeft,
   Upload,
   CheckCircle2,
@@ -22,16 +22,16 @@ import {
   MapPin,
   Bell,
   Lock,
+  TrendingUp,
 } from "lucide-react";
 
 type Step = "select-campaign" | "upload-report" | "review" | "success";
 
 const BeneficiaryReporting = () => {
   const navigate = useNavigate();
-  const { campaigns } = useApp();
-  const { logout } = useAuth();
-  const beneficiary = mockDataService.getBeneficiaryUser();
-  
+  const { campaigns: userCampaigns, loading: campaignsLoading, error: campaignsError } = useBeneficiaryCampaigns();
+  const { user, logout } = useAuth();
+
   const [currentStep, setCurrentStep] = useState<Step>("select-campaign");
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [reportFiles, setReportFiles] = useState<File[]>([]);
@@ -39,27 +39,16 @@ const BeneficiaryReporting = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get campaigns for this beneficiary
-  const userCampaigns = campaigns.filter(
-    (c) => c.beneficiaryId === beneficiary.id && c.status === "active"
+  // Campaigns available for reporting (ACTIVE and provider-confirmed)
+  const reportableCampaigns = (userCampaigns || []).filter(
+    (c) => c.status === "ACTIVE" && c.confirmationStatus === "provider_confirmed"
   );
 
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/beneficiary",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Funds Received",
-      href: "/beneficiary/funds",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      label: "Reporting",
-      href: "/beneficiary/reporting",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+    { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [
@@ -100,7 +89,7 @@ const BeneficiaryReporting = () => {
   return (
     <DashboardLayout
       navItems={navItems}
-      userName={beneficiary.name}
+      userName={user?.firstName || user?.name || (user as any)?.email || "User"}
       userRole="Aid Beneficiary"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -129,11 +118,16 @@ const BeneficiaryReporting = () => {
         {currentStep === "select-campaign" && (
           <div>
             <h2 className="text-2xl font-bold mb-6">Select Campaign</h2>
+            {campaignsError && (
+              <p className="text-sm text-destructive mb-4" role="alert">{campaignsError}</p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {userCampaigns.length > 0 ? (
-                userCampaigns.map((campaign) => (
+              {campaignsLoading ? (
+                <p className="col-span-full text-muted-foreground">Loading campaigns…</p>
+              ) : reportableCampaigns.length > 0 ? (
+                reportableCampaigns.map((campaign) => (
                   <Card
-                    key={campaign.id}
+                    key={campaign.id || campaign._id}
                     className="p-6 card-elevated cursor-pointer hover:shadow-lg transition-all"
                     onClick={() => {
                       setSelectedCampaign(campaign);
@@ -147,9 +141,9 @@ const BeneficiaryReporting = () => {
                     
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Amount Raised</span>
+                        <span className="text-muted-foreground">Amount raised</span>
                         <span className="font-bold">
-                          ${(campaign.amountRaised / 100).toFixed(0)}
+                          ${Number(campaign.amountRaised ?? 0).toFixed(0)}
                         </span>
                       </div>
                       <div className="w-full bg-secondary/50 rounded-full h-2">
@@ -157,15 +151,12 @@ const BeneficiaryReporting = () => {
                           className="h-full bg-primary rounded-full"
                           style={{
                             width: `${Math.min(
-                              (campaign.amountRaised / campaign.targetAmount) * 100,
+                              (Number(campaign.amountRaised ?? 0) / Number(campaign.targetAmount ?? 1)) * 100,
                               100
                             )}%`,
                           }}
                         ></div>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {campaign.donorCount} donors
-                      </p>
                     </div>
 
                     <Button className="w-full mt-4 btn-cta rounded-lg">
@@ -205,7 +196,7 @@ const BeneficiaryReporting = () => {
               <div className="p-4 rounded-lg bg-secondary/30">
                 <h3 className="font-semibold mb-2">{selectedCampaign.title}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Campaign ID: {selectedCampaign.id}
+                  Campaign ID: {selectedCampaign.id || selectedCampaign._id}
                 </p>
               </div>
 

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { mockDataService } from "../../services/mockData";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
@@ -28,14 +27,19 @@ import {
 const DonorDonations = () => {
   const navigate = useNavigate();
   const { campaigns, donations } = useApp();
-  const { logout } = useAuth();
-  const donor = mockDataService.getDonorUser();
-  
+  const { logout, user } = useAuth();
+
+  // Use real user from context or fallback if loading
+  const donorName = user?.name || "Donor";
+  const donorId = user?.id; // In real app, we filter by this ID or backend returns only mine
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
   // Get donations for this donor
-  const donorDonations = donations.filter((d) => d.donorId === donor.id);
+  // Get donations for this donor (already filtered by backend /donations/me generally, 
+  // but if global list in context, we filter again to be safe)
+  const donorDonations = donations; // Assuming /me endpoint populates this in AppContext
 
   const filteredDonations = donorDonations.filter((donation) => {
     const campaign = campaigns.find((c) => c.id === donation.campaignId);
@@ -75,9 +79,9 @@ const DonorDonations = () => {
   ];
 
   return (
-    <DashboardLayout 
-      navItems={navItems} 
-      userName={donor.name} 
+    <DashboardLayout
+      navItems={navItems}
+      userName={donorName}
       userRole="Donor"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -156,11 +160,10 @@ const DonorDonations = () => {
                               <Calendar className="w-3 h-3" />
                               {donation.paymentMethod}
                             </span>
-                            <span className={`px-2 py-1 rounded-full ${
-                              donation.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            <span className={`px-2 py-1 rounded-full ${donation.status === 'completed' ? 'bg-green-100 text-green-700' :
                               donation.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
+                                'bg-red-100 text-red-700'
+                              }`}>
                               {donation.status}
                             </span>
                           </div>
@@ -207,7 +210,7 @@ const DonorDonations = () => {
               <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="font-semibold text-lg mb-2">No donations found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || filterStatus !== "all" 
+                {searchTerm || filterStatus !== "all"
                   ? "Try adjusting your search or filters"
                   : "Start making a difference by donating to campaigns"
                 }

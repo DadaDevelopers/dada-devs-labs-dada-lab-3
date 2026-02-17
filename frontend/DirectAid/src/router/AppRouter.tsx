@@ -1,11 +1,12 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import LandingPage from "../pages/LandingPage";
+import AdminDashboard from "../pages/dashboard/AdminDashboardPage";
 import LoginPage from "../components/pages/LoginPage";
 import SignUpPage from "../components/pages/SignUpPage";
 import ForgotPasswordPage from "../components/pages/ForgotPasswordPage";
 import OnboardingWizard from "../pages/OnboardingWizard";
 import VerifyEmailPage from "../pages/VerifyEmailPage";
-import AdminDashboard from "../pages/dashboard/AdminDashboard";
 import BeneficiaryDashboard from "../pages/dashboard/BeneficiaryDashboard";
 import ProviderDashboard from "../pages/dashboard/ProviderDashboard";
 import DonorDashboard from "../pages/dashboard/DonorDashboard";
@@ -25,8 +26,27 @@ import DonorDonations from "../pages/donor/DonorDonations";
 import DonorReceipts from "../pages/donor/DonorReceipts";
 import BeneficiaryReporting from "../pages/beneficiary/BeneficiaryReporting";
 import BeneficiaryFunds from "../pages/beneficiary/BeneficiaryFunds";
+import BeneficiaryCampaignsPage from "../pages/beneficiary/BeneficiaryCampaignsPage";
+import BeneficiaryCampaignDetail from "../pages/beneficiary/BeneficiaryCampaignDetail";
+
+/** If user is logged in but has no role / UNASSIGNED, send them to onboarding when they hit a role-specific path. */
+function useOnboardingRedirect() {
+  const { user, role } = useAuth();
+  const { pathname } = useLocation();
+  const isRolePath = /^\/(admin|donor|provider|beneficiary)(\/|$)/.test(pathname);
+  const effectiveRole = String(role ?? "").trim().toUpperCase();
+  const needsOnboarding =
+    user && (effectiveRole === "UNASSIGNED" || !effectiveRole) && isRolePath;
+  return needsOnboarding;
+}
 
 export default function AppRouter() {
+  const redirectToOnboarding = useOnboardingRedirect();
+
+  if (redirectToOnboarding) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   return (
     <Routes>
       {/* Public Pages */}
@@ -71,6 +91,10 @@ export default function AppRouter() {
       <Route path="/beneficiary/settings/change-password" element={<BeneficiarySettings />} />
       <Route path="/beneficiary/reporting" element={<BeneficiaryReporting />} />
       <Route path="/beneficiary/funds" element={<BeneficiaryFunds />} />
+      <Route path="/beneficiary/campaigns" element={<BeneficiaryCampaignsPage />} />
+      <Route path="/beneficiary/campaigns/:id" element={<BeneficiaryCampaignDetail />} />
+      <Route path="/beneficiary/campaigns" element={<BeneficiaryCampaignsPage />} />
+      <Route path="/beneficiary/campaigns/:id" element={<BeneficiaryCampaignDetail />} />
 
       {/* Donor */}
       <Route path="/donor/settings" element={<DonorSettings />} />
@@ -83,7 +107,7 @@ export default function AppRouter() {
       <Route path="/donor/receipts" element={<DonorReceipts />} />
 
       {/* Dashboards */}
-      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/*" element={<AdminDashboard />} />
       <Route path="/beneficiary" element={<BeneficiaryDashboard />} />
       <Route path="/provider" element={<ProviderDashboard />} />
       <Route path="/donor" element={<DonorDashboard />} />

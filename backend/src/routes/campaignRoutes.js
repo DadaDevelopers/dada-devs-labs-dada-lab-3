@@ -1,78 +1,77 @@
 import express from "express";
 import {
-  adminListCampaigns,
-  adminGetCampaign,
-  adminUpdateCampaignStatus as adminUpdateCampaignStatusFull,
-  adminAddAllocation,
-  adminUpdateAllocation,
-  adminDeleteAllocation,
-  getCampaignStats
-} from "../controllers/campaignProfileController.js";
-import {
   createCampaign,
+  confirmProvider,
+  confirmBeneficiary,
   getAllCampaigns,
+  getMyCampaigns,
   getCampaignById,
+  getCampaignWithdrawals,
+  getCampaignTransactions,
   updateCampaign,
   adminUpdateCampaignStatus,
   deleteCampaign,
-  submitCampaignForReview
+  linkProviderToCampaign,
+  providerAcceptCampaign,
+  submitCampaignForReview,
+  disburseCampaignFunds,
+  beneficiaryDisburseToProvider,
+  getCampaignDisbursement,
+  submitCampaignReport,
+  getCampaignReports,
+  reviewCampaignReport,
 } from "../controllers/campaignController.js";
 import { protect, authorize } from "../middlewares/auth.js";
-import {
-  linkProviderToCampaign,
-  providerAcceptCampaign
-} from "../controllers/campaignRequiredController.js";
-import { confirmCampaignCompletion } from "../controllers/campaignController.js";
-import { createDisbursement } from "../controllers/disbursementController.js";
 
 const router = express.Router();
-
-// Admin endpoints
-router.get("/admin/campaigns", protect, authorize("ADMIN"), adminListCampaigns);
-router.get("/admin/campaigns/:id", protect, authorize("ADMIN"), adminGetCampaign);
-router.patch("/admin/campaigns/:id/status", protect, authorize("ADMIN"), adminUpdateCampaignStatusFull);
-router.post("/admin/campaigns/:id/allocations", protect, authorize("ADMIN"), adminAddAllocation);
-router.put("/admin/campaigns/:id/allocations/:allocationId", protect, authorize("ADMIN"), adminUpdateAllocation);
-router.delete("/admin/campaigns/:id/allocations/:allocationId", protect, authorize("ADMIN"), adminDeleteAllocation);
-
-// Campaign stats
-router.get("/:id/stats", getCampaignStats);
-// Beneficiary submits campaign for review
-router.post("/:id/submit", protect, submitCampaignForReview);
-
-// Required endpoints from doc
-router.post("/:id/link-provider", protect, linkProviderToCampaign);
-router.post("/:id/provider-accept", protect, providerAcceptCampaign);
 
 // Create a campaign — only BENEFICIARY users
 router.post("/", protect, authorize("BENEFICIARY"), createCampaign);
 
-// List campaigns — public
+// Provider confirms they will provide the service
+router.patch("/:id/confirm-provider", protect, confirmProvider);
+
+// Beneficiary confirms they have received the service
+router.patch("/:id/confirm-beneficiary", protect, authorize("BENEFICIARY"), confirmBeneficiary);
+
+// List campaigns — public (supports ?beneficiaryId=, ?confirmationStatus=)
 router.get("/", getAllCampaigns);
+
+// My campaigns — authenticated BENEFICIARY only (must be before /:id)
+router.get("/me", protect, authorize("BENEFICIARY"), getMyCampaigns);
+
+// Provider linking and acceptance
+router.post("/:id/link-provider", protect, linkProviderToCampaign);
+router.post("/:id/provider-accept", protect, authorize("PROVIDER"), providerAcceptCampaign);
+router.post("/:id/submit", protect, submitCampaignForReview);
 
 // Admin campaign endpoints (keep before dynamic /:id if needed)
 router.patch("/:id/status", protect, authorize("ADMIN"), adminUpdateCampaignStatus);
 
 // Get single campaign by id — public
 router.get("/:id", getCampaignById);
+// Campaign transparency: withdrawals and transactions (public)
+router.get("/:id/withdrawals", getCampaignWithdrawals);
+router.get("/:id/transactions", getCampaignTransactions);
 
 // Update campaign — must be authenticated; controller enforces owner or ADMIN
 router.put("/:id", protect, updateCampaign);
 
+// Admin disburses funds
+router.post("/:id/disburse", protect, authorize("ADMIN"), disburseCampaignFunds);
+
+// Beneficiary disburses to provider (campaign owner)
+router.post("/:id/disburse-to-provider", protect, authorize("BENEFICIARY"), beneficiaryDisburseToProvider);
+
+// Beneficiary sees funds disbursed
+router.get("/:id/disbursement", protect, getCampaignDisbursement);
+
+/* About Campaign Reports */
+router.post("/:id/reports", protect, submitCampaignReport);
+router.get("/:id/reports", protect, getCampaignReports);
+router.patch("/:id/reports/:reportId/review", protect, reviewCampaignReport);
+
 // Delete campaign — must be authenticated; controller enforces owner or ADMIN
 router.delete("/:id", protect, deleteCampaign);
-
-import { submitCampaignReport, listCampaignReports } from "../controllers/campaignReport.controller.js";
-
-// Submit a campaign report (beneficiary only)
-router.post("/:id/reports", protect, authorize("BENEFICIARY"), submitCampaignReport);
-// List campaign reports (beneficiary, provider, admin)
-router.get("/:id/reports", protect, listCampaignReports);
-
-// Beneficiary confirms campaign completion
-router.post("/:id/confirm", protect, authorize("BENEFICIARY"), confirmCampaignCompletion);
-
-// Beneficiary requests disbursement
-router.post("/:id/disbursements", protect, authorize("BENEFICIARY"), createDisbursement);
 
 export default router;

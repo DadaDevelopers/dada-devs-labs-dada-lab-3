@@ -15,6 +15,7 @@ import {
   FileText,
   Settings,
 } from "lucide-react";
+import { getBeneficiaryDisplayName } from "../lib/utils";
 
 const ProviderInvoices = () => {
   const navigate = useNavigate();
@@ -101,7 +102,7 @@ const ProviderInvoices = () => {
                     <p className="text-sm text-muted-foreground mb-3">
                       Beneficiary:{" "}
                       <span className="font-semibold">
-                        {campaign.beneficiary?.name}
+                        {getBeneficiaryDisplayName(campaign)}
                       </span>
                     </p>
                   </div>

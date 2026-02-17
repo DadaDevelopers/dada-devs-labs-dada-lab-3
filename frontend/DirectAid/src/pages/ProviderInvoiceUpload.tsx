@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDataService } from "../services/mockData";
+import api from "../services/api";
+import { CampaignService } from "../services/apiServices";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import type { Campaign } from "../types/index";
 
 import {
   ArrowLeft,
@@ -23,10 +24,6 @@ import {
   Lock,
 } from "lucide-react";
 
-// -------------------------------------------------------
-// Types
-// -------------------------------------------------------
-
 type Step = "upload-invoice" | "review" | "success";
 
 interface InvoiceFormState {
@@ -37,54 +34,49 @@ interface InvoiceFormState {
   invoiceFile: File | null;
 }
 
-interface Campaign {
-  id: string;
-  title: string;
-  description: string;
-  invoices?: any[];
-  providerConfirmed?: boolean;
-}
-
-// -------------------------------------------------------
-// Component
-// -------------------------------------------------------
+const PAYMENT_METHODS = ["MPESA", "BANK", "STRIPE", "CARD", "BITCOIN", "LIGHTNING", "CASH", "OTHER"] as const;
 
 const ProviderInvoiceUpload = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { campaigns, updateCampaign } = useApp();
   const { user, role, logout } = useAuth();
-
-  const provider = mockDataService.getProviderUser();
   const campaignId = searchParams.get("campaignId");
 
-  // Provider navigation items
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [provider, setProvider] = useState<{ _id: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  // MVP: only campaigns this provider is linked to (providerId === current user)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [campRes, provRes] = await Promise.all([
+          CampaignService.getAll(),
+          api.get("/providers/me"),
+        ]);
+        const rawList = campRes?.campaigns || [];
+        const prov = (provRes as any).provider || null;
+        setProvider(prov);
+        const userId = (user as any)?.id ?? (user as any)?._id ?? (prov as any)?.userId;
+        const myCampaigns = rawList.filter((c: any) => {
+          const pid = c.providerId?._id ?? c.providerId;
+          return pid != null && String(pid) === String(userId);
+        });
+        setCampaigns(myCampaigns);
+      } catch (e) {
+        console.error("Failed to load campaigns/provider", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [user]);
+
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/provider",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Campaigns",
-      href: "/provider/campaigns",
-      icon: <FolderKanban className="w-5 h-5" />,
-    },
-    {
-      label: "Upload Invoices",
-      href: "/provider/invoices",
-      icon: <Upload className="w-5 h-5" />,
-    },
-    {
-      label: "Withdrawals",
-      href: "/provider/withdrawals",
-      icon: <Wallet className="w-5 h-5" />,
-    },
-    {
-      label: "Proof Upload",
-      href: "/provider/proof-upload",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/provider", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/provider/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Upload Invoices", href: "/provider/invoices", icon: <Upload className="w-5 h-5" /> },
+    { label: "Withdrawals", href: "/provider/withdrawals", icon: <Wallet className="w-5 h-5" /> },
+    { label: "Proof Upload", href: "/provider/proof-upload", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [
@@ -102,7 +94,6 @@ const ProviderInvoiceUpload = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
 
-  // Invoice Data
   const [invoiceData, setInvoiceData] = useState<InvoiceFormState>({
     invoiceNumber: "",
     invoiceDate: "",
@@ -110,70 +101,28 @@ const ProviderInvoiceUpload = () => {
     description: "",
     invoiceFile: null,
   });
+  const [paymentMethod, setPaymentMethod] = useState<string>("OTHER");
+  const [currency, setCurrency] = useState("USD");
+  const [submitError, setSubmitError] = useState("");
 
-  // -------------------------------------------------------
-  // Load Campaign
-  // -------------------------------------------------------
   useEffect(() => {
-    // Comment out parameter requirement for now to allow direct navigation
-    // if (!campaignId) {
-    //   navigate("/provider");
-    //   return;
-    // }
-
-    // For demo purposes, just use the first available campaign if no ID provided
-    if (!campaignId) {
-      const providerCampaigns = campaigns.filter(c => c.providerId === provider.id);
-      if (providerCampaigns.length > 0) {
-        setSelectedCampaign(providerCampaigns[0] as Campaign);
-      } else {
-        // Create a mock campaign for demo
-        setSelectedCampaign({
-          id: "demo_campaign_001",
-          title: "Demo Medical Campaign",
-          description: "Sample campaign for invoice upload demonstration",
-          invoices: [],
-          providerConfirmed: false
-        });
-      }
-      return;
-    }
-
-    const campaign = campaigns.find((c) => c.id === campaignId);
-    if (!campaign) {
-      // Don't redirect, just use demo campaign
-      setSelectedCampaign({
-        id: "demo_campaign_001",
-        title: "Demo Medical Campaign", 
-        description: "Sample campaign for invoice upload demonstration",
-        invoices: [],
-        providerConfirmed: false
-      });
+    if (!campaigns.length) return;
+    if (campaignId) {
+      const campaign = campaigns.find((c) => String((c as any)._id || (c as any).id) === campaignId);
+      if (campaign) setSelectedCampaign(campaign as Campaign);
     } else {
-      setSelectedCampaign(campaign as Campaign);
+      setSelectedCampaign(campaigns[0] as Campaign);
     }
-  }, [campaignId, campaigns, navigate, provider.id]);
+  }, [campaignId, campaigns]);
 
-  // -------------------------------------------------------
-  // Handlers
-  // -------------------------------------------------------
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setInvoiceData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setInvoiceData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    setInvoiceData((prev) => ({ ...prev, invoiceFile: file }));
-
-    if (file.type.startsWith("image/") || file.type === "application/pdf") {
+    if (file) {
+      setInvoiceData((prev) => ({ ...prev, invoiceFile: file }));
       setPreviewUrl(URL.createObjectURL(file));
     }
   };
@@ -184,55 +133,36 @@ const ProviderInvoiceUpload = () => {
   };
 
   const canProceed = () => {
-    const { invoiceNumber, invoiceDate, invoiceAmount, description, invoiceFile } =
-      invoiceData;
-    return (
-      invoiceNumber &&
-      invoiceDate &&
-      invoiceAmount &&
-      description &&
-      invoiceFile
-    );
+    const { invoiceAmount } = invoiceData;
+    return selectedCampaign && provider && invoiceAmount && Number(invoiceAmount) > 0;
   };
 
   const handleSubmitInvoice = async () => {
-    if (!selectedCampaign) return;
-
+    if (!selectedCampaign || !provider) return;
     setIsSubmitting(true);
-
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    const invoiceId = `invoice_${Date.now()}`;
-
-    const updated = {
-      ...selectedCampaign,
-      providerConfirmed: true,
-      invoices: [
-        ...(selectedCampaign.invoices ?? []),
-        {
-          id: invoiceId,
-          number: invoiceData.invoiceNumber,
-          amount: parseFloat(invoiceData.invoiceAmount),
-          date: invoiceData.invoiceDate,
-          description: invoiceData.description,
-          fileUrl: previewUrl,
-          status: "pending_approval",
-          uploadedAt: new Date().toISOString(),
-          uploadedBy: provider.id,
-        },
-      ],
-    };
-
-    updateCampaign(selectedCampaign.id, updated);
-    setIsSubmitting(false);
-    setCurrentStep("success");
+    setSubmitError("");
+    try {
+      const amount = Number(invoiceData.invoiceAmount);
+      const campaignId = (selectedCampaign as any)._id || (selectedCampaign as any).id;
+      await api.post("/invoices", {
+        campaignId,
+        providerId: provider._id,
+        amount,
+        currency: currency || "USD",
+        paymentMethod: paymentMethod || "OTHER",
+        invoiceFileUrl: null,
+      });
+      setCurrentStep("success");
+    } catch (e: any) {
+      setSubmitError(e?.response?.data?.message || e?.message || "Failed to submit invoice");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const backToDashboard = () => navigate("/provider");
 
-  // -------------------------------------------------------
-  // Loading State
-  // -------------------------------------------------------
+  if (loading) return <div className="p-10 text-center">Loading...</div>;
   if (!selectedCampaign) {
     return (
       <DashboardLayout
@@ -240,333 +170,184 @@ const ProviderInvoiceUpload = () => {
         userName={userName}
         userRole={userRole}
         settingsNavItems={settingsNavItems}
-        onLogout={async () => {
-          await logout();
-          navigate("/");
-        }}
+        onLogout={async () => { await logout(); navigate("/"); }}
       >
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading campaign...</p>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // -------------------------------------------------------
-  // Upload Step
-  // -------------------------------------------------------
-  if (currentStep === "upload-invoice") {
-    return (
-      <DashboardLayout
-        navItems={navItems}
-        userName={userName}
-        userRole={userRole}
-        settingsNavItems={settingsNavItems}
-        onLogout={async () => {
-          await logout();
-          navigate("/");
-        }}
-      >
-        <div className="space-y-6">
-          <div className="max-w-2xl mx-auto">
-            {/* Back */}
-            <button
-              onClick={backToDashboard}
-              className="flex items-center gap-2 text-primary font-medium mb-6"
-            >
-              <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-            </button>
-
-          {/* Header */}
-          <h1 className="text-3xl font-bold mb-2">Provider Confirmation</h1>
-          <p className="text-muted-foreground mb-6">
-            Upload your invoice to confirm service readiness for{" "}
-            <span className="font-semibold text-foreground">
-              {selectedCampaign.title}
-            </span>
+        <div className="max-w-2xl mx-auto p-10 text-center space-y-4">
+          <p className="text-muted-foreground">
+            You haven&apos;t been assigned to any campaign yet. When a beneficiary creates a campaign and an admin links you as the provider, or you accept a campaign from your Campaigns page, it will appear here so you can upload an invoice.
           </p>
-
-          {/* Info Box */}
-          <Card className="p-4 mb-6 bg-primary/5 border-primary/20">
-            <div className="flex gap-3">
-              <AlertCircle className="w-5 h-5 text-primary" />
-              <div className="text-sm">
-                <p className="font-semibold mb-1">What is Provider Confirmation?</p>
-                <p className="text-muted-foreground">
-                  Uploading your invoice confirms your readiness to deliver
-                  services as agreed under this campaign.
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Invoice Form */}
-          <Card className="p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4">Invoice Details</h2>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Invoice Number
-                </label>
-                <Input
-                  name="invoiceNumber"
-                  value={invoiceData.invoiceNumber}
-                  onChange={handleInputChange}
-                  placeholder="INV-2024-001"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Invoice Date
-                </label>
-                <Input
-                  type="date"
-                  name="invoiceDate"
-                  value={invoiceData.invoiceDate}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Amount (USD)
-                </label>
-                <Input
-                  type="number"
-                  name="invoiceAmount"
-                  value={invoiceData.invoiceAmount}
-                  onChange={handleInputChange}
-                  placeholder="0.00"
-                  step="0.01"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <label className="block text-sm font-medium mb-2">
-                Description of Services
-              </label>
-              <textarea
-                name="description"
-                value={invoiceData.description}
-                onChange={handleInputChange}
-                rows={4}
-                className="w-full px-4 py-2 rounded-lg bg-card border border-border focus:ring-primary focus:ring-2"
-              />
-            </div>
-          </Card>
-
-          {/* File Upload */}
-          <Card className="p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4">Upload Invoice File</h2>
-
-            {!invoiceData.invoiceFile ? (
-              <label className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer block hover:bg-secondary/50 transition">
-                <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                <p className="font-medium mb-1">Click to upload or drag & drop</p>
-                <p className="text-sm text-muted-foreground">
-                  PDF, PNG, JPG — Max 10MB
-                </p>
-
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-              </label>
-            ) : (
-              <div className="p-4 border border-green-500/30 bg-green-500/10 rounded-lg flex items-start justify-between">
-                <div className="flex gap-3">
-                  <CheckCircle2 className="w-6 h-6 text-green-600 mt-1" />
-                  <div>
-                    <p className="font-semibold">{invoiceData.invoiceFile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {(invoiceData.invoiceFile.size / 1024).toFixed(2)} KB
-                    </p>
-                  </div>
-                </div>
-
-                <button onClick={handleRemoveFile} className="text-destructive">
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            )}
-          </Card>
-
-            {/* Actions */}
-            <div className="flex gap-4">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={backToDashboard}
-              >
-                Cancel
-              </Button>
-
-              <Button
-                className="flex-1"
-                disabled={!canProceed()}
-                onClick={() => setCurrentStep("review")}
-              >
-                Review & Submit
-              </Button>
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Campaigns appear here once you&apos;re assigned by an admin or after you accept a campaign in <strong>Campaigns → To approve</strong>.
+          </p>
+          <Button variant="outline" onClick={() => navigate("/provider/campaigns")}>Go to Campaigns</Button>
         </div>
       </DashboardLayout>
     );
   }
 
-  // -------------------------------------------------------
-  // Review Step
-  // -------------------------------------------------------
-  if (currentStep === "review") {
-    return (
-      <DashboardLayout
-        navItems={navItems}
-        userName={userName}
-        userRole={userRole}
-        settingsNavItems={settingsNavItems}
-        onLogout={async () => {
-          await logout();
-          navigate("/");
-        }}
-      >
-        <div className="space-y-6">
-          <div className="max-w-2xl mx-auto">
-          <button
-            onClick={() => setCurrentStep("upload-invoice")}
-            className="flex items-center gap-2 text-primary font-medium mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" /> Edit Invoice
-          </button>
-
-          <h1 className="text-3xl font-bold mb-8">Review Invoice</h1>
-
-          {/* Campaign Info */}
-          <Card className="p-6 mb-6">
-            <h2 className="text-lg font-bold mb-3">Campaign</h2>
-            <div className="p-4 bg-card rounded-lg border border-border">
-              <p className="font-semibold">{selectedCampaign.title}</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                {selectedCampaign.description}
-              </p>
-            </div>
-          </Card>
-
-          {/* Invoice Summary */}
-          <Card className="p-6 mb-6">
-            <h2 className="text-lg font-bold mb-4">Invoice Summary</h2>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between py-2 border-b border-border">
-                <span>Invoice Number</span>
-                <span className="font-semibold">{invoiceData.invoiceNumber}</span>
-              </div>
-
-              <div className="flex justify-between py-2 border-b border-border">
-                <span>Date</span>
-                <span className="font-semibold">
-                  {new Date(invoiceData.invoiceDate).toLocaleDateString()}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-2 border-b border-border">
-                <span>Amount</span>
-                <span className="font-semibold text-primary">
-                  $
-                  {Number(invoiceData.invoiceAmount).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-
-              <div className="py-2 border-b border-border">
-                <p className="mb-1 font-medium">Description</p>
-                <p className="bg-card p-3 rounded">{invoiceData.description}</p>
-              </div>
-
-              <div className="py-2">
-                <p className="mb-1 font-medium">File</p>
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-muted-foreground" />
-                  <span>{invoiceData.invoiceFile?.name}</span>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Warning */}
-          <Card className="p-4 mb-6 bg-primary/5 border-primary/20">
-            <div className="flex gap-3">
-              <AlertCircle className="w-5 h-5 text-primary" />
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium mb-1">Before you submit:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Ensure all invoice details are correct.</li>
-                  <li>Invoice must match services for this campaign.</li>
-                </ul>
-              </div>
-            </div>
-          </Card>
-
-            {/* Actions */}
-            <div className="flex gap-4">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setCurrentStep("upload-invoice")}
-              >
-                Edit
-              </Button>
-
-              <Button
-                className="flex-1"
-                disabled={isSubmitting}
-                onClick={handleSubmitInvoice}
-              >
-                {isSubmitting ? "Submitting..." : "Confirm & Submit"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // -------------------------------------------------------
-  // Success Step
-  // -------------------------------------------------------
   return (
     <DashboardLayout
       navItems={navItems}
       userName={userName}
       userRole={userRole}
       settingsNavItems={settingsNavItems}
-      onLogout={async () => {
-        await logout();
-        navigate("/");
-      }}
+      onLogout={async () => { await logout(); navigate("/"); }}
     >
-      <div className="flex items-start pt-12">
-        <div className="max-w-md mx-auto text-center">
-        <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
-        <h1 className="text-3xl font-bold mb-2">Invoice Submitted!</h1>
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Step Navigation Header */}
+        <button onClick={backToDashboard} className="flex items-center gap-2 text-primary font-medium mb-6">
+          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+        </button>
 
-        <p className="text-muted-foreground mb-6">
-          Your invoice has been successfully uploaded and sent for admin approval.
-        </p>
+        {currentStep === "upload-invoice" && (
+          <>
+            <h1 className="text-3xl font-bold mb-2">Provider Confirmation</h1>
+            <p className="text-sm text-muted-foreground mb-4">
+              Campaigns appear here once you&apos;re assigned by an admin or after you accept a campaign in Campaigns → To approve.
+            </p>
+            {campaigns.length > 1 && (
+              <div className="mb-4">
+                <label className="text-sm font-medium block mb-2">Campaign</label>
+                <select
+                  value={(selectedCampaign as any)?._id || (selectedCampaign as any)?.id}
+                  onChange={(e) => {
+                    const c = campaigns.find((x) => String((x as any)._id || (x as any).id) === e.target.value);
+                    if (c) setSelectedCampaign(c as Campaign);
+                  }}
+                  className="w-full max-w-md rounded-md border px-3 py-2 bg-background"
+                >
+                  {campaigns.map((c) => (
+                    <option key={(c as any)._id || (c as any).id} value={(c as any)._id || (c as any).id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <p className="text-muted-foreground mb-6">
+              Upload your invoice for <span className="font-semibold text-foreground">{selectedCampaign?.title}</span>
+            </p>
 
-          <Button onClick={backToDashboard} className="w-full">
-            Back to Dashboard
-          </Button>
-        </div>
+            <Card className="p-4 mb-6 bg-primary/5 border-primary/10 border border-white/10 shadow-[var(--shadow-sm)] transition-all duration-200">
+              <div className="flex gap-3">
+                <AlertCircle className="w-5 h-5 text-primary" />
+                <div className="text-sm">
+                  <p className="font-semibold mb-1">Upload invoice for services you are rendering</p>
+                  <p className="text-muted-foreground">
+                    Upload your invoice for the services you are providing to this beneficiary. This helps the beneficiary get funded—you are confirming you are the provider of record for this campaign.
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6 space-y-6 card-elevated">
+              <h2 className="text-xl font-bold">Invoice Details</h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Invoice Number</label>
+                  <Input name="invoiceNumber" value={invoiceData.invoiceNumber} onChange={handleInputChange} placeholder="INV-2024-001" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Invoice Date</label>
+                  <Input type="date" name="invoiceDate" value={invoiceData.invoiceDate} onChange={handleInputChange} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Amount</label>
+                  <Input type="number" name="invoiceAmount" value={invoiceData.invoiceAmount} onChange={handleInputChange} placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Currency</label>
+                  <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full rounded-md border px-3 py-2 bg-background">
+                    <option value="USD">USD</option>
+                    <option value="KES">KES</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Payment method</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full rounded-md border px-3 py-2 bg-background">
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Description</label>
+                <textarea 
+                  name="description" 
+                  value={invoiceData.description} 
+                  onChange={handleInputChange} 
+                  rows={4} 
+                  className="w-full px-4 py-2 rounded-lg bg-background border border-input focus:ring-2 focus:ring-primary outline-none" 
+                />
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <h2 className="text-xl font-bold mb-4">Upload Invoice File</h2>
+              {!invoiceData.invoiceFile ? (
+                <label className="border-2 border-dashed border-muted rounded-lg p-8 text-center cursor-pointer block hover:bg-accent/50 transition">
+                  <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                  <p className="font-medium">Click to upload or drag & drop</p>
+                  <input type="file" className="hidden" onChange={handleFileChange} />
+                </label>
+              ) : (
+                <div className="p-4 border border-primary/30 bg-primary/5 rounded-lg flex items-center justify-between">
+                  <div className="flex gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-primary" />
+                    <span className="font-medium">{invoiceData.invoiceFile.name}</span>
+                  </div>
+                  <button onClick={handleRemoveFile} className="text-destructive"><Trash2 className="w-5 h-5" /></button>
+                </div>
+              )}
+            </Card>
+
+            <div className="flex gap-4">
+              <Button variant="outline" className="flex-1" onClick={backToDashboard}>Cancel</Button>
+              <Button className="flex-1" disabled={!canProceed()} onClick={() => setCurrentStep("review")}>Review & Submit</Button>
+            </div>
+          </>
+        )}
+
+        {currentStep === "review" && (
+          <div className="space-y-6">
+            <h1 className="text-3xl font-bold">Review Invoice</h1>
+            {submitError && <p className="text-destructive text-sm">{submitError}</p>}
+            <Card className="p-6 card-elevated">
+              <h2 className="text-lg font-bold mb-4">Invoice Summary</h2>
+              <div className="space-y-3">
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Campaign</span>
+                  <span className="font-semibold">{selectedCampaign?.title}</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-semibold text-primary">{currency} {Number(invoiceData.invoiceAmount).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-muted-foreground">Payment method</span>
+                  <span className="font-semibold">{paymentMethod}</span>
+                </div>
+              </div>
+            </Card>
+            <div className="flex gap-4">
+              <Button variant="outline" className="flex-1" onClick={() => setCurrentStep("upload-invoice")}>Edit</Button>
+              <Button className="flex-1" disabled={isSubmitting} onClick={handleSubmitInvoice}>
+                {isSubmitting ? "Submitting..." : "Confirm & Submit"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === "success" && (
+          <div className="text-center py-12 space-y-4">
+            <CheckCircle2 className="w-16 h-16 text-primary mx-auto" />
+            <h1 className="text-3xl font-bold">Invoice Submitted!</h1>
+            <p className="text-muted-foreground">Sent for admin approval.</p>
+            <Button onClick={backToDashboard} className="w-full">Back to Dashboard</Button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

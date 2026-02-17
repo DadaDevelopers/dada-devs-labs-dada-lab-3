@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { mockDataService } from "../../services/mockData";
+import { useBeneficiaryCampaigns, useBeneficiaryMetrics, useBeneficiaryDisbursements } from "../../hooks/useBeneficiaryApi";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
@@ -11,6 +10,7 @@ import {
   LayoutDashboard,
   DollarSign,
   FileText,
+  FolderKanban,
   ArrowLeft,
   Search,
   Calendar,
@@ -19,7 +19,6 @@ import {
   Eye,
   CheckCircle,
   Clock,
-  Filter,
   User,
   MapPin,
   Bell,
@@ -28,64 +27,28 @@ import {
 
 const BeneficiaryFunds = () => {
   const navigate = useNavigate();
-  const { campaigns } = useApp();
-  const { logout } = useAuth();
-  const beneficiary = mockDataService.getBeneficiaryUser();
-  const metrics = mockDataService.getBeneficiaryMetrics();
-  
+  const { user, logout } = useAuth();
+  const { campaigns: userCampaigns, loading: campaignsLoading, error: campaignsError } = useBeneficiaryCampaigns();
+  const { metrics, loading: metricsLoading, error: metricsError } = useBeneficiaryMetrics();
+  const { disbursements, loading: disbursementsLoading, error: disbursementsError } = useBeneficiaryDisbursements();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  // Get campaigns for this beneficiary
-  const userCampaigns = campaigns.filter(
-    (c) => c.beneficiaryId === beneficiary.id
-  );
+  const beneficiaryName = user?.firstName || user?.name || user?.email || "User";
 
-  // Mock disbursement data
-  const disbursements = [
-    {
-      id: "disb_001",
-      campaignId: userCampaigns[0]?.id,
-      amount: 250000, // in cents
-      status: "completed",
-      disbursedAt: "2024-11-15T10:30:00Z",
-      description: "Initial emergency relief disbursement",
-      transactionRef: "TXN-2024-001",
-    },
-    {
-      id: "disb_002", 
-      campaignId: userCampaigns[0]?.id,
-      amount: 150000,
-      status: "pending",
-      disbursedAt: "2024-11-20T14:15:00Z",
-      description: "Medical supplies procurement",
-      transactionRef: "TXN-2024-002",
-    },
-  ];
-
-  const filteredDisbursements = disbursements.filter((disbursement) => {
-    const campaign = campaigns.find((c) => c.id === disbursement.campaignId);
-    const matchesSearch = campaign?.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === "all" || disbursement.status === filterStatus;
+  const filteredDisbursements = disbursements.filter((d) => {
+    const campaign = userCampaigns.find((c) => c.id === d.campaignId);
+    const matchesSearch = campaign?.title?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus === "all" || d.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
 
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/beneficiary",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      label: "Funds Received",
-      href: "/beneficiary/funds",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      label: "Reporting",
-      href: "/beneficiary/reporting",
-      icon: <FileText className="w-5 h-5" />,
-    },
+    { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
+    { label: "Funds Received", href: "/beneficiary/funds", icon: <DollarSign className="w-5 h-5" /> },
+    { label: "Reporting", href: "/beneficiary/reporting", icon: <FileText className="w-5 h-5" /> },
   ];
 
   const settingsNavItems = [
@@ -98,7 +61,7 @@ const BeneficiaryFunds = () => {
   return (
     <DashboardLayout
       navItems={navItems}
-      userName={beneficiary.name}
+      userName={beneficiaryName}
       userRole="Aid Beneficiary"
       settingsNavItems={settingsNavItems}
       onLogout={async () => {
@@ -127,6 +90,11 @@ const BeneficiaryFunds = () => {
           </Button>
         </div>
 
+        {(campaignsError || metricsError || disbursementsError) && (
+          <p className="text-sm text-destructive" role="alert">
+            {campaignsError || metricsError || disbursementsError}
+          </p>
+        )}
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Card className="p-4 sm:p-6 card-elevated">
@@ -137,7 +105,7 @@ const BeneficiaryFunds = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Total Received</p>
                 <p className="text-2xl font-bold">
-                  ${(metrics.totalAidReceived / 100).toFixed(0)}
+                  {metricsLoading ? "…" : `$${Number(metrics?.totalAidReceived ?? 0).toFixed(0)}`}
                 </p>
               </div>
             </div>
@@ -149,9 +117,9 @@ const BeneficiaryFunds = () => {
                 <TrendingUp className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Last Disbursement</p>
+                <p className="text-sm text-muted-foreground">Disbursements</p>
                 <p className="text-2xl font-bold">
-                  ${(metrics.totalDisbursements / 100).toFixed(0)}
+                  {metricsLoading ? "…" : `$${Number(metrics?.totalDisbursements ?? 0).toFixed(0)}`}
                 </p>
               </div>
             </div>
@@ -164,7 +132,7 @@ const BeneficiaryFunds = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Active Campaigns</p>
-                <p className="text-2xl font-bold">{userCampaigns.length}</p>
+                <p className="text-2xl font-bold">{campaignsLoading ? "…" : userCampaigns.length}</p>
               </div>
             </div>
           </Card>
@@ -197,9 +165,13 @@ const BeneficiaryFunds = () => {
 
         {/* Disbursements List */}
         <div className="space-y-4">
-          {filteredDisbursements.length > 0 ? (
+          {disbursementsLoading ? (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">Loading disbursements…</p>
+            </Card>
+          ) : filteredDisbursements.length > 0 ? (
             filteredDisbursements.map((disbursement) => {
-              const campaign = campaigns.find((c) => c.id === disbursement.campaignId);
+              const campaign = userCampaigns.find((c) => c.id === disbursement.campaignId);
               return (
                 <Card key={disbursement.id} className="p-4 sm:p-6 card-elevated">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -213,16 +185,20 @@ const BeneficiaryFunds = () => {
                             {campaign?.title || "Campaign"}
                           </h3>
                           <p className="text-sm text-muted-foreground mb-2">
-                            {disbursement.description}
+                            {disbursement.description ?? "—"}
                           </p>
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              {new Date(disbursement.disbursedAt).toLocaleDateString()}
+                              {disbursement.disbursedAt
+                                ? new Date(disbursement.disbursedAt).toLocaleDateString()
+                                : "—"}
                             </span>
-                            <span className="flex items-center gap-1">
-                              Ref: {disbursement.transactionRef}
-                            </span>
+                            {disbursement.transactionRef && (
+                              <span className="flex items-center gap-1">
+                                Ref: {disbursement.transactionRef}
+                              </span>
+                            )}
                             <span className={`px-2 py-1 rounded-full ${
                               disbursement.status === 'completed' ? 'bg-green-100 text-green-700' :
                               disbursement.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
@@ -240,7 +216,7 @@ const BeneficiaryFunds = () => {
                     <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
                       <div className="sm:text-right">
                         <p className="font-bold text-xl">
-                          ${(disbursement.amount / 100).toFixed(2)}
+                          ${(typeof disbursement.amount === "number" ? disbursement.amount / 100 : Number(disbursement.amount) / 100 || 0).toFixed(2)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Disbursed
@@ -252,7 +228,7 @@ const BeneficiaryFunds = () => {
                           variant="outline"
                           size="sm"
                           className="rounded-full"
-                          onClick={() => navigate(`/campaigns/${campaign?.id}`)}
+                          onClick={() => navigate(campaign?.id ? `/beneficiary/campaigns/${campaign.id}` : "/beneficiary/campaigns")}
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -276,9 +252,9 @@ const BeneficiaryFunds = () => {
               <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="font-semibold text-lg mb-2">No disbursements found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || filterStatus !== "all" 
+                {searchTerm || filterStatus !== "all"
                   ? "Try adjusting your search or filters"
-                  : "No fund disbursements have been made yet"
+                  : "No disbursements yet. Disbursements will appear here once funds are released from your campaigns."
                 }
               </p>
               <Button
@@ -293,24 +269,34 @@ const BeneficiaryFunds = () => {
 
         {/* Monthly Breakdown */}
         <Card className="p-4 sm:p-6 card-elevated">
-          <h2 className="text-xl font-bold mb-4">Monthly Breakdown</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-secondary/30">
-              <p className="text-sm text-muted-foreground mb-1">November 2024</p>
-              <p className="text-xl font-bold">$4,000</p>
-              <p className="text-xs text-green-600">2 disbursements</p>
+          <h2 className="text-xl font-bold mb-4">Monthly breakdown</h2>
+          {filteredDisbursements.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {(() => {
+                const byMonth = new Map<string, { amount: number; count: number }>();
+                filteredDisbursements.forEach((d) => {
+                  if (!d.disbursedAt) return;
+                  const month = new Date(d.disbursedAt).toLocaleString("default", { month: "long", year: "numeric" });
+                  const prev = byMonth.get(month) ?? { amount: 0, count: 0 };
+                  const amt = typeof d.amount === "number" ? d.amount : Number(d.amount) || 0;
+                  byMonth.set(month, { amount: prev.amount + amt, count: prev.count + 1 });
+                });
+                return Array.from(byMonth.entries())
+                  .slice(0, 6)
+                  .map(([month, { amount, count }]) => (
+                    <div key={month} className="p-4 rounded-xl bg-[var(--color-secondary-bg)] border border-white/10">
+                      <p className="text-sm text-[var(--color-text-light)]/70 mb-1">{month}</p>
+                      <p className="text-xl font-bold text-[var(--color-text-light)]">${Number(amount).toFixed(0)}</p>
+                      <p className="text-xs text-[var(--color-accent)]">{count} disbursement{count !== 1 ? "s" : ""}</p>
+                    </div>
+                  ));
+              })()}
             </div>
-            <div className="p-4 rounded-lg bg-secondary/30">
-              <p className="text-sm text-muted-foreground mb-1">October 2024</p>
-              <p className="text-xl font-bold">$2,500</p>
-              <p className="text-xs text-green-600">1 disbursement</p>
-            </div>
-            <div className="p-4 rounded-lg bg-secondary/30">
-              <p className="text-sm text-muted-foreground mb-1">September 2024</p>
-              <p className="text-xl font-bold">$1,800</p>
-              <p className="text-xs text-green-600">1 disbursement</p>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4">
+              Monthly breakdown will appear here once disbursements with dates are available.
+            </p>
+          )}
         </Card>
       </div>
     </DashboardLayout>
