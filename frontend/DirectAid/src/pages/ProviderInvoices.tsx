@@ -130,7 +130,7 @@ const ProviderInvoices = () => {
 
                 <Button
                   className="w-full btn-cta rounded-lg"
-                  onClick={() => handleUploadInvoice(campaign.id)}
+                  onClick={() => handleUploadInvoice(campaign.id ?? "")}
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   {campaign.invoices?.length > 0 ? "View/Update Invoice" : "Upload Invoice"}

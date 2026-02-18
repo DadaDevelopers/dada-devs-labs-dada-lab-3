@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBeneficiaryCampaigns, confirmBeneficiaryReceipt } from "../hooks/useBeneficiaryApi";
+import { mockDataService } from "../services/mockData";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import {
@@ -103,7 +104,7 @@ const BeneficiaryConfirmation = () => {
                     <div
                       className="p-6 cursor-pointer hover:bg-gray-50 transition"
                       onClick={() =>
-                        setExpandedCampaign(isExpanded ? null : campaign.id)
+                        setExpandedCampaign(isExpanded ? null : campaign.id ?? null)
                       }
                     >
                       <div className="flex items-start justify-between">
@@ -135,9 +136,7 @@ const BeneficiaryConfirmation = () => {
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="w-4 h-4" />
-                              {new Date(
-                                campaign.createdAt
-                              ).toLocaleDateString()}
+                              {campaign.createdAt ? new Date(campaign.createdAt).toLocaleDateString() : "—"}
                             </div>
                           </div>
                         </div>
@@ -164,7 +163,7 @@ const BeneficiaryConfirmation = () => {
                                 <p className="text-gray-600">Provider</p>
                                 <p className="font-semibold text-gray-900">
                                   {mockDataService.getProviderById(
-                                    campaign.providerId
+                                    campaign.providerId ?? ""
                                   )?.name || "Not Assigned"}
                                 </p>
                               </div>
@@ -251,28 +250,26 @@ const BeneficiaryConfirmation = () => {
                                 <FileText className="w-4 h-4 text-gray-400" />
                                 <div>
                                   <p className="text-sm font-semibold text-gray-900">
-                                    {campaign.invoice.invoiceNumber}
+                                    {campaign.invoice?.invoiceNumber}
                                   </p>
                                   <p className="text-xs text-gray-600 mt-0.5">
-                                    {new Date(
-                                      campaign.invoice.invoiceDate
-                                    ).toLocaleDateString()}{" "}
-                                    • {campaign.invoice.description}
+                                    {campaign.invoice?.invoiceDate ? new Date(campaign.invoice.invoiceDate).toLocaleDateString() : "—"}{" "}
+                                    • {campaign.invoice?.description}
                                   </p>
                                 </div>
                               </div>
                               <div className="text-right">
                                 <p className="font-semibold text-gray-900">
-                                  ${campaign.invoice.amount.toLocaleString()}
+                                  ${(campaign.invoice?.amount ?? 0).toLocaleString()}
                                 </p>
                                 <span
                                   className={`text-xs font-semibold px-2 py-1 rounded inline-block mt-1 ${
-                                    campaign.invoice.status === "approved"
+                                    campaign.invoice?.status === "approved"
                                       ? "bg-green-100 text-green-800"
                                       : "bg-yellow-100 text-yellow-800"
                                   }`}
                                 >
-                                  {campaign.invoice.status}
+                                  {campaign.invoice?.status}
                                 </span>
                               </div>
                             </div>
@@ -294,16 +291,12 @@ const BeneficiaryConfirmation = () => {
                                   Provider Confirmed
                                 </p>
                                 <p className="text-sm text-gray-600">
-                                  {new Date(
-                                    campaign.providerConfirmedAt
-                                  ).toLocaleDateString()}{" "}
+                                  {campaign.providerConfirmedAt ? new Date(campaign.providerConfirmedAt).toLocaleDateString() : "—"}{" "}
                                   at{" "}
-                                  {new Date(
-                                    campaign.providerConfirmedAt
-                                  ).toLocaleTimeString([], {
+                                  {campaign.providerConfirmedAt ? new Date(campaign.providerConfirmedAt).toLocaleTimeString([], {
                                     hour: "2-digit",
                                     minute: "2-digit",
-                                  })}
+                                  }) : "—"}
                                 </p>
                               </div>
                             </div>
@@ -332,11 +325,11 @@ const BeneficiaryConfirmation = () => {
                           </label>
                           <textarea
                             placeholder="Add any notes about service receipt (optional)..."
-                            value={confirmationNote[campaign.id] || ""}
+                            value={confirmationNote[campaign.id ?? ""] || ""}
                             onChange={(e) =>
                               setConfirmationNote((prev) => ({
                                 ...prev,
-                                [campaign.id]: e.target.value,
+                                [campaign.id ?? ""]: e.target.value,
                               }))
                             }
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
@@ -352,7 +345,7 @@ const BeneficiaryConfirmation = () => {
                             This will unlock the funds for payout.
                           </p>
                           <Button
-                            onClick={() => handleConfirmReceipt(campaign.id)}
+                            onClick={() => campaign.id && handleConfirmReceipt(campaign.id)}
                             disabled={
                               confirmingId === campaign.id
                             }
@@ -395,7 +388,7 @@ const BeneficiaryConfirmation = () => {
                     <div
                       className="p-6 cursor-pointer hover:bg-green-100 transition"
                       onClick={() =>
-                        setExpandedCampaign(isExpanded ? null : campaign.id)
+                        setExpandedCampaign(isExpanded ? null : campaign.id ?? null)
                       }
                     >
                       <div className="flex items-start justify-between">
@@ -418,9 +411,7 @@ const BeneficiaryConfirmation = () => {
                             <div className="flex items-center gap-1">
                               <CheckCircle2 className="w-4 h-4 text-green-600" />
                               Confirmed on{" "}
-                              {new Date(
-                                campaign.beneficiaryConfirmedAt
-                              ).toLocaleDateString()}
+                              {campaign.beneficiaryConfirmedAt ? new Date(campaign.beneficiaryConfirmedAt).toLocaleDateString() : "—"}
                             </div>
                             <div className="flex items-center gap-1">
                               <DollarSign className="w-4 h-4" />$
@@ -451,7 +442,7 @@ const BeneficiaryConfirmation = () => {
                                 <p className="text-gray-600">Provider</p>
                                 <p className="font-semibold text-gray-900">
                                   {mockDataService.getProviderById(
-                                    campaign.providerId
+                                    campaign.providerId ?? ""
                                   )?.name || "Not Assigned"}
                                 </p>
                               </div>
@@ -506,16 +497,12 @@ const BeneficiaryConfirmation = () => {
                               </p>
                               <p className="text-xs text-green-700 mt-2">
                                 Confirmed on{" "}
-                                {new Date(
-                                  campaign.beneficiaryConfirmedAt
-                                ).toLocaleDateString()}{" "}
+                                {campaign.beneficiaryConfirmedAt ? new Date(campaign.beneficiaryConfirmedAt).toLocaleDateString() : "—"}{" "}
                                 at{" "}
-                                {new Date(
-                                  campaign.beneficiaryConfirmedAt
-                                ).toLocaleTimeString([], {
+                                {campaign.beneficiaryConfirmedAt ? new Date(campaign.beneficiaryConfirmedAt).toLocaleTimeString([], {
                                   hour: "2-digit",
                                   minute: "2-digit",
-                                })}
+                                }) : "—"}
                               </p>
                             </div>
                           </div>

@@ -273,14 +273,14 @@ const DonorDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
             {recommendedCampaigns.map((campaign) => (
               <CampaignSummaryCard
-                key={campaign.id}
-                id={campaign.id}
-                title={campaign.title}
+                key={campaign.id ?? ""}
+                id={campaign.id ?? ""}
+                title={campaign.title ?? ""}
                 description={campaign.description}
                 category={campaign.category}
                 location={campaign.location}
                 deadline={campaign.fundraisingDeadline}
-                organizerName={campaign.provider?.name || "Provider"}
+                organizerName={campaign.provider?.name ?? "Provider"}
                 amountRaised={campaign.amountRaised}
                 targetAmount={campaign.targetAmount}
                 donorCount={campaign.donorCount}

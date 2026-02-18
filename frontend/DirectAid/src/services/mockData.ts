@@ -165,6 +165,8 @@ export const mockCampaigns: Campaign[] = [
     status: "active",
     adminStatus: "approved",
     confirmationStatus: "both_confirmed",
+    providerConfirmed: true,
+    invoices: [mockInvoices[0]],
     providerConfirmedAt: "2024-11-20",
     beneficiaryConfirmedAt: "2024-11-21",
     proofDocuments: [
@@ -238,6 +240,8 @@ export const mockCampaigns: Campaign[] = [
     status: "active",
     adminStatus: "approved",
     confirmationStatus: "provider_confirmed",
+    providerConfirmed: true,
+    invoices: [mockInvoices[1]],
     providerConfirmedAt: "2024-11-22",
     proofDocuments: [
       {
@@ -310,6 +314,8 @@ export const mockCampaigns: Campaign[] = [
     status: "active",
     adminStatus: "approved",
     confirmationStatus: "pending",
+    providerConfirmed: false,
+    invoices: [mockInvoices[2]],
     proofDocuments: [
       {
         id: "doc_003",

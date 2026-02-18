@@ -87,14 +87,14 @@ const DonationFlow = () => {
   useEffect(() => {
     const campaignIdFromUrl = searchParams.get("campaignId");
     if (campaignIdFromUrl && !selectedCampaign) {
-      selectCampaign(campaignIdFromUrl);
+      selectCampaign(campaignIdFromUrl as string);
     } else if (selectedCampaign && !selectedCampaign.location) {
       // If location is missing (stale data), force refresh
 
       campaignService.getCampaignById(selectedCampaign.id).then(fresh => {
         // We need a way to update `selectedCampaign` in context with this fresh data
         // AppContext has `updateCampaign`.
-        updateCampaign(selectedCampaign.id, fresh);
+        updateCampaign(selectedCampaign.id ?? "", fresh);
       }).catch(err => console.error("Refresh failed", err));
     }
   }, [searchParams, selectedCampaign, selectCampaign, updateCampaign]);

@@ -1,8 +1,8 @@
 // src/components/Hero.tsx
-import React from "react";
+import type React from "react";
 import { Link } from "react-router-dom";
 
-export default function HeroSection(): JSX.Element {
+export default function HeroSection(): React.JSX.Element {
   return (
     <section
       id="hero"

@@ -71,7 +71,7 @@ export default function AdminCampaignDetailPage() {
           </p>
         </div>
 
-        {campaign.description && (
+        {campaign.description != null && campaign.description !== "" && (
           <div>
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Description</h3>
             <p className="text-slate-300 text-sm whitespace-pre-wrap">{String(campaign.description)}</p>

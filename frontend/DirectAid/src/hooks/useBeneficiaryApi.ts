@@ -28,6 +28,9 @@ export interface BeneficiaryCampaign {
   percentRaised?: number;
   progressPercentage?: number;
   donorCount?: number;
+  expectedOutcome?: string;
+  invoice?: { invoiceNumber?: string; amount?: number; invoiceDate?: string; description?: string; status?: string };
+  location?: string;
 }
 
 export interface BeneficiaryMetrics {

@@ -26,7 +26,7 @@ const UserRolesPieChart = () => {
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>
-          <Tooltip formatter={(value: number) => value.toLocaleString()} />
+          <Tooltip formatter={(value: number | undefined) => value != null ? value.toLocaleString() : ""} />
           <Legend 
             layout="vertical" 
             align="right" 
