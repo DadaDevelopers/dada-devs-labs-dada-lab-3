@@ -33,7 +33,7 @@ const DonationsChart = () => {
             />
           <Tooltip 
             contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155" }}
-            formatter={(value: number) => `$${value.toLocaleString()}`}
+            formatter={(value: number | undefined) => value != null ? `$${value.toLocaleString()}` : ""}
           />
           <Line type="monotone" dataKey="amount" stroke="#06b6d4" strokeWidth={3} dot={false} />
         </LineChart>

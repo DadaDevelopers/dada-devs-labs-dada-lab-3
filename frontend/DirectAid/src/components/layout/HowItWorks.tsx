@@ -1,3 +1,4 @@
+import type React from "react";
 import { useState, useRef, useEffect } from "react";
 
 /* ---------------- Step definitions ---------------- */
@@ -47,16 +48,16 @@ const STEPS = [
 /* ---------------- Main component ---------------- */
 export default function HowItWorks() {
   const [active, setActive] = useState(0);
-  const listRef = useRef(null);
+  const listRef = useRef<HTMLElement | null>(null);
   const ActiveIcon = STEPS[active].icon;
 
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    const buttons = Array.from(el.querySelectorAll("button[data-index]"));
+    const buttons = Array.from(el.querySelectorAll<HTMLButtonElement>("button[data-index]"));
     let current = active;
 
-    function onKey(e) {
+    function onKey(e: KeyboardEvent) {
       if (["ArrowLeft", "ArrowUp"].includes(e.key)) {
         e.preventDefault();
         current = (current - 1 + buttons.length) % buttons.length;
@@ -148,7 +149,7 @@ export default function HowItWorks() {
 }
 
 /* ---------------- Step Button ---------------- */
-function StepButton({ index, active, onClick, title, short, Icon }) {
+function StepButton({ index, active, onClick, title, short, Icon }: { index: number; active: boolean; onClick: () => void; title: string; short: string; Icon: React.ComponentType<{ className?: string }> }) {
   return (
     <button
       id={`how-step-${title.toLowerCase()}`}
@@ -178,7 +179,7 @@ function StepButton({ index, active, onClick, title, short, Icon }) {
 }
 
 /* ---------------- Progress Bar ---------------- */
-function ProgressBar({ step, total }) {
+function ProgressBar({ step, total }: { step: number; total: number }) {
   const pct = Math.round(((step + 1) / total) * 100);
   return (
     <div className="mt-2">
@@ -196,35 +197,35 @@ function ProgressBar({ step, total }) {
 }
 
 /* ---------------- Inline SVG Icons ---------------- */
-function DiscoverIcon(props) {
+function DiscoverIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
       <path d="M12 2l2.8 5.7L21 9l-4.5 3.9L17 20l-5-2.6L7 20l.5-7.1L3 9l6.2-1.3L12 2z" fill="currentColor" />
     </svg>
   );
 }
-function DonateIcon(props) {
+function DonateIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
       <path d="M12 21s-6-4.35-9-7.2C-3 8 3 3 12 8c9-5 15 0 9 5.8-3 2.85-9 7.2-9 7.2z" fill="currentColor"/>
     </svg>
   );
 }
-function EscrowIcon(props) {
+function EscrowIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
       <path d="M4 7h16v5a7 7 0 01-8 7 7 7 0 01-8-7V7z" fill="currentColor" />
     </svg>
   );
 }
-function DeliverIcon(props) {
+function DeliverIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
       <path d="M3 12h13l4 4v3H8l-5-7zM16 3v9H8l3-6 5-3z" fill="currentColor" />
     </svg>
   );
 }
-function VerifyIcon(props) {
+function VerifyIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
       <path d="M12 2l3 6 6 .5-4.5 4 1.3 6.7L12 16l-6 3.2L7 12 2.5 8 8 7z" fill="currentColor" />

@@ -23,7 +23,6 @@ import {
   LayoutDashboard,
   DollarSign,
   FileText,
-  ShieldCheck,
   TrendingUp,
   Calendar,
   Upload,
@@ -31,12 +30,9 @@ import {
   Clock,
   Copy,
   Share2,
-  MessageSquare,
   AlertCircle,
-  Eye,
   PlusCircle,
   FolderKanban,
-  Heart,
   User,
   MapPin,
   Bell,
@@ -46,8 +42,6 @@ import {
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -60,7 +54,7 @@ const BENEFICIARY_PROFILE_BANNER_DISMISSED = "beneficiary_profile_banner_dismiss
 const BeneficiaryDashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { campaigns: userCampaigns, loading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useBeneficiaryCampaigns();
+  const { campaigns: userCampaigns, loading: _campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useBeneficiaryCampaigns();
   const { metrics, loading: metricsLoading, error: metricsError } = useBeneficiaryMetrics();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedCampaignForConfirm, setSelectedCampaignForConfirm] =
@@ -156,31 +150,6 @@ const BeneficiaryDashboard = () => {
     { month: "Nov", amount: 2800 },
   ];
 
-  const aidDistribution = [
-    { category: "Food", amount: 4500 },
-    { category: "Medical", amount: 3200 },
-    { category: "Education", amount: 2800 },
-    { category: "Shelter", amount: 2000 },
-  ];
-
-  const messages = [
-    {
-      from: primaryCampaign?.provider?.name || "Global Relief Foundation",
-      message:
-        primaryCampaign?.confirmationStatus === "provider_confirmed"
-          ? "Service is ready. Please confirm receipt to unlock funds."
-          : "We're preparing services for you. Stay tuned.",
-      date: "2 days ago",
-      unread: primaryCampaign?.confirmationStatus === "provider_confirmed",
-    },
-    {
-      from: "Admin Team",
-      message: "Your campaign has been approved. Funds are being collected.",
-      date: "5 days ago",
-      unread: false,
-    },
-  ];
-
   const navItems = [
     { label: "Dashboard", href: "/beneficiary", icon: <LayoutDashboard className="w-5 h-5" /> },
     { label: "Campaigns", href: "/beneficiary/campaigns", icon: <FolderKanban className="w-5 h-5" /> },
@@ -221,14 +190,6 @@ const BeneficiaryDashboard = () => {
       navigator.clipboard.writeText(url);
       alert("Campaign link copied to clipboard!");
     }
-  };
-
-  const handleUploadDocuments = () => {
-    alert("Document upload dialog would open here");
-  };
-
-  const handleUploadReport = () => {
-    alert("Report upload dialog would open here");
   };
 
   // Helpers for campaign UI

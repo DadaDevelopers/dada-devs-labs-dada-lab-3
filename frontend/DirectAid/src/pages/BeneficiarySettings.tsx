@@ -19,8 +19,6 @@ import {
   DollarSign,
   FileText,
   User,
-  UploadCloud,
-  X,
   FolderKanban,
 } from "lucide-react";
 

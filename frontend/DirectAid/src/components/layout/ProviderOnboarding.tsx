@@ -78,7 +78,7 @@ export default function ProviderOnboarding() {
   );
 }
 
-function TrustStat({ label, value }) {
+function TrustStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-l-2 border-yellow-500/30 pl-4">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">{label}</p>
@@ -87,7 +87,7 @@ function TrustStat({ label, value }) {
   );
 }
 
-function Step({ number, title, desc }) {
+function Step({ number, title, desc }: { number: string; title: string; desc: string }) {
   return (
     <div className="flex gap-5">
       <span className="text-xs font-black text-yellow-500/50 mt-1">{number}</span>

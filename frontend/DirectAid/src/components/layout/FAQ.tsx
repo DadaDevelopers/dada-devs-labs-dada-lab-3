@@ -35,7 +35,7 @@ const FAQ_DATA: FAQItemType[] = [
   },
 ];
 
-export default function FAQ(): JSX.Element {
+export default function FAQ(): React.JSX.Element {
   // controlled accordion: only one open at a time
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   // animation hook for staggered entry

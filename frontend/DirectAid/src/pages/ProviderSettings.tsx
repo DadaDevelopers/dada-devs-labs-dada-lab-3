@@ -568,7 +568,7 @@ const ProviderSettings = () => {
                         onChange={() =>
                           setNotifications((prev) => ({
                             ...prev,
-                            [key]: !prev[key],
+                            [key]: !prev[key as keyof typeof prev],
                           }))
                         }
                         style={{ accentColor: "var(--color-accent)" }}

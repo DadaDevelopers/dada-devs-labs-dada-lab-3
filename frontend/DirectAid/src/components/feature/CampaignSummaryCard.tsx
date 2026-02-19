@@ -1,5 +1,5 @@
 import { Card } from "../../components/ui/card";
-import { Users, Target, MapPin, Clock, Heart, ChevronRight } from "lucide-react";
+import { Users, MapPin, Clock, Heart, ChevronRight } from "lucide-react";
 import { Button } from "../ui/Button";
 
 interface CampaignSummaryCardProps {
@@ -19,7 +19,7 @@ interface CampaignSummaryCardProps {
 }
 
 export const CampaignSummaryCard = ({
-  id,
+  id: _id,
   title,
   description,
   organizerName,

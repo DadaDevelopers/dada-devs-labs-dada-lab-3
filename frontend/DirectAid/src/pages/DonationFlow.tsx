@@ -19,8 +19,6 @@ import {
   Check,
 } from "lucide-react";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
-import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/input";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -47,54 +45,20 @@ const DonationFlow = () => {
   const currentUser = user;
   const donor = currentUser || { name: "Guest", email: "" }; // Fallback for guest
 
-  // Select campaign from URL query parameter if provided
-  useEffect(() => {
-    const fetchFreshCampaign = async () => {
-      const campaignIdFromUrl = searchParams.get("campaignId");
-      const targetId = campaignIdFromUrl || selectedCampaign?.id;
-
-      if (targetId && targetId !== "camp_fallback") {
-        try {
-          // Always fetch fresh to ensure we have location and latest details
-          const freshCampaign = await campaignService.getCampaignById(targetId);
-
-
-          // If we have selectCampaign/updateCampaign in context, use them
-          // But selectCampaign might just set the ID. 
-          // Let's rely on selectCampaign logic if it fetches, OR update local state if we could.
-          // Since `selectCampaign` in AppContext checks cache first, we might need to bypass it or update the cache.
-          // context.updateCampaign is available.
-
-          // We'll use the context's mechanism to set it as selected, but we might need to "inject" the fresh data.
-          // For now, let's assume calling selectCampaign might be enough if we didn't have it, but here we likely HAVE it cached.
-          // Let's just update the app context with fresh data if possible.
-          // Actually, AppContext exposes updateCampaign!
-
-          // context.updateCampaign(targetId, freshCampaign); // This would be ideal but I need to access it from useApp()
-        } catch (e) {
-          console.error("Failed to refresh campaign", e);
-        }
-      }
-    };
-
-    // Trigger this only once or when ID changes
-    // fetchFreshCampaign(); 
-  }, []); // Intentionally empty dependency to run on mount check? No, use IDs.
-
-  // Actually, simpler approach:
+  // Simpler approach:
   // If campaign.location is missing, fetch it.
 
   useEffect(() => {
     const campaignIdFromUrl = searchParams.get("campaignId");
     if (campaignIdFromUrl && !selectedCampaign) {
-      selectCampaign(campaignIdFromUrl);
+      selectCampaign(campaignIdFromUrl as string);
     } else if (selectedCampaign && !selectedCampaign.location) {
       // If location is missing (stale data), force refresh
 
-      campaignService.getCampaignById(selectedCampaign.id).then(fresh => {
+      campaignService.getCampaignById(selectedCampaign.id ?? "").then(fresh => {
         // We need a way to update `selectedCampaign` in context with this fresh data
         // AppContext has `updateCampaign`.
-        updateCampaign(selectedCampaign.id, fresh);
+        updateCampaign(selectedCampaign.id ?? "", fresh);
       }).catch(err => console.error("Refresh failed", err));
     }
   }, [searchParams, selectedCampaign, selectCampaign, updateCampaign]);
@@ -201,6 +165,7 @@ const DonationFlow = () => {
 
     return true;
   };
+  void requireAuth; // referenced so TS noUnusedLocals is satisfied
 
   const campaignsRedirect = isAuthenticated ? "/donor/campaigns" : "/campaigns";
   const requireValidCampaign = () => {
@@ -459,7 +424,7 @@ support@directaid.example.com
     children,
     onClick,
     disabled = false,
-    variant = "primary",
+    variant: _variant = "primary",
     className = "",
     style = {},
   }: any) => {

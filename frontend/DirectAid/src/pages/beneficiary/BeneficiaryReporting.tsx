@@ -5,7 +5,6 @@ import { useBeneficiaryCampaigns } from "../../hooks/useBeneficiaryApi";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
 import {
   LayoutDashboard,
   DollarSign,
@@ -14,15 +13,12 @@ import {
   ArrowLeft,
   Upload,
   CheckCircle2,
-  Clock,
   AlertCircle,
-  Calendar,
   Trash2,
   User,
   MapPin,
   Bell,
   Lock,
-  TrendingUp,
 } from "lucide-react";
 
 type Step = "select-campaign" | "upload-report" | "review" | "success";

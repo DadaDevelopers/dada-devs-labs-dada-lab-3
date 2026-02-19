@@ -163,7 +163,7 @@ const ProviderConfirmation = () => {
                     <div
                       className="p-6 cursor-pointer hover:bg-gray-50 transition"
                       onClick={() =>
-                        setExpandedCampaign(isExpanded ? null : campaign._id)
+                        setExpandedCampaign(isExpanded ? null : campaign._id ?? null)
                       }
                     >
                       <div className="flex items-start justify-between">
@@ -224,7 +224,7 @@ const ProviderConfirmation = () => {
                                 <p className="text-gray-600">Beneficiary</p>
                                 <p className="font-semibold text-gray-900">
                                   {mockDataService.getBeneficiaryById(
-                                    campaign.beneficiaryId
+                                    typeof campaign.beneficiaryId === "string" ? campaign.beneficiaryId : (campaign.beneficiaryId as { id?: string })?.id ?? ""
                                   )?.name || "Unknown"}
                                 </p>
                               </div>
@@ -403,7 +403,7 @@ const ProviderConfirmation = () => {
                               this campaign.
                             </p>
                             <Button
-                              onClick={() => handleConfirmService(campaign._id)}
+                              onClick={() => campaign._id && handleConfirmService(campaign._id)}
                               disabled={
                                 isSubmitting && confirmingId === campaign._id
                               }

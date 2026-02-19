@@ -1,7 +1,7 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
-// export const API_BASE = "https://directaid-backend.onrender.com/api";
-export const API_BASE = "http://localhost:5000/api";
+export const API_BASE = "https://directaid-backend.onrender.com/api";
+// export const API_BASE = "http://localhost:5000/api";
 
 import type { AdminMetrics } from "../types";
 
