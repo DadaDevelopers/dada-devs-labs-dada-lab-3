@@ -52,10 +52,10 @@ const corsOptions = {
     if (!origin) return cb(null, true);
     //Future Render + frontend URLs:
     const allowed = [
-      config.FRONTEND_URL,
-      "http://localhost:5000",
-      "http://127.0.0.1:5173",
-    ];
+  "https://directaid.vercel.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
     //return cb(null, allowed.includes(origin));
     return cb(null, allowed.includes(origin) || !origin); //cors to allow frontend and render
 
