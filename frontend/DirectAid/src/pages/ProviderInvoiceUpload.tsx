@@ -92,7 +92,7 @@ const ProviderInvoiceUpload = () => {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>("upload-invoice");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [_previewUrl, setPreviewUrl] = useState("");
 
   const [invoiceData, setInvoiceData] = useState<InvoiceFormState>({
     invoiceNumber: "",

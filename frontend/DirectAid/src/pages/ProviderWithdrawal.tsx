@@ -8,12 +8,10 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import {
-  ArrowLeft,
   Wallet,
   AlertCircle,
   CheckCircle2,
   Clock,
-  DollarSign,
   LayoutDashboard,
   FolderKanban,
   Upload,

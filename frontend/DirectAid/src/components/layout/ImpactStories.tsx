@@ -53,7 +53,17 @@ export default function ImpactStories() {
   );
 }
 
-function ImpactCard({ story }) {
+interface ImpactStory {
+  image: string;
+  title: string;
+  metric?: string;
+  location?: string;
+  description?: string;
+  amount?: string | number;
+  provider?: string;
+}
+
+function ImpactCard({ story }: { story: ImpactStory }) {
   return (
     <div className="group relative glass-card bg-slate-950/30 border border-white/5 rounded-[3rem] overflow-hidden hover:border-yellow-500/20 transition-all duration-700">
       
@@ -72,7 +82,7 @@ function ImpactCard({ story }) {
         <div className="flex justify-between items-start mb-12">
           <div className="bg-white/5 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
             <p className="text-[10px] font-black text-yellow-500 uppercase tracking-widest leading-none mb-1">Impact Radius</p>
-            <p className="text-2xl font-black text-white tracking-tighter">{story.metric}</p>
+            <p className="text-2xl font-black text-white tracking-tighter">{story.metric ?? ""}</p>
           </div>
           <div className="flex flex-col items-end">
             <div className="h-2 w-2 rounded-full bg-[#00b37e] shadow-[0_0_12px_#00b37e] mb-2" />
@@ -82,12 +92,12 @@ function ImpactCard({ story }) {
 
         {/* Content Section */}
         <div className="max-w-sm mb-12">
-          <p className="text-[10px] font-bold text-yellow-500/80 uppercase tracking-widest mb-2">{story.location}</p>
+          <p className="text-[10px] font-bold text-yellow-500/80 uppercase tracking-widest mb-2">{story.location ?? ""}</p>
           <h4 className="text-3xl font-black text-white tracking-tighter mb-4 leading-tight">
             {story.title}
           </h4>
           <p className="text-sm text-slate-400 font-medium leading-relaxed">
-            {story.description}
+            {story.description ?? ""}
           </p>
         </div>
 
@@ -95,11 +105,11 @@ function ImpactCard({ story }) {
         <div className="pt-8 border-t border-white/10 grid grid-cols-2 gap-8">
           <div>
             <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Cleared Amount</p>
-            <p className="text-lg font-black text-white tracking-tight">{story.amount}</p>
+            <p className="text-lg font-black text-white tracking-tight">{String(story.amount ?? "")}</p>
           </div>
           <div>
             <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Settlement Provider</p>
-            <p className="text-[11px] font-black text-slate-300 uppercase truncate">{story.provider}</p>
+            <p className="text-[11px] font-black text-slate-300 uppercase truncate">{story.provider ?? ""}</p>
           </div>
         </div>
       </div>

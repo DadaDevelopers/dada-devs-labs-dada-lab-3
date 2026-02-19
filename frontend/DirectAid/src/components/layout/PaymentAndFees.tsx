@@ -1,6 +1,7 @@
 // ============================================
 // src/components/PaymentsAndFees.jsx
 // ============================================
+import type { ChangeEvent } from 'react';
 import { useState, useEffect } from 'react';
 
 export default function PaymentsAndFees() {
@@ -11,7 +12,7 @@ export default function PaymentsAndFees() {
   const deliveryEfficiency = 99.0;
 
   // Manual Input Logic
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/[^0-9]/g, '');
     const num = val === '' ? 0 : parseInt(val);
     if (num <= 50000) setAmount(num);
@@ -127,7 +128,7 @@ export default function PaymentsAndFees() {
   );
 }
 
-function ProtocolRow({ label, value }) {
+function ProtocolRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-4 border-b border-white/5 group hover:border-yellow-500/30 transition-all duration-500">
       <span className="text-xs font-bold text-slate-500 group-hover:text-slate-300 transition-colors uppercase tracking-widest">{label}</span>

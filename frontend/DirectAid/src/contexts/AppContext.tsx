@@ -69,7 +69,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // AUTHENTICATION FUNCTIONS
   // ============================================================================
 
-  const login = async (email: string, password: string, role: string) => {
+  const login = async (_email: string, _password: string, role: string) => {
     setIsLoading(true);
     setError(null);
 

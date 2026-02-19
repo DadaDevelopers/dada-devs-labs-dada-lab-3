@@ -25,7 +25,7 @@ interface FormErrors {
 
 const SignUpPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [_searchParams] = useSearchParams();
   const [formData, setFormData] = useState<SignUpFormData>({
     firstName: "",
     lastName: "",

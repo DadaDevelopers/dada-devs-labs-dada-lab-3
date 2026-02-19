@@ -19,12 +19,6 @@ interface User {
   [key: string]: any;
 }
 
-interface LoginResponse {
-  ok: boolean;
-  user?: any; // You can change 'any' to your 'User' type later
-  error?: string;
-}
-
 interface AuthContextType {
   user: User | null;
   role: Role | null;

@@ -1,14 +1,6 @@
 // src/services/apiServices.ts
 import api from "./api";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-// Helper to get your Auth Token (saved after login)
-const getHeaders = () => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${localStorage.getItem('token')}`
-});
-
 export const ProviderService = {
   getProfile: () => api.get("/providers/me"),
   updateProfile: (data: any) => api.put("/providers/me", data),

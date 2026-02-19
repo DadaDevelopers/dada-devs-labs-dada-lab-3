@@ -265,21 +265,6 @@ export default function CampaignPage() {
     providerMatchesCurrentUser,
   ]);
 
-  const getProgressPercentage = (campaign: CampaignListItem) => {
-    if (!campaign.targetAmount || campaign.targetAmount <= 0) return 0;
-    return Math.min((campaign.amountRaised / campaign.targetAmount) * 100, 100);
-  };
-
-  const daysLeft = (deadline: string) => {
-    if (!deadline) return 0;
-    const end = new Date(deadline);
-    const now = new Date();
-    const diff = Math.ceil(
-      (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return diff > 0 ? diff : 0;
-  };
-
   const handleCardClick = (campaign: CampaignListItem) => {
     if (isBeneficiaryMyView) {
       navigate(`/beneficiary/campaigns/${campaign.id}`);

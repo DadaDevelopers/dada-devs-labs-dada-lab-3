@@ -12,10 +12,8 @@ import {
   Receipt,
   ArrowLeft,
   Search,
-  Filter,
   Download,
   Calendar,
-  DollarSign,
   ExternalLink,
   User,
   CreditCard,
@@ -31,7 +29,6 @@ const DonorDonations = () => {
 
   // Use real user from context or fallback if loading
   const donorName = user?.name || "Donor";
-  const donorId = user?.id; // In real app, we filter by this ID or backend returns only mine
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
