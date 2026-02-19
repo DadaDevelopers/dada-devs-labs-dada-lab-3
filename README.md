@@ -3,13 +3,14 @@
 
 # ⚡ DADA LABS — Build Track
 
+
 <div align="center">
 
 ![Bitcoin](https://img.shields.io/badge/Bitcoin-FF9900?style=for-the-badge&logo=bitcoin&logoColor=white)
 ![Lightning](https://img.shields.io/badge/Lightning-792EE5?style=for-the-badge&logo=lightning&logoColor=white)
 ![Build](https://img.shields.io/badge/Status-Building-success?style=for-the-badge)
 
-**12-Week Program | Nov 10, 2025 - Feb 2, 2026**
+**12-Week Program | Nov 10, 2025 - Feb 2,  2026**
 
 *Building real Bitcoin & Lightning applications for Africa*
 
