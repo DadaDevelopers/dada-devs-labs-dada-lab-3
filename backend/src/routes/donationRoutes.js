@@ -13,11 +13,11 @@ const router = express.Router();
 // normal JSON body routes
 router.post("/", optionalAuth, createDonation); // create donation (guest or logged-in donor)
 
-/*Provider webhooks : no auth*/
+/*Provider webhooks : no auth - callers are external (LNBits, Daraja, etc.)*/
 // MPESA webhook (Daraja will POST JSON)
 router.post("/webhooks/mpesa", protect, mpesaWebhook);
-//router.post("/webhooks/mpesa", express.json(), mpesaCallbackController);
-router.post("/webhooks/lightning", protect, lightningWebhook);
+// Lightning: LNBits POSTs here when an invoice is paid (no JWT; optional: verify webhook secret)
+router.post("/webhooks/lightning", lightningWebhook);
 
 // ---- Crypto confirmation ----
 router.post("/bitcoin/confirm", protect, confirmBitcoinDonation);

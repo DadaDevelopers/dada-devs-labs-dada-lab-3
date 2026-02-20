@@ -621,7 +621,9 @@ export default function CampaignDetail() {
 
               {/* Transactions (donations + withdrawals) */}
               <div className="mt-6">
-                <CampaignTransactionsSection campaignId={id ?? String(campaign.id)} />
+                {(id || campaign?.id) && (
+                  <CampaignTransactionsSection campaignId={String(id ?? campaign?.id)} />
+                )}
               </div>
             </div>
           </div>
@@ -637,7 +639,7 @@ export default function CampaignDetail() {
                   <div className="space-y-2">
                     <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Progress to Goal</p>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-5xl font-extrabold text-white">${campaign.amountRaised.toLocaleString()}</span>
+                      <span className="text-5xl font-extrabold text-white">${Number(campaign?.amountRaised ?? 0).toLocaleString()}</span>
                       <span className="text-lg text-primary font-bold">Raised</span>
                     </div>
                   </div>

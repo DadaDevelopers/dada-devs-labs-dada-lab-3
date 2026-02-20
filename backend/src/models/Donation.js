@@ -160,9 +160,9 @@ DonationSchema.post("save", async function (doc) {
     return;
   }
 
-  const session = await mongoose.startSession();
-
+  let session;
   try {
+    session = await mongoose.startSession();
     session.startTransaction();
 
     // Re-fetch inside transaction with a lock-like guarantee
@@ -197,24 +197,42 @@ DonationSchema.post("save", async function (doc) {
 
     await session.commitTransaction();
   } catch (err) {
-    await session.abortTransaction();
-    console.error("Failed to apply donation to campaign:", err);
-    // In a post-hook, throwing usually crashes the flow or is logged.
-    // If we want to ensure the save succeeds even if this fails (so we don't rollback the donation),
-    // we might catch it and just log it.
-    // BUT the requirement is atomic update. 
-    // Wait, this is a POST hook. The donation is ALREADY saved (outside this transaction).
-    // If this fails, the donation logic (status=COMPLETED) remains, but campaign isn't updated.
-    // This creates inconsistency.
-    // IDEALLY, this logic should be in the controller or a service method, not a hook.
-    // But fixing that is a larger refactor.
-    // For now, logging error is safer than crashing if we can't rollback the main donation save.
-    // However, if we throw here, does it bubble up to the `Donation.create` call?
-    // In Mongoose 5+, async post hooks errors usually bubble up.
-    // If we want to alert the user/system, we should probably throw.
-    throw err;
+    if (session) {
+      try { await session.abortTransaction(); } catch (_) {}
+      try { await session.endSession(); } catch (_) {}
+    }
+    // Transactions require a replica set; standalone MongoDB throws. Fall back to non-transactional update.
+    const msg = err?.message || String(err);
+    if (/transaction|replica set|startSession/i.test(msg)) {
+      try {
+        const freshDonation = await mongoose.model("Donation").findOne(
+          { _id: doc._id, appliedToCampaign: false }
+        );
+        if (freshDonation) {
+          const incrementValue = freshDonation.amountBase
+            ? mongoose.Types.Decimal128.fromString(freshDonation.amountBase.toString())
+            : mongoose.Types.Decimal128.fromString(freshDonation.amountFiat.toString());
+          await mongoose.model("Campaign").findByIdAndUpdate(
+            freshDonation.campaignId,
+            { $inc: { amountRaised: incrementValue } }
+          );
+          await mongoose.model("Donation").findByIdAndUpdate(
+            freshDonation._id,
+            { appliedToCampaign: true }
+          );
+        }
+      } catch (fallbackErr) {
+        console.error("Failed to apply donation to campaign (fallback):", fallbackErr);
+        throw fallbackErr;
+      }
+    } else {
+      console.error("Failed to apply donation to campaign:", err);
+      throw err;
+    }
   } finally {
-    await session.endSession();
+    if (session) {
+      try { await session.endSession(); } catch (_) {}
+    }
   }
 });
 

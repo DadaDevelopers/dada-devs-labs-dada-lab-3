@@ -24,13 +24,21 @@ export function CampaignTransactionsSection({ campaignId }: { campaignId: string
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!campaignId) return;
+    if (!campaignId) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
+    setLoading(true);
     api
       .get(`/campaigns/${campaignId}/transactions`)
       .then((res: any) => {
-        if (!cancelled) {
-          setData(res);
+        if (!cancelled && res && typeof res === "object") {
+          setData({
+            donationCount: res.donationCount ?? 0,
+            totalDonations: res.totalDonations ?? 0,
+            withdrawals: Array.isArray(res.withdrawals) ? res.withdrawals : [],
+          });
           setError(null);
         }
       })
@@ -44,6 +52,31 @@ export function CampaignTransactionsSection({ campaignId }: { campaignId: string
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
+  }, [campaignId]);
+
+  // Refetch when user returns to the tab (e.g. after completing a donation in another tab)
+  useEffect(() => {
+    const onFocus = () => {
+      if (!campaignId) return;
+      api
+        .get(`/campaigns/${campaignId}/transactions`)
+        .then((res: any) => {
+          if (res && typeof res === "object") {
+            setData({
+              donationCount: res.donationCount ?? 0,
+              totalDonations: res.totalDonations ?? 0,
+              withdrawals: Array.isArray(res.withdrawals) ? res.withdrawals : [],
+            });
+            setError(null);
+          }
+        })
+        .catch(() => {
+          setError("unavailable");
+          setData(null);
+        });
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [campaignId]);
 
   if (loading) {

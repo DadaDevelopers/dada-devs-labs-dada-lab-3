@@ -4,18 +4,16 @@ const { Schema } = mongoose;
 const PayoutMethodSchema = new Schema({
   method: {
     type: String,
-    enum: ["MPESA", "BANK"],
+    enum: ["LIGHTNING", "BITCOIN"],
     required: true
   },
   active: { type: Boolean, default: true },
 
-  // MPESA
-  mpesaPhone: { type: String },
+  // LIGHTNING
+  lightningAddress: { type: String },
 
-  // BANK (optional for now)
-  bankName: String,
-  accountName: String,
-  accountNumber: String,
+  // BITCOIN
+  btcAddress: { type: String },
 
   createdAt: { type: Date, default: Date.now }
 }, { _id: true });
@@ -80,16 +78,9 @@ ProviderSchema.methods.toClient = function () {
     );
   }
 
-  // Mask bank account numbers
+  // Payout methods are returned as-is (lightningAddress/btcAddress for display)
   if (Array.isArray(obj.payoutMethods)) {
-    obj.payoutMethods = obj.payoutMethods.map(pm => {
-      if (pm.accountNumber) {
-        pm.accountNumberMasked =
-          "****" + pm.accountNumber.slice(-4);
-        delete pm.accountNumber;
-      }
-      return pm;
-    });
+    obj.payoutMethods = obj.payoutMethods.map(pm => ({ ...pm }));
   }
 
   return obj;

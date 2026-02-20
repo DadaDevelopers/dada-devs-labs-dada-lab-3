@@ -6,7 +6,7 @@ import Payment from "../models/Payment.js";
 
 import { initiateStkPush } from "../services/mpesa.js";
 import { createBtcAddress, checkBtcTransaction } from "../services/bitcoin.service.js";
-import { createLightningInvoice } from "../services/lightning.service.js";
+import { createLightningInvoice, checkPaymentStatus } from "../services/lightning.service.js";
 
 /* ---------------- Helpers ---------------- */
 
@@ -136,10 +136,25 @@ export const createDonation = async (req, res, next) => {
 
       /* -------- LIGHTNING -------- */
       case "BTC_LIGHTNING": {
-        const invoice = await createLightningInvoice({
-          amountFiat,
-          memo: `Donation ${donation._id}`
-        });
+        let invoice;
+        try {
+          invoice = await createLightningInvoice({
+            amountFiat,
+            memo: `Donation ${donation._id}`
+          });
+        } catch (e) {
+          const msg = (e?.message || String(e)).toLowerCase();
+          if (msg.includes("not configured") || msg.includes("lnbits")) {
+            const isUnavailable = /503|502|504|unavailable|temporarily/.test(msg);
+            return res.status(503).json({
+              message: isUnavailable
+                ? "The Lightning payment service is temporarily unavailable. Please try again in a few minutes or use another payment method."
+                : "Lightning payments are not configured. Please use another payment method or try again later.",
+              code: isUnavailable ? "LIGHTNING_SERVICE_UNAVAILABLE" : "LIGHTNING_NOT_CONFIGURED"
+            });
+          }
+          throw e;
+        }
 
         await Payment.create({
           donationId: donation._id,
@@ -158,7 +173,8 @@ export const createDonation = async (req, res, next) => {
 
         return res.status(201).json({
           donationId: donation._id,
-          invoice: invoice.bolt11
+          invoice: invoice.bolt11,
+          ...(invoice.demoInvoice && { demoInvoice: true })
         });
       }
 
@@ -251,12 +267,13 @@ export const confirmBitcoinDonation = async (req, res, next) => {
 /* ---------------- DONATION STATUS (LIGHTWEIGHT) ---------------- */
 
 // GET /donations/:id/status — return minimal status info for polling
+// For Lightning: if still PENDING, ask LNBits if the invoice was paid (so success page works without webhook e.g. localhost)
 export const getDonationStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ message: "Donation id required" });
 
-    const donation = await Donation.findById(id);
+    let donation = await Donation.findById(id);
     if (!donation) return res.status(404).json({ message: "Donation not found" });
 
     // Basic auth: only owner or admin can see detailed status; guests only see status string.
@@ -264,9 +281,40 @@ export const getDonationStatus = async (req, res, next) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
+    // If Lightning and still PENDING, poll LNBits so we can mark COMPLETED without webhook (e.g. when backend is localhost)
+    if (donation.status === "PENDING" && donation.paymentMethod === "BTC_LIGHTNING") {
+      const payment = await Payment.findOne({ donationId: donation._id, provider: "LIGHTNING" });
+      if (!payment && process.env.NODE_ENV !== "production") {
+        console.log("[Donation] GET status: no LIGHTNING payment found for donationId=" + id);
+      }
+      const paymentHash = payment?.lightning?.paymentHash || payment?.externalId;
+      if (paymentHash) {
+        const paid = await checkPaymentStatus(paymentHash);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[Donation] GET status: donationId=" + id + " payment_hash=" + (paymentHash.slice?.(0, 12) || paymentHash) + "... LNBits paid=" + paid);
+        }
+        if (paid) {
+          try {
+            payment.status = "SUCCESS";
+            payment.lightning.settled = true;
+            donation.status = "COMPLETED";
+            await payment.save();
+            await donation.save();
+            donation = await Donation.findById(id);
+            if (donation?.status === "COMPLETED") {
+              console.log("[Donation] Marked COMPLETED (Lightning) donationId=" + id);
+            }
+          } catch (err) {
+            console.error("[Donation] Failed to mark COMPLETED:", err.message);
+          }
+        }
+      }
+    }
+
+    const status = donation.status ? String(donation.status) : "PENDING";
     return res.json({
       id: donation._id,
-      status: donation.status,
+      status,
       campaignId: donation.campaignId,
       amountFiat: donation.amountFiat,
       paymentMethod: donation.paymentMethod
@@ -280,7 +328,8 @@ export const getDonationStatus = async (req, res, next) => {
 
 export const lightningWebhook = async (req, res, next) => {
   try {
-    const { payment_hash } = req.body;
+    const payment_hash = req.body?.payment_hash ?? req.body?.paymentHash;
+    if (!payment_hash) return res.sendStatus(200);
 
     const payment = await Payment.findOne({
       provider: "LIGHTNING",

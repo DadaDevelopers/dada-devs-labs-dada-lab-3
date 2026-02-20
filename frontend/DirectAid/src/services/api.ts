@@ -91,13 +91,14 @@ async function fetchWrapper(
     // If it's already our custom error, rethrow it
     if (err.response) throw err;
 
-    // Admin endpoints: never use demo fallback — require real backend so UI shows error/retry
+    // Never use demo fallback for these — require real backend (donation status must return real status for success page)
     const isAdminEndpoint =
       url.includes("/users/stats") ||
       (url.startsWith("/users") && !url.includes("/me")) ||
       url.includes("/providers") ||
       url.includes("/campaigns");
-    if (isAdminEndpoint) throw err;
+    const isDonationStatus = url.includes("/donations/") && url.includes("/status");
+    if (isAdminEndpoint || isDonationStatus) throw err;
 
     // Otherwise, handle demo fallback for non-admin
     return handleDemoFallback(url, method, data);
@@ -371,6 +372,21 @@ export async function getProviderById(id: string) {
 /** PUT /providers/:id/kyc — body: { status: "APPROVED" | "REJECTED", notes?: string } */
 export async function approveProviderKyc(providerId: string, body: { status: "APPROVED" | "REJECTED"; notes?: string }) {
   const res = await api.put(`/providers/${providerId}/kyc`, body);
+  return res?.data ?? res;
+}
+
+/** GET /providers/withdrawals?status=PENDING — admin; list withdrawals (with lightningAddress when LIGHTNING) */
+export async function getProviderWithdrawals(params?: { status?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  const q = sp.toString();
+  const res = await api.get(`/providers/withdrawals${q ? `?${q}` : ""}`);
+  return (res?.data ?? res) as { withdrawals: { _id: string; campaignId: unknown; providerId: unknown; amount: number; currency: string; status: string; reference?: string; lightningAddress?: string | null; campaignId?: { title?: string } }[] };
+}
+
+/** POST /providers/withdrawals/:id/send-lightning — admin; send payout via Lightning and mark COMPLETED */
+export async function sendWithdrawalLightning(withdrawalId: string) {
+  const res = await api.post(`/providers/withdrawals/${withdrawalId}/send-lightning`);
   return res?.data ?? res;
 }
 

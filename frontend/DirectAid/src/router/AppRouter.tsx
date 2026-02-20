@@ -28,6 +28,7 @@ import BeneficiaryReporting from "../pages/beneficiary/BeneficiaryReporting";
 import BeneficiaryFunds from "../pages/beneficiary/BeneficiaryFunds";
 import BeneficiaryCampaignsPage from "../pages/beneficiary/BeneficiaryCampaignsPage";
 import BeneficiaryCampaignDetail from "../pages/beneficiary/BeneficiaryCampaignDetail";
+import ProvidersPage from "../pages/ProvidersPage";
 
 /** If user is logged in but has no role / UNASSIGNED, send them to onboarding when they hit a role-specific path. */
 function useOnboardingRedirect() {
@@ -51,6 +52,7 @@ export default function AppRouter() {
     <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/providers" element={<ProvidersPage />} />
 
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
@@ -103,6 +105,7 @@ export default function AppRouter() {
       <Route path="/donor/settings/notifications" element={<DonorSettings />} />
       <Route path="/donor/settings/change-password" element={<DonorSettings />} />
       <Route path="/donor/campaigns" element={<CampaignPage />} />
+      <Route path="/donor/campaigns/:id" element={<CampaignDetail />} />
       <Route path="/donor/donations" element={<DonorDonations />} />
       <Route path="/donor/receipts" element={<DonorReceipts />} />
 

@@ -3,6 +3,9 @@ import Provider from "../models/Provider.js";
 import { User } from "../models/User.js";
 import Campaign from "../models/Campaign.js";
 import Withdrawal from "../models/Withdrawal.js";
+import Disbursement from "../models/Disbursement.js";
+import { payToLightningAddress, isPayConfigured } from "../services/lightning.service.js";
+import { logActivity } from "../utils/activityLogger.js";
 
 // --------------------------
 // Create provider profile
@@ -90,23 +93,27 @@ export const updateProvider = async (req, res, next) => {
 // --------------------------
 export const addPayoutMethod = async (req, res, next) => {
   try {
-    const { method, mpesaPhone, bankName, accountName, accountNumber } = req.body;
+    const { method, lightningAddress, btcAddress } = req.body;
 
     const provider = await Provider.findOne({ userId: req.user.userId });
     if (!provider) {
       return res.status(404).json({ message: "Provider not found" });
     }
 
-    if (method === "MPESA" && !mpesaPhone) {
-      return res.status(400).json({ message: "Mpesa phone required" });
+    if (method === "LIGHTNING" && !lightningAddress?.trim()) {
+      return res.status(400).json({ message: "Lightning address required" });
+    }
+    if (method === "BITCOIN" && !btcAddress?.trim()) {
+      return res.status(400).json({ message: "BTC address required" });
+    }
+    if (!["LIGHTNING", "BITCOIN"].includes(method)) {
+      return res.status(400).json({ message: "Method must be LIGHTNING or BITCOIN" });
     }
 
     provider.payoutMethods.push({
       method,
-      mpesaPhone,
-      bankName,
-      accountName,
-      accountNumber
+      lightningAddress: method === "LIGHTNING" ? lightningAddress?.trim() : undefined,
+      btcAddress: method === "BITCOIN" ? btcAddress?.trim() : undefined
     });
 
     await provider.save();
@@ -167,11 +174,11 @@ export const requestPayout = async (req, res, next) => {
 };
 
 // --------------------------
-// Public: list providers for beneficiary campaign creation (select provider dropdown)
+// Public: list registered and approved providers (landing page + beneficiary campaign creation)
 // --------------------------
 export const listPublicProviders = async (req, res, next) => {
   try {
-    const providers = await Provider.find()
+    const providers = await Provider.find({ kycStatus: "APPROVED" })
       .populate("userId", "city country organization providerProfile");
 
     const list = providers.map((p) => {
@@ -266,6 +273,119 @@ export const deleteProvider = async (req, res, next) => {
     }
 
     res.json({ message: "Provider deleted" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// --------------------------
+// Admin: list pending withdrawals (for payout processing)
+// --------------------------
+export const listWithdrawals = async (req, res, next) => {
+  try {
+    const status = req.query.status || "PENDING";
+    const withdrawals = await Withdrawal.find({ status })
+      .populate("campaignId", "title amountRaised currency beneficiaryId")
+      .populate("providerId");
+    const list = withdrawals.map((w) => {
+      const client = w.toClient();
+      const provider = w.providerId;
+      const lightning = (provider?.payoutMethods || []).find((pm) => pm.method === "LIGHTNING");
+      return {
+        ...client,
+        lightningAddress: lightning?.lightningAddress || null,
+      };
+    });
+    res.json({ withdrawals: list });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// --------------------------
+// Admin: send withdrawal to provider via Lightning (mark COMPLETED, create Disbursement)
+// --------------------------
+export const sendWithdrawalLightning = async (req, res, next) => {
+  try {
+    if (!isPayConfigured()) {
+      return res.status(503).json({
+        message: "Lightning pay is not configured. In the backend .env set LNBITS_URL (e.g. https://your-lnbits.com) and LNBITS_ADMIN_KEY (admin key of the wallet used to send payouts).",
+      });
+    }
+
+    const withdrawal = await Withdrawal.findById(req.params.id)
+      .populate("campaignId")
+      .populate("providerId");
+    if (!withdrawal) {
+      return res.status(404).json({ message: "Withdrawal not found" });
+    }
+    if (withdrawal.status !== "PENDING") {
+      return res.status(400).json({ message: "Withdrawal is not PENDING" });
+    }
+
+    const provider = withdrawal.providerId;
+    if (!provider) {
+      return res.status(400).json({ message: "Provider not found" });
+    }
+    const lightning = (provider.payoutMethods || []).find((pm) => pm.method === "LIGHTNING");
+    const lightningAddress = lightning?.lightningAddress;
+    if (!lightningAddress?.trim()) {
+      return res.status(400).json({
+        message: "Provider has no Lightning payout method. Ask provider to add a Lightning address in Settings → Payouts.",
+      });
+    }
+
+    const amountFiat = parseFloat(String(withdrawal.amount));
+    const currency = (withdrawal.currency || "USD").toUpperCase();
+    const satsPerUnit = Number(process.env.USD_TO_SATS) || 2500;
+    const amountSats = Math.round(amountFiat * satsPerUnit);
+    if (amountSats < 1) {
+      return res.status(400).json({ message: "Amount too small to convert to sats (min 1 sat). Check USD_TO_SATS or amount." });
+    }
+
+    await payToLightningAddress(lightningAddress.trim(), amountSats);
+
+    withdrawal.status = "COMPLETED";
+    await withdrawal.save();
+
+    const campaign = withdrawal.campaignId;
+    if (!campaign) {
+      return res.status(400).json({ message: "Campaign not found" });
+    }
+    const disbursement = await Disbursement.create({
+      campaignId: campaign._id,
+      beneficiaryId: campaign.beneficiaryId,
+      providerId: provider._id,
+      amount: amountFiat,
+      currency: withdrawal.currency || "USD",
+      status: "completed",
+      paymentMethod: "LIGHTNING",
+      transactionRef: `LN-${withdrawal.reference || withdrawal._id}`,
+      disbursedAt: new Date(),
+      notes: `Paid to ${lightningAddress} (${amountSats} sats)`,
+    });
+
+    if (campaign.disbursementStatus !== "completed") {
+      campaign.disbursementStatus = "completed";
+      campaign.disbursedAt = new Date();
+      await campaign.save();
+    }
+
+    await logActivity({
+      actorId: req.user.userId,
+      actorRole: "ADMIN",
+      actionType: "ADMIN_SENT_WITHDRAWAL_LIGHTNING",
+      entityType: "Withdrawal",
+      entityId: withdrawal._id,
+      metadata: { amountSats, lightningAddress: lightningAddress.substring(0, 20) + "...", disbursementId: disbursement._id },
+      req,
+    });
+
+    res.json({
+      message: "Payment sent via Lightning",
+      withdrawal: withdrawal.toClient(),
+      disbursement: { _id: disbursement._id, amount: amountFiat, currency: disbursement.currency, status: disbursement.status },
+    });
   } catch (err) {
     next(err);
   }

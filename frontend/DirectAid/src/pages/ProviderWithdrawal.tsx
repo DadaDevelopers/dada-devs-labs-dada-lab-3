@@ -392,15 +392,11 @@ const ProviderWithdrawal = () => {
                     <option value="">Select a payout method</option>
                     {payoutMethods.map((pm) => {
                       const pid = (pm as any).id ?? (pm as any)._id ?? "";
+                      const method = (pm as any).method ?? (pm as any).type ?? "payout";
+                      const label = (pm as any).lightningAddress || (pm as any).btcAddress || (pm as any).details?.bankName || (pm as any).details?.provider || (pm as any).details?.walletAddress || (pm as any).bankName || (pm as any).accountName || pid;
                       return (
                         <option key={pid} value={pid}>
-                          {((pm as any).type ?? "payout").toString().toUpperCase()} -{" "}
-                          {(pm as any).details?.bankName ||
-                            (pm as any).details?.provider ||
-                            (pm as any).details?.walletAddress ||
-                            (pm as any).bankName ||
-                            (pm as any).accountName ||
-                            pid}
+                          {String(method).toUpperCase()} - {label}
                         </option>
                       );
                     })}

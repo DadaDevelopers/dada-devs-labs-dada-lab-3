@@ -73,6 +73,8 @@ interface PayoutMethod {
   id?: string;
   _id?: string;
   method: string;
+  lightningAddress?: string;
+  btcAddress?: string;
   details?: {
     bankName?: string;
     provider?: string;
@@ -543,7 +545,7 @@ const ProviderDashboard = () => {
                     {(providerData?.payoutMethods || []).map((pm: PayoutMethod, index: number) => (
                       <option key={pm._id || pm.id || index} value={pm._id || pm.id}>
                         {pm.method?.toUpperCase() || "METHOD"} -{" "}
-                        {pm.details?.bankName || pm.details?.provider || pm.details?.walletAddress || "Payout Method"}
+                        {(pm as any).lightningAddress || (pm as any).btcAddress || pm.details?.bankName || pm.details?.provider || pm.details?.walletAddress || "Payout Method"}
                       </option>
                     ))}
                   </select>

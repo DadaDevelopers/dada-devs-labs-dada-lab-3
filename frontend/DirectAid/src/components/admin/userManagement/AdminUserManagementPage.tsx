@@ -35,7 +35,7 @@ interface UserRow {
 
 interface ProviderRow {
   _id: string;
-  userId: string;
+  userId: string | { _id?: string };
   businessName?: string;
   kycStatus?: string;
 }
@@ -134,7 +134,8 @@ export default function AdminUserManagementPage() {
   };
 
   const userIdToProvider = providers.reduce((acc, p) => {
-    acc[String(p.userId)] = p;
+    const uid = typeof p.userId === "object" && (p.userId as { _id?: string })?._id != null ? String((p.userId as { _id: string })._id) : String(p.userId);
+    acc[uid] = p;
     return acc;
   }, {} as Record<string, ProviderRow>);
 
@@ -292,24 +293,28 @@ export default function AdminUserManagementPage() {
                             <FileText className="w-3.5 h-3.5" />
                             View documents
                           </button>
-                        {u.role === "PROVIDER" && provider && isPendingKyc && (
+                        {u.role === "PROVIDER" && provider && (
                           <>
-                            <button
-                              type="button"
-                              disabled={actioningId === provider._id}
-                              onClick={() => handleProviderKyc(provider._id, "APPROVED")}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              disabled={actioningId === provider._id}
-                              onClick={() => handleProviderKyc(provider._id, "REJECTED")}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
+                            {(kycStatus === "PENDING" || kycStatus === "REJECTED") && (
+                              <button
+                                type="button"
+                                disabled={actioningId === provider._id}
+                                onClick={() => handleProviderKyc(provider._id, "APPROVED")}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
+                              >
+                                Approve
+                              </button>
+                            )}
+                            {(kycStatus === "PENDING" || kycStatus === "APPROVED") && (
+                              <button
+                                type="button"
+                                disabled={actioningId === provider._id}
+                                onClick={() => handleProviderKyc(provider._id, "REJECTED")}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                            )}
                           </>
                         )}
                         {u.role === "BENEFICIARY" && isBeneficiaryPending && (

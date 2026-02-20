@@ -43,7 +43,7 @@ const ProviderInvoiceUpload = () => {
   const campaignId = searchParams.get("campaignId");
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [provider, setProvider] = useState<{ _id: string } | null>(null);
+  const [provider, setProvider] = useState<{ _id: string; payoutMethods?: { method: string; lightningAddress?: string; btcAddress?: string }[] } | null>(null);
   const [loading, setLoading] = useState(true);
   // MVP: only campaigns this provider is linked to (providerId === current user)
   useEffect(() => {
@@ -104,6 +104,9 @@ const ProviderInvoiceUpload = () => {
   const [paymentMethod, setPaymentMethod] = useState<string>("OTHER");
   const [currency, setCurrency] = useState("USD");
   const [submitError, setSubmitError] = useState("");
+  // Lightning/Bitcoin addresses for invoice (prefilled from payouts when set)
+  const [invoiceLightningAddress, setInvoiceLightningAddress] = useState("");
+  const [invoiceBtcAddress, setInvoiceBtcAddress] = useState("");
 
   useEffect(() => {
     if (!campaigns.length) return;
@@ -114,6 +117,15 @@ const ProviderInvoiceUpload = () => {
       setSelectedCampaign(campaigns[0] as Campaign);
     }
   }, [campaignId, campaigns]);
+
+  // Prefill Lightning/BTC address from provider payouts when available
+  useEffect(() => {
+    const methods = provider?.payoutMethods ?? [];
+    const lightning = methods.find((pm: { method: string }) => pm.method === "LIGHTNING") as { lightningAddress?: string } | undefined;
+    const bitcoin = methods.find((pm: { method: string }) => pm.method === "BITCOIN") as { btcAddress?: string } | undefined;
+    if (lightning?.lightningAddress) setInvoiceLightningAddress((prev) => prev || lightning.lightningAddress || "");
+    if (bitcoin?.btcAddress) setInvoiceBtcAddress((prev) => prev || bitcoin.btcAddress || "");
+  }, [provider?.payoutMethods]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setInvoiceData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -134,7 +146,10 @@ const ProviderInvoiceUpload = () => {
 
   const canProceed = () => {
     const { invoiceAmount } = invoiceData;
-    return selectedCampaign && provider && invoiceAmount && Number(invoiceAmount) > 0;
+    if (!selectedCampaign || !provider || !invoiceAmount || Number(invoiceAmount) <= 0) return false;
+    if (paymentMethod === "LIGHTNING" && !invoiceLightningAddress?.trim()) return false;
+    if (paymentMethod === "BITCOIN" && !invoiceBtcAddress?.trim()) return false;
+    return true;
   };
 
   const handleSubmitInvoice = async () => {
@@ -144,14 +159,17 @@ const ProviderInvoiceUpload = () => {
     try {
       const amount = Number(invoiceData.invoiceAmount);
       const campaignId = (selectedCampaign as any)._id || (selectedCampaign as any).id;
-      await api.post("/invoices", {
+      const payload: Record<string, unknown> = {
         campaignId,
         providerId: provider._id,
         amount,
         currency: currency || "USD",
         paymentMethod: paymentMethod || "OTHER",
         invoiceFileUrl: null,
-      });
+      };
+      if (paymentMethod === "LIGHTNING" && invoiceLightningAddress?.trim()) payload.lightningAddress = invoiceLightningAddress.trim();
+      if (paymentMethod === "BITCOIN" && invoiceBtcAddress?.trim()) payload.btcAddress = invoiceBtcAddress.trim();
+      await api.post("/invoices", payload);
       setCurrentStep("success");
     } catch (e: any) {
       setSubmitError(e?.response?.data?.message || e?.message || "Failed to submit invoice");
@@ -272,6 +290,34 @@ const ProviderInvoiceUpload = () => {
                   ))}
                 </select>
               </div>
+              {paymentMethod === "LIGHTNING" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Lightning address</label>
+                  <Input
+                    value={invoiceLightningAddress}
+                    onChange={(e) => setInvoiceLightningAddress(e.target.value)}
+                    placeholder="e.g. you@getalby.com"
+                    className="w-full rounded-md border px-3 py-2 bg-background"
+                  />
+                  {provider?.payoutMethods?.some((pm: { method: string }) => pm.method === "LIGHTNING") && (
+                    <p className="text-xs text-muted-foreground">Prefilled from your Payouts settings. You can change it for this invoice if needed.</p>
+                  )}
+                </div>
+              )}
+              {paymentMethod === "BITCOIN" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">BTC address</label>
+                  <Input
+                    value={invoiceBtcAddress}
+                    onChange={(e) => setInvoiceBtcAddress(e.target.value)}
+                    placeholder="e.g. bc1q..."
+                    className="w-full rounded-md border px-3 py-2 bg-background font-mono text-sm"
+                  />
+                  {provider?.payoutMethods?.some((pm: { method: string }) => pm.method === "BITCOIN") && (
+                    <p className="text-xs text-muted-foreground">Prefilled from your Payouts settings. You can change it for this invoice if needed.</p>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Description</label>
                 <textarea 
@@ -329,6 +375,18 @@ const ProviderInvoiceUpload = () => {
                   <span className="text-muted-foreground">Payment method</span>
                   <span className="font-semibold">{paymentMethod}</span>
                 </div>
+                {paymentMethod === "LIGHTNING" && invoiceLightningAddress && (
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">Lightning address</span>
+                    <span className="font-mono text-sm">{invoiceLightningAddress}</span>
+                  </div>
+                )}
+                {paymentMethod === "BITCOIN" && invoiceBtcAddress && (
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">BTC address</span>
+                    <span className="font-mono text-sm break-all">{invoiceBtcAddress}</span>
+                  </div>
+                )}
               </div>
             </Card>
             <div className="flex gap-4">
