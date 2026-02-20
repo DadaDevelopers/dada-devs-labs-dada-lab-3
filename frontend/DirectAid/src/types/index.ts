@@ -104,15 +104,18 @@ export interface AidRequest {
 // ============================================================================
 
 // src/types/index.ts — FINAL CLEAN VERSION
+// Backend Campaign.status enum: PENDING | ACTIVE | COMPLETED | CANCELLED.
+// Use utils/campaignStatus for display labels and filter mapping.
 
 export type CampaignStatus =
-  | "draft"
+  | "PENDING"
+  | "ACTIVE"
+  | "COMPLETED"
+  | "CANCELLED"
   | "pending_approval"
   | "active"
   | "completed"
-  | "cancelled"
-  | "in_progress"
-  | "paused";
+  | "cancelled";
 
 export type ConfirmationStatus =
   | "pending"

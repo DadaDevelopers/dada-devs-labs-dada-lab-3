@@ -90,7 +90,7 @@ export const linkProviderToCampaign = async (req, res, next) => {
 };
 
 /**
- * Provider accepts a campaign
+ * Provider accepts a campaign (linked by providerId OR by metadata.manualProvider.email)
  */
 export const providerAcceptCampaign = async (req, res, next) => {
   try {
@@ -102,17 +102,33 @@ export const providerAcceptCampaign = async (req, res, next) => {
       return res.status(404).json({ message: "Campaign not found" });
     }
 
-    // Check if this USER is the provider linked to the campaign
-    if (!campaign.providerId || campaign.providerId.toString() !== req.user.userId) {
+    const isLinkedByProviderId = campaign.providerId && campaign.providerId.toString() === req.user.userId;
+    const manualEmail = campaign.metadata?.manualProvider?.email?.trim?.();
+    const providerDoc = await Provider.findOne({ userId: req.user.userId });
+    const myEmail = (providerDoc?.email || req.user.email || "").trim().toLowerCase();
+    const isInvitedByEmail = !campaign.providerId && manualEmail && myEmail && manualEmail.toLowerCase() === myEmail;
+
+    if (!isLinkedByProviderId && !isInvitedByEmail) {
       return res.status(403).json({ 
         message: "Not authorized. This campaign is not linked to your provider account." 
       });
+    }
+
+    // When accepting as manual-invited provider, set providerId to this user
+    if (isInvitedByEmail && !campaign.providerId) {
+      campaign.providerId = req.user.userId;
     }
 
     // Update provider acceptance
     campaign.providerAccepted = true;
     campaign.providerAcceptedAt = new Date();
     campaign.providerNotes = notes || "";
+
+    // If admin has already approved, this acceptance makes the campaign fully active
+    if (campaign.adminStatus === "approved" && campaign.status === "PENDING") {
+      campaign.status = "ACTIVE";
+    }
+
     await campaign.save();
 
     // Log activity
@@ -253,8 +269,28 @@ export const confirmProvider = async (req, res, next) => {
       return res.status(403).json({ message: "Only providers can confirm campaigns" });
     }
 
+    const isLinkedByProviderId = campaign.providerId && campaign.providerId.toString() === req.user.userId;
+    const manualEmail = campaign.metadata?.manualProvider?.email?.trim?.();
+    const providerDoc = await Provider.findOne({ userId: req.user.userId });
+    const myEmail = (providerDoc?.email || req.user.email || "").trim().toLowerCase();
+    const isInvitedByEmail = !campaign.providerId && manualEmail && myEmail && manualEmail.toLowerCase() === myEmail;
+
+    if (!isLinkedByProviderId && !isInvitedByEmail) {
+      return res.status(403).json({ message: "Not authorized. This campaign is not linked to your provider account." });
+    }
+
+    if (isInvitedByEmail && !campaign.providerId) {
+      campaign.providerId = req.user.userId;
+    }
+
     campaign.confirmationStatus = "provider_confirmed";
     campaign.providerConfirmedAt = new Date();
+
+    // If admin has already approved, provider confirmation makes the campaign active
+    if (campaign.adminStatus === "approved" && campaign.status === "PENDING") {
+      campaign.status = "ACTIVE";
+    }
+
     await campaign.save();
 
     await logActivity({
@@ -335,7 +371,8 @@ export const getAllCampaigns = async (req, res, next) => {
       category,
       beneficiaryId,
       confirmationStatus,
-      providerId
+      providerId,
+      includeHidden
     } = req.query;
 
     const filter = {};
@@ -353,6 +390,13 @@ export const getAllCampaigns = async (req, res, next) => {
     if (beneficiaryId) filter.beneficiaryId = beneficiaryId;
     if (confirmationStatus) filter.confirmationStatus = confirmationStatus;
     if (providerId) filter.providerId = providerId;
+
+    // By default, do not return hidden campaigns to public callers.
+    // Admins or explicit includeHidden=true can see everything.
+    const isAdmin = req.user && req.user.role === "ADMIN";
+    if (!isAdmin && String(includeHidden) !== "true") {
+      filter.isHidden = { $ne: true };
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -422,6 +466,43 @@ export const getMyCampaigns = async (req, res, next) => {
 };
 
 /**
+ * Get campaigns for the current provider: assigned (providerId) OR invited by email (metadata.manualProvider.email)
+ */
+export const getCampaignsForProvider = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const providerDoc = await Provider.findOne({ userId: req.user.userId });
+    const myEmail = (providerDoc?.email || req.user.email || "").trim().toLowerCase();
+    const filter = {
+      $or: [
+        { providerId: req.user.userId },
+        ...(myEmail
+          ? [{ "metadata.manualProvider.email": { $regex: new RegExp(`^${myEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } }]
+          : [])
+      ]
+    };
+    const skip = (Number(page) - 1) * Number(limit);
+    const [campaigns, total] = await Promise.all([
+      Campaign.find(filter)
+        .populate("beneficiaryId", "firstName lastName email beneficiaryProfile.displayName")
+        .populate("providerId", "firstName lastName email organization phoneNumber")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Campaign.countDocuments(filter)
+    ]);
+    res.json({
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      campaigns: campaigns.map((c) => formatCampaign(c))
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Get Campaign By ID - accept either _id or publicId via ?by=public
  */
 export const getCampaignById = async (req, res, next) => {
@@ -429,9 +510,15 @@ export const getCampaignById = async (req, res, next) => {
     const id = req.params.id;
     const byPublic = req.query.by === "public";
 
-    const query = byPublic ? { publicId: id } : { _id: id };
+    const baseQuery = byPublic ? { publicId: id } : { _id: id };
 
-    const campaign = await Campaign.findOne(query)
+    // Hide hidden campaigns from public detail unless admin
+    const isAdmin = req.user && req.user.role === "ADMIN";
+    if (!isAdmin) {
+      baseQuery.isHidden = { $ne: true };
+    }
+
+    const campaign = await Campaign.findOne(baseQuery)
       .populate("beneficiaryId", "firstName lastName email beneficiaryProfile.displayName")
       .populate("providerId", "firstName lastName organization phoneNumber");
 
@@ -481,9 +568,27 @@ export const getCampaignTransactions = async (req, res, next) => {
 
     const [donationStats, withdrawals] = await Promise.all([
       Donation.aggregate([
-        { $match: { campaignId: new mongoose.Types.ObjectId(campaignId) } },
-        { $group: { _id: null, donationCount: { $sum: 1 }, totalDonations: { $sum: "$amountFiat" } } },
-      ]).then((r) => (r[0] ? { donationCount: r[0].donationCount, totalDonations: parseFloat(String(r[0].totalDonations || 0)) } : { donationCount: 0, totalDonations: 0 })),
+        {
+          $match: {
+            campaignId: new mongoose.Types.ObjectId(campaignId),
+            status: "COMPLETED",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            donationCount: { $sum: 1 },
+            totalDonations: { $sum: "$amountFiat" },
+          },
+        },
+      ]).then((r) =>
+        r[0]
+          ? {
+              donationCount: r[0].donationCount,
+              totalDonations: parseFloat(String(r[0].totalDonations || 0)),
+            }
+          : { donationCount: 0, totalDonations: 0 }
+      ),
       Withdrawal.find({ campaignId })
         .populate("providerId", "businessName email")
         .sort({ createdAt: -1 })
@@ -501,11 +606,11 @@ export const getCampaignTransactions = async (req, res, next) => {
 };
 
 /**
- * Update Campaign - owner or admin
+ * Update Campaign - owner or admin. Provider/manualProvider only when PENDING and not provider_confirmed.
  */
 export const updateCampaign = async (req, res, next) => {
   try {
-    const { title, description, targetAmount, currency, providerId, status, category } = req.body;
+    const { title, description, targetAmount, currency, providerId, status, category, metadata: bodyMetadata } = req.body;
 
     const campaign = await Campaign.findById(req.params.id);
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
@@ -515,21 +620,34 @@ export const updateCampaign = async (req, res, next) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
+    const canEditProvider = campaign.status === "PENDING" && campaign.confirmationStatus !== "provider_confirmed";
+
     if (title !== undefined) campaign.title = title;
     if (description !== undefined) campaign.description = description;
     if (targetAmount !== undefined) campaign.targetAmount = mongoose.Types.Decimal128.fromString(String(targetAmount));
     if (currency !== undefined) campaign.currency = currency;
-    // providerId in body is Provider document _id; Campaign stores User id (ref: User)
-    if (providerId !== undefined) {
-      if (providerId === null || providerId === "") {
-        campaign.providerId = null;
-      } else {
-        const provider = await Provider.findById(providerId);
-        campaign.providerId = provider ? provider.userId : providerId;
-      }
-    }
     if (status !== undefined) campaign.status = status;
     if (category !== undefined) campaign.category = category;
+
+    // Provider / manualProvider only when campaign is still pending provider confirmation
+    if (canEditProvider) {
+      if (providerId !== undefined) {
+        if (providerId === null || providerId === "") {
+          campaign.providerId = null;
+        } else {
+          const provider = await Provider.findById(providerId);
+          campaign.providerId = provider ? provider.userId : providerId;
+        }
+      }
+      if (bodyMetadata && typeof bodyMetadata === "object" && bodyMetadata.manualProvider) {
+        campaign.metadata = campaign.metadata || {};
+        campaign.metadata.manualProvider = {
+          name: bodyMetadata.manualProvider.name ?? campaign.metadata.manualProvider?.name,
+          phone: bodyMetadata.manualProvider.phone ?? campaign.metadata.manualProvider?.phone,
+          email: bodyMetadata.manualProvider.email ?? campaign.metadata.manualProvider?.email,
+        };
+      }
+    }
 
     await campaign.save();
 
@@ -567,8 +685,27 @@ export const adminUpdateCampaignStatus = async (req, res, next) => {
 
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
+    if (status === "approved") {
+      const providerOk = campaign.providerAccepted === true || campaign.confirmationStatus === "provider_confirmed";
+      if (!providerOk) {
+        return res.status(400).json({
+          message: "Provider must approve campaign before admin approval.",
+        });
+      }
+    }
+
     const oldStatus = campaign.adminStatus;
     campaign.adminStatus = status;
+
+    // When admin approves and provider has already accepted/confirmed, mark lifecycle as ACTIVE
+    if (
+      status === "approved" &&
+      campaign.status === "PENDING" &&
+      (campaign.providerAccepted || campaign.confirmationStatus === "provider_confirmed")
+    ) {
+      campaign.status = "ACTIVE";
+    }
+
     await campaign.save();
 
     await logActivity({
@@ -579,6 +716,41 @@ export const adminUpdateCampaignStatus = async (req, res, next) => {
       entityId: campaign._id,
       description: `Campaign adminStatus changed from ${oldStatus} to ${status} by admin`,
       metadata: { oldStatus, newStatus: status },
+      req
+    });
+
+    res.json({ campaign: formatCampaign(campaign) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Admin: hide or unhide a campaign from public view
+ * PATCH /campaigns/:id/visibility { isHidden: boolean }
+ */
+export const adminUpdateCampaignVisibility = async (req, res, next) => {
+  try {
+    const { isHidden } = req.body;
+    if (typeof isHidden !== "boolean") {
+      return res.status(400).json({ message: "isHidden boolean is required" });
+    }
+
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    const previous = campaign.isHidden;
+    campaign.isHidden = isHidden;
+    await campaign.save();
+
+    await logActivity({
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      actionType: isHidden ? "ADMIN_HID_CAMPAIGN" : "ADMIN_UNHID_CAMPAIGN",
+      entityType: "Campaign",
+      entityId: campaign._id,
+      description: `Campaign visibility changed from ${previous ? "hidden" : "visible"} to ${isHidden ? "hidden" : "visible"} by admin`,
+      metadata: { previous, isHidden },
       req
     });
 

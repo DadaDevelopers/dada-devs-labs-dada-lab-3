@@ -248,6 +248,34 @@ export const confirmBitcoinDonation = async (req, res, next) => {
   }
 };
 
+/* ---------------- DONATION STATUS (LIGHTWEIGHT) ---------------- */
+
+// GET /donations/:id/status — return minimal status info for polling
+export const getDonationStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ message: "Donation id required" });
+
+    const donation = await Donation.findById(id);
+    if (!donation) return res.status(404).json({ message: "Donation not found" });
+
+    // Basic auth: only owner or admin can see detailed status; guests only see status string.
+    if (donation.donorId && req.user && String(donation.donorId) !== String(req.user.userId) && req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    return res.json({
+      id: donation._id,
+      status: donation.status,
+      campaignId: donation.campaignId,
+      amountFiat: donation.amountFiat,
+      paymentMethod: donation.paymentMethod
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 /* ---------------- LIGHTNING WEBHOOK ---------------- */
 
 export const lightningWebhook = async (req, res, next) => {

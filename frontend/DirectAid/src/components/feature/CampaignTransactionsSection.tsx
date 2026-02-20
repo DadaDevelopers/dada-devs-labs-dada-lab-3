@@ -81,7 +81,9 @@ export function CampaignTransactionsSection({ campaignId }: { campaignId: string
             <p className="font-medium" style={{ color: "var(--color-text-light)" }}>
               {donationCount} donation{donationCount !== 1 ? "s" : ""} · ${Number(totalDonations).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
-            <p className="text-xs text-muted-foreground">Total raised from donors</p>
+            <p className="text-xs text-muted-foreground">
+              Total completed donations applied to this campaign. Provider withdrawals below do not reduce this amount.
+            </p>
           </div>
         </div>
 

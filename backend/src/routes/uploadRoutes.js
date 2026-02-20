@@ -1,13 +1,17 @@
 // routes/uploadRoutes.js
 import express from "express";
-import { protect } from "../middlewares/auth.js";
+import { protect, authorize } from "../middlewares/auth.js";
 import {
   presignUpload,
   confirmUpload,
-  createUploadFromMetadata
+  createUploadFromMetadata,
+  listUploadsForUser
 } from "../controllers/uploadController.js";
 
 const router = express.Router();
+
+// Admin: list uploads for a user (KYC docs)
+router.get("/", protect, authorize("ADMIN"), listUploadsForUser);
 
 // Beneficiary documents
 router.post("/presign", protect, presignUpload);

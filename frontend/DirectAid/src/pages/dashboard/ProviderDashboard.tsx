@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useApp } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
-import api, { confirmProviderCampaign } from "../../services/api";
+import api, { confirmProviderCampaign, getCampaignsForProvider } from "../../services/api";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
 import { Button } from "../../components/ui/Button";
@@ -140,9 +140,9 @@ const ProviderDashboard = () => {
     };
   }>({});
 
-  // Fetch provider data (retry once on 404 so backend auto-create can run)
+  // Fetch provider data (retry once on 404 so backend auto-create can run; on 401 re-attach token and retry once)
   useEffect(() => {
-    const fetchProviderData = async (retry = false) => {
+    const fetchProviderData = async (retry404 = false, retry401 = false) => {
       try {
         setLoading(true);
         setError(null);
@@ -165,8 +165,18 @@ const ProviderDashboard = () => {
         }
       } catch (err: any) {
         const status = err?.response?.status;
-        if (status === 404 && !retry) {
-          await fetchProviderData(true);
+        if (status === 404 && !retry404) {
+          await fetchProviderData(true, false);
+          return;
+        }
+        if (status === 401 && !retry401) {
+          const token = localStorage.getItem("auth_token");
+          if (token) {
+            api.setAuthToken(token);
+            await fetchProviderData(false, true);
+            return;
+          }
+          setError("Please log in again.");
           return;
         }
         if (status === 401) {
@@ -188,52 +198,29 @@ const ProviderDashboard = () => {
     console.log("Provider data:", providerData);
   }, [user, providerData]);
 
-  // Fetch provider campaigns
+  // Fetch provider campaigns (includes campaigns where beneficiary entered this provider's email — GET /campaigns/for-provider)
   useEffect(() => {
     const fetchProviderCampaigns = async () => {
       if (!user?.id) return;
-      
+
       try {
-        const response = await api.get("/campaigns");
-        console.log("FULL API RESPONSE:", response);
-        
-        // Campaigns are directly in response.campaigns (not response.data.campaigns)
-        const allCampaigns = response.campaigns || [];
-        
-        console.log("Number of campaigns from API:", allCampaigns.length);
-        console.log("Campaigns data:", allCampaigns);
-        
-        // Filter campaigns where YOU are the provider
-        const providerCampaigns = allCampaigns.filter((campaign: any) => {
-          // Check the provider ID - it's an object with _id field
-          const campaignProviderId = campaign.providerId?._id || campaign.providerId;
-          const userId = user.id;
-          
-          console.log(`Comparing: Campaign "${campaign.title}"`);
-          console.log(`  Campaign Provider ID: ${campaignProviderId}`);
-          console.log(`  User ID: ${userId}`);
-          console.log(`  Match: ${campaignProviderId === userId}`);
-          
-          return campaignProviderId === userId;
-        });
-        
-        console.log("YOUR CAMPAIGNS after filter:", providerCampaigns.length);
-        console.log("Your campaigns:", providerCampaigns);
-        
+        const data = await getCampaignsForProvider({ limit: 100 });
+        const list = data.campaigns ?? [];
+        const providerCampaigns = Array.isArray(list) ? list : [];
+
         setMetrics({
           totalCampaigns: providerCampaigns.length,
           totalFundsRaised: providerCampaigns.reduce((sum: number, c: any) => sum + (c.amountRaised || 0), 0),
           activeDonors: providerCampaigns.reduce((sum: number, c: any) => sum + (c.donorCount || 0), 0)
         });
-        
+
         setPendingCampaigns(providerCampaigns.filter((c: any) => !c.providerAccepted));
         setAcceptedCampaigns(providerCampaigns.filter((c: any) => c.providerAccepted));
-        
       } catch (err: any) {
-        console.error("Error fetching campaigns:", err);
+        console.error("Error fetching provider campaigns:", err);
       }
     };
-    
+
     if (user) {
       fetchProviderCampaigns();
     }
@@ -249,11 +236,13 @@ const ProviderDashboard = () => {
     { month: "Nov", raised: 245500 },
   ];
 
+  // Chart data in dollars (backend stores in cents); format with $ and thousands separator
   const campaignPerformance = (campaigns as AppCampaign[]).map((c: AppCampaign) => ({
     name: c.title.split(" - ")[0],
-    raised: c.amountRaised / 100,
-    target: c.targetAmount / 100,
+    raised: Number(c.amountRaised ?? 0) / 100,
+    target: Number(c.targetAmount ?? 0) / 100,
   }));
+  const formatCurrency = (val: number) => `$${Number(val).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
   const navItems = [
     { label: "Dashboard", href: "/provider", icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -334,26 +323,20 @@ const ProviderDashboard = () => {
       await api.post(`/campaigns/${campaignId}/provider-accept`, {
         notes: "Provider has accepted this campaign"
       });
-      
-      // Refresh campaigns
-      const response = await api.get("/campaigns");
-      const allCampaigns = response.campaigns || [];
-      const providerCampaigns = allCampaigns.filter((campaign: any) => {
-        const campaignProviderId = campaign.providerId?._id || campaign.providerId;
-        return campaignProviderId === user?.id;
-      });
-      
-      const pending = providerCampaigns.filter((c: any) => !c.providerAccepted);
-      const accepted = providerCampaigns.filter((c: any) => c.providerAccepted);
-      
-      setPendingCampaigns(pending);
-      setAcceptedCampaigns(accepted);
+
+      // Refresh from same endpoint (includes manual-provider + assigned campaigns)
+      const data = await getCampaignsForProvider({ limit: 100 });
+      const list = data.campaigns ?? [];
+      const providerCampaigns = Array.isArray(list) ? list : [];
+
+      setPendingCampaigns(providerCampaigns.filter((c: any) => !c.providerAccepted));
+      setAcceptedCampaigns(providerCampaigns.filter((c: any) => c.providerAccepted));
       setMetrics({
         totalCampaigns: providerCampaigns.length,
         totalFundsRaised: providerCampaigns.reduce((sum: number, c: any) => sum + (c.amountRaised || 0), 0),
         activeDonors: providerCampaigns.reduce((sum: number, c: any) => sum + (c.donorCount || 0), 0)
       });
-      
+
       alert("Campaign accepted successfully!");
     } catch (err: any) {
       alert(err.message || "Failed to accept campaign");
@@ -908,15 +891,18 @@ const ProviderDashboard = () => {
               <BarChart data={campaignPerformance}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "12px",
-                }} />
-                <Legend wrapperStyle={{ fontSize: "12px" }} />
-                <Bar dataKey="raised" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="target" fill="hsl(var(--muted))" radius={[8, 8, 0, 0]} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "12px",
+                  }}
+                  formatter={(value: number | undefined, name?: string) => [formatCurrency(value ?? 0), (name === "raised" ? "Raised" : "Target") as "Raised" | "Target"]}
+                />
+                <Legend wrapperStyle={{ fontSize: "12px" }} formatter={(v) => (v === "raised" ? "Raised ($)" : "Target ($)")} />
+                <Bar dataKey="raised" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} name="raised" />
+                <Bar dataKey="target" fill="hsl(var(--muted))" radius={[8, 8, 0, 0]} name="target" />
               </BarChart>
             </ResponsiveContainer>
           </Card>

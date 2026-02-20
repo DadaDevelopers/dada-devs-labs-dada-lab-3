@@ -1,10 +1,29 @@
 import React from 'react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-
+import { useAuth } from '../../contexts/AuthContext';
+import api from '../../services/api';
 
 const Header: React.FC = () => {
   const [openMenu, setOpenMenu] = useState<boolean>(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = ((user as { role?: string })?.role ?? '').toUpperCase();
+  const dashboardPath =
+    role === 'ADMIN' ? '/admin' :
+    role === 'BENEFICIARY' ? '/beneficiary' :
+    role === 'PROVIDER' ? '/provider' :
+    role === 'DONOR' ? '/donor' : '/';
+  const isLoggedIn = !!user;
+
+  const goToDashboard = () => {
+    const token = localStorage.getItem('auth_token');
+    if (token) api.setAuthToken(token);
+    setOpenMenu(false);
+    navigate(dashboardPath);
+  };
+
   return (
     <header className="bg-[#0B1221] shadow-lg border-b border-white/10 fixed top-0 left-0 right-0 z-50">
       <nav className="container mx-auto px-4 py-4 max-w-7xl">
@@ -39,9 +58,15 @@ const Header: React.FC = () => {
 
           {/* DESKTOP: Right CTAs */}
           <div className="hidden lg:flex items-center gap-6 shrink-0">
-            <a href="/login" className="text-sm text-white/80 hover:text-[var(--color-accent)] transition">
-              Login
-            </a>
+            {isLoggedIn ? (
+              <button type="button" onClick={goToDashboard} className="text-sm text-white/80 hover:text-[var(--color-accent)] transition">
+                Dashboard
+              </button>
+            ) : (
+              <a href="/login" className="text-sm text-white/80 hover:text-[var(--color-accent)] transition">
+                Login
+              </a>
+            )}
             <a href="/signup" className="btn-cta text-sm py-2 px-6 rounded-lg font-medium">
               Get Started
             </a>
@@ -82,9 +107,15 @@ const Header: React.FC = () => {
 
           {/* Mobile CTAs */}
           <div className="flex flex-col gap-5 items-center">
-            <a href="/login" className="text-lg text-white/80 hover:text-[var(--color-accent)] transition">
-              Login
-            </a>
+            {isLoggedIn ? (
+              <button type="button" onClick={goToDashboard} className="text-lg text-white/80 hover:text-[var(--color-accent)] transition">
+                Dashboard
+              </button>
+            ) : (
+              <a href="/login" className="text-lg text-white/80 hover:text-[var(--color-accent)] transition">
+                Login
+              </a>
+            )}
             <a href="/signup" className="btn-cta text-base py-3 px-10 w-full max-w-xs rounded-lg font-medium">
               Get Started
             </a>

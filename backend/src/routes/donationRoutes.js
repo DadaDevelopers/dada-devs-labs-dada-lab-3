@@ -1,6 +1,6 @@
 // src/routes/donationRoutes.js
 import express from "express";
-import { createDonation, mpesaWebhook, confirmBitcoinDonation, lightningWebhook, getDonation, getDonationsByCampaign, getDonationsByUser, getDonationReceipt, listDonations } from "../controllers/donationController.js";
+import { createDonation, mpesaWebhook, confirmBitcoinDonation, lightningWebhook, getDonation, getDonationsByCampaign, getDonationsByUser, getDonationReceipt, listDonations, getDonationStatus } from "../controllers/donationController.js";
 //import { mpesaCallbackController } from "../controllers/mpesaCallbackController.js";
 //import { stripeWebhookController } from "../controllers/stripeWebhookController.js";
 import { getDonorMetrics, getReceiptPDF, emailReceipt } from "../controllers/donorMetricsController.js";
@@ -26,6 +26,7 @@ router.post("/bitcoin/confirm", protect, confirmBitcoinDonation);
 router.get("/me", protect, getDonationsByUser);
 router.get("/:id", protect, getDonation);
 router.get("/campaign/:campaignId", protect, getDonationsByCampaign);
+router.get("/:id/status", optionalAuth, getDonationStatus);
 
 // Admin list
 router.get("/", protect, authorize("ADMIN"), listDonations);

@@ -7,6 +7,7 @@ import {
   useBeneficiaryMetrics,
   confirmBeneficiaryReceipt,
 } from "../../hooks/useBeneficiaryApi";
+import { getCampaignStatusLabel, canEditCampaign } from "../../utils/campaignStatus";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { MetricCard } from "../../components/feature/MetricCard";
 import { Button } from "../../components/ui/Button";
@@ -61,6 +62,8 @@ const BeneficiaryDashboard = () => {
     useState<any>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [profileIncomplete, setProfileIncomplete] = useState<boolean | null>(null);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
+  const [identityVerified, setIdentityVerified] = useState<boolean | null>(null);
   const [profileBannerDismissed, setProfileBannerDismissed] = useState(() =>
     typeof sessionStorage !== "undefined" ? sessionStorage.getItem(BENEFICIARY_PROFILE_BANNER_DISMISSED) === "1" : false
   );
@@ -76,6 +79,8 @@ const BeneficiaryDashboard = () => {
         const missingNationalId = !bp?.nationalIdHash && !bp?.nationalId;
         const missingPreferredProvider = !bp?.preferredProvider || (typeof bp.preferredProvider === "string" && !bp.preferredProvider.trim());
         setProfileIncomplete(!!(missingNationalId || missingPreferredProvider));
+        setKycStatus(u?.kyc?.status ?? null);
+        setIdentityVerified(!!bp?.identityVerified);
       })
       .catch(() => {
         if (!cancelled) setProfileIncomplete(false);
@@ -100,7 +105,7 @@ const BeneficiaryDashboard = () => {
     navigate("/campaigns/create");
   };
 
-  // Delivery timeline - dynamically generated from campaign status
+  // Delivery timeline - dynamically generated from campaign + admin + confirmation status
   const deliveryTimeline = primaryCampaign
     ? [
       {
@@ -109,15 +114,28 @@ const BeneficiaryDashboard = () => {
         date: primaryCampaign.createdAt ? primaryCampaign.createdAt.split("T")[0] : "Pending",
       },
       {
-        status: primaryCampaign.status !== "draft" ? "Completed" : "Upcoming",
+        // Admin approval should come from adminStatus, not generic status
+        status:
+          primaryCampaign.adminStatus === "approved"
+            ? "Completed"
+            : primaryCampaign.submittedForReview
+              ? "Current"
+              : "Upcoming",
         label: "Campaign Approved",
-        date: "Pending",
+        date:
+          primaryCampaign.adminStatus === "approved"
+            ? "Approved by admin"
+            : primaryCampaign.submittedForReview
+              ? "In review"
+              : "Pending",
       },
       {
         status:
           primaryCampaign.confirmationStatus === "provider_confirmed"
             ? "Completed"
-            : "Current",
+            : primaryCampaign.adminStatus === "approved"
+              ? "Current"
+              : "Upcoming",
         label: "Provider confirmed service",
         date: primaryCampaign.providerConfirmedAt
           ? primaryCampaign.providerConfirmedAt.split("T")[0]
@@ -186,26 +204,15 @@ const BeneficiaryDashboard = () => {
 
   const handleShareCampaign = () => {
     if (primaryCampaign) {
-      const url = `${window.location.origin}/campaign/${primaryCampaign.id}`;
+      const id = primaryCampaign.id ?? primaryCampaign._id;
+      const url = `${window.location.origin}/campaigns/${id}`;
       navigator.clipboard.writeText(url);
       alert("Campaign link copied to clipboard!");
     }
   };
 
-  // Helpers for campaign UI
-  const getCampaignStatusLabel = (c: any) => {
-    if (c.status === "draft") return "Draft";
-    if (c.confirmationStatus === "disputed") return "Rejected";
-    if (c.confirmationStatus !== "provider_confirmed") return "Pending approval";
-    if (c.beneficiaryReceipt) return c.status === "COMPLETED" ? "Completed" : "Service in progress";
-    if (c.confirmationStatus === "provider_confirmed") return "Ready";
-    if (c.status === "COMPLETED") return "Completed";
-    return c.status?.charAt?.(0)?.toUpperCase() + (c.status?.slice?.(1) ?? "") || "Active";
-  };
 
-  const canEditCampaign = (c: any) => {
-    return c.status === "draft" || (c.confirmationStatus !== "provider_confirmed" && c.confirmationStatus !== "disputed");
-  };
+
 
   const canConfirmReadiness = (c: any) => {
     return c.confirmationStatus === "provider_confirmed";
@@ -375,7 +382,7 @@ const BeneficiaryDashboard = () => {
                       className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${item.status === "Completed"
                         ? "bg-green-500 text-white"
                         : item.status === "Current"
-                          ? "bg-primary text-primary-foreground"
+                          ? "bg-amber-500/90 text-white"
                           : "bg-muted text-muted-foreground"
                         }`}
                     >
@@ -406,7 +413,7 @@ const BeneficiaryDashboard = () => {
                         </p>
                       </div>
                       {item.status === "Current" && (
-                        <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary self-start">
+                        <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 self-start">
                           Action Required
                         </span>
                       )}
@@ -665,9 +672,7 @@ const BeneficiaryDashboard = () => {
                         ? "bg-red-500/20 text-red-400 border border-red-500/40"
                         : getCampaignStatusLabel(campaign) === "Pending approval"
                           ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                          : getCampaignStatusLabel(campaign) === "Draft"
-                            ? "bg-gray-600/30 text-gray-400 border border-white/10"
-                            : getCampaignStatusLabel(campaign) === "Ready"
+                          : getCampaignStatusLabel(campaign) === "Ready"
                               ? "bg-[var(--color-accent)]/20 text-[var(--color-accent)] border border-[var(--color-accent)]/30"
                               : getCampaignStatusLabel(campaign) === "Service in progress" || getCampaignStatusLabel(campaign) === "Completed"
                                 ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/25"
@@ -797,29 +802,64 @@ const BeneficiaryDashboard = () => {
               </div>
 
               <div className="space-y-2 sm:space-y-3">
+                {/* Campaign approval row */}
                 <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[var(--color-secondary-bg)] border border-white/10 gap-2">
                   <span className="text-xs sm:text-sm font-medium text-[var(--color-text-light)]">
                     Campaign approval
                   </span>
-                  <span className="text-xs text-[var(--color-accent)] font-medium flex-shrink-0">
-                    ✓ Approved
-                  </span>
+                  {primaryCampaign?.adminStatus === "approved" ? (
+                    <span className="text-xs text-emerald-400 font-medium flex-shrink-0">
+                      ✓ Approved
+                    </span>
+                  ) : primaryCampaign?.adminStatus === "rejected" || primaryCampaign?.adminStatus === "flagged" ? (
+                    <span className="text-xs text-red-400 font-medium flex-shrink-0">
+                      Needs review
+                    </span>
+                  ) : (
+                    <span className="text-xs text-amber-400 font-medium flex-shrink-0">
+                      Pending review
+                    </span>
+                  )}
                 </div>
+
+                {/* Document verification row (basic signal from beneficiary profile docs) */}
                 <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[var(--color-secondary-bg)] border border-white/10 gap-2">
                   <span className="text-xs sm:text-sm font-medium text-[var(--color-text-light)]">
                     Document verification
                   </span>
-                  <span className="text-xs text-[var(--color-accent)] font-medium flex-shrink-0">
-                    ✓ Verified
-                  </span>
+                  {identityVerified ? (
+                    <span className="text-xs text-emerald-400 font-medium flex-shrink-0">
+                      ✓ Verified
+                    </span>
+                  ) : profileIncomplete ? (
+                    <span className="text-xs text-amber-400 font-medium flex-shrink-0">
+                      Upload documents
+                    </span>
+                  ) : (
+                    <span className="text-xs text-amber-300 font-medium flex-shrink-0">
+                      In review
+                    </span>
+                  )}
                 </div>
+
+                {/* Compliance check row (maps to KYC status) */}
                 <div className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-[var(--color-secondary-bg)] border border-white/10 gap-2">
                   <span className="text-xs sm:text-sm font-medium text-[var(--color-text-light)]">
                     Compliance check
                   </span>
-                  <span className="text-xs text-[var(--color-accent)] font-medium flex-shrink-0">
-                    ✓ Passed
-                  </span>
+                  {kycStatus === "APPROVED" ? (
+                    <span className="text-xs text-emerald-400 font-medium flex-shrink-0">
+                      ✓ Passed
+                    </span>
+                  ) : kycStatus === "REJECTED" ? (
+                    <span className="text-xs text-red-400 font-medium flex-shrink-0">
+                      Review required
+                    </span>
+                  ) : (
+                    <span className="text-xs text-amber-400 font-medium flex-shrink-0">
+                      Pending
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,10 +1,13 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Users,
   ShieldCheck,
   HandCoins,
   User,
   RefreshCw,
+  FileText,
+  X,
 } from "lucide-react";
 import {
   getAdminMetrics,
@@ -12,6 +15,7 @@ import {
   getProviders,
   approveProviderKyc,
   verifyUserIdentity,
+  getUploadsForUser,
 } from "../../../services/api";
 import type { AdminMetrics } from "../../../types";
 
@@ -44,6 +48,27 @@ export default function AdminUserManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [docsUserId, setDocsUserId] = useState<string | null>(null);
+  const [docsUserName, setDocsUserName] = useState<string>("");
+  const [docsUploads, setDocsUploads] = useState<{ id: string; name: string; mimeType?: string; purpose?: string; url?: string; status?: string }[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [highlightUserId, setHighlightUserId] = useState<string | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightFromUrl = searchParams.get("highlightUserId");
+
+  useEffect(() => {
+    if (highlightFromUrl) {
+      setFilter("PROVIDER");
+      setHighlightUserId(highlightFromUrl);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("highlightUserId");
+        return next;
+      }, { replace: true });
+    }
+  }, [highlightFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async () => {
     setError(null);
@@ -68,6 +93,21 @@ export default function AdminUserManagementPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (loading || !highlightUserId) return;
+    const el = tableContainerRef.current?.querySelector(`[data-user-id="${highlightUserId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      el.classList.add("admin-row-highlight");
+      const t = setTimeout(() => {
+        el.classList.remove("admin-row-highlight");
+        setHighlightUserId(null);
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+    setHighlightUserId(null);
+  }, [loading, highlightUserId]);
 
   const handleProviderKyc = async (providerId: string, status: "APPROVED" | "REJECTED") => {
     setActioningId(providerId);
@@ -97,6 +137,27 @@ export default function AdminUserManagementPage() {
     acc[String(p.userId)] = p;
     return acc;
   }, {} as Record<string, ProviderRow>);
+
+  const openDocsPanel = async (userId: string, userName: string) => {
+    setDocsUserId(userId);
+    setDocsUserName(userName);
+    setDocsLoading(true);
+    setDocsUploads([]);
+    try {
+      const { uploads } = await getUploadsForUser(userId);
+      setDocsUploads(uploads ?? []);
+    } catch {
+      setDocsUploads([]);
+    } finally {
+      setDocsLoading(false);
+    }
+  };
+
+  const closeDocsPanel = () => {
+    setDocsUserId(null);
+    setDocsUserName("");
+    setDocsUploads([]);
+  };
 
   const displayUsers =
     filter === "PROVIDER"
@@ -161,11 +222,19 @@ export default function AdminUserManagementPage() {
       </div>
 
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
+        <style>{`
+          @keyframes admin-row-highlight-pulse {
+            0% { background: rgba(245, 158, 11, 0.35); }
+            100% { background: transparent; }
+          }
+          .admin-row-highlight { animation: admin-row-highlight-pulse 2s ease-out forwards; }
+        `}</style>
+        <div className="overflow-x-auto overflow-y-auto max-h-[70vh]" ref={tableContainerRef}>
           <table className="w-full border-collapse">
             <thead>
               <tr className="text-left text-slate-400 border-b border-white/10 bg-white/[0.02]">
-                <th className="py-4 px-4 text-[10px] font-black uppercase tracking-widest">Name / Organisation</th>
+                <th className="py-4 px-4 text-[10px] font-black uppercase tracking-widest">Name</th>
+                <th className="py-4 px-4 text-[10px] font-black uppercase tracking-widest">Organisation</th>
                 <th className="py-4 px-4 text-[10px] font-black uppercase tracking-widest">Role</th>
                 <th className="py-4 px-4 text-[10px] font-black uppercase tracking-widest">Country</th>
                 <th className="py-4 px-4 text-[10px] font-black uppercase tracking-widest">KYC / Status</th>
@@ -175,11 +244,11 @@ export default function AdminUserManagementPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-slate-500">Loading…</td>
+                  <td colSpan={6} className="text-center py-12 text-slate-500">Loading…</td>
                 </tr>
               ) : displayUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-slate-400">
+                  <td colSpan={6} className="text-center py-12 text-slate-400">
                     No users for {filter}.
                   </td>
                 </tr>
@@ -193,10 +262,9 @@ export default function AdminUserManagementPage() {
                   const isBeneficiaryPending = u.role === "BENEFICIARY" && (u.kyc?.status === "PENDING" || !u.beneficiaryProfile?.identityVerified);
 
                   return (
-                    <tr key={id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="py-4 px-4 font-semibold text-white">
-                        {provider?.businessName ?? name}
-                      </td>
+                    <tr key={id} data-user-id={id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-4 px-4 font-semibold text-white">{name}</td>
+                      <td className="py-4 px-4 text-slate-300 text-sm">{provider?.businessName ?? "—"}</td>
                       <td className="py-4 px-4 text-slate-300 text-sm">{u.role ?? "—"}</td>
                       <td className="py-4 px-4 text-slate-400 text-sm">{u.country ?? "—"}</td>
                       <td className="py-4 px-4">
@@ -215,8 +283,17 @@ export default function AdminUserManagementPage() {
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right">
+                        <span className="flex gap-2 justify-end items-center flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => openDocsPanel(id, name)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-400 hover:bg-sky-500/30"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            View documents
+                          </button>
                         {u.role === "PROVIDER" && provider && isPendingKyc && (
-                          <span className="flex gap-2 justify-end">
+                          <>
                             <button
                               type="button"
                               disabled={actioningId === provider._id}
@@ -233,10 +310,10 @@ export default function AdminUserManagementPage() {
                             >
                               Reject
                             </button>
-                          </span>
+                          </>
                         )}
                         {u.role === "BENEFICIARY" && isBeneficiaryPending && (
-                          <span className="flex gap-2 justify-end">
+                          <>
                             <button
                               type="button"
                               disabled={actioningId === id}
@@ -253,12 +330,13 @@ export default function AdminUserManagementPage() {
                             >
                               Reject
                             </button>
-                          </span>
+                          </>
                         )}
                         {u.role === "PROVIDER" && !provider && (
                           <span className="text-slate-500 text-xs">—</span>
                         )}
                         {u.role === "DONOR" && <span className="text-slate-500 text-xs">—</span>}
+                        </span>
                       </td>
                     </tr>
                   );
@@ -268,6 +346,48 @@ export default function AdminUserManagementPage() {
           </table>
         </div>
       </div>
+
+      {docsUserId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60" onClick={closeDocsPanel} role="dialog" aria-modal="true">
+          <div
+            className="w-full max-w-md h-full bg-slate-900 border-l border-white/10 shadow-xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 flex items-center justify-between p-4 border-b border-white/10 bg-slate-900/95">
+              <h3 className="text-lg font-bold text-white">Documents — {docsUserName}</h3>
+              <button type="button" onClick={closeDocsPanel} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              {docsLoading ? (
+                <p className="text-slate-500 text-sm">Loading documents…</p>
+              ) : docsUploads.length === 0 ? (
+                <p className="text-slate-500 text-sm">No documents uploaded.</p>
+              ) : (
+                docsUploads.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between gap-2 p-3 rounded-xl bg-white/5 border border-white/10">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{doc.name}</p>
+                      <p className="text-xs text-slate-500">{doc.purpose ?? "—"} · {doc.status ?? "—"}</p>
+                    </div>
+                    {doc.url && (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-400 hover:bg-sky-500/30"
+                      >
+                        View
+                      </a>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

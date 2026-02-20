@@ -16,6 +16,8 @@ interface CampaignRow {
   description?: string;
   category?: string;
   adminStatus?: string;
+  providerAccepted?: boolean;
+  confirmationStatus?: string;
   targetAmount?: number;
   amountRaised?: number;
   beneficiaryId?: { firstName?: string; lastName?: string; email?: string };
@@ -51,11 +53,13 @@ export default function AdminCampaignList({ filter }: AdminCampaignListProps) {
 
   const handleStatus = async (campaignId: string, status: "approved" | "rejected" | "flagged" | "pending") => {
     setActioningId(campaignId);
+    setError(null);
     try {
       await updateCampaignStatus(campaignId, status);
       await load();
-    } catch {
-      setError("Failed to update status.");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? "Failed to update status.";
+      setError(msg);
     } finally {
       setActioningId(null);
     }
@@ -128,14 +132,24 @@ export default function AdminCampaignList({ filter }: AdminCampaignListProps) {
                         </Link>
                         {status === "pending" && (
                           <>
-                            <Button
-                              size="sm"
-                              onClick={() => handleStatus(id, "approved")}
-                              disabled={busy}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white border-0"
-                            >
-                              Approve
-                            </Button>
+                            {(campaign as CampaignRow).providerAccepted === true ||
+                            (campaign as CampaignRow).confirmationStatus === "provider_confirmed" ? (
+                              <Button
+                                size="sm"
+                                onClick={() => handleStatus(id, "approved")}
+                                disabled={busy}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white border-0"
+                              >
+                                Approve
+                              </Button>
+                            ) : (
+                              <span
+                                className="px-3 py-1.5 rounded-lg text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30"
+                                title="Provider must approve campaign before admin approval."
+                              >
+                                Waiting for provider approval
+                              </span>
+                            )}
                             <Button
                               size="sm"
                               variant="destructive"

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import {Button} from "../ui/Button";
-import api from "../../services/api";
+import { Button } from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
+import { donationService } from "../../services/donationService";
 
 export default function DonationForm() {
   const { user } = useAuth();
@@ -21,16 +21,25 @@ export default function DonationForm() {
 
     setIsSubmitting(true);
     try {
-      const payload = {
-        amount: Number(amount),
-        email: user ? user.email : email,
-        method,
+      const payload: any = {
+        amountFiat: Number(amount),
+        currency: "USD",
+        paymentMethod: method === "lightning" ? "BTC_LIGHTNING" : "BTC_ONCHAIN",
+        payer: {
+          email: user ? user.email : email || undefined,
+          name: user?.firstName || user?.name || user?.email || "Guest",
+        },
       };
-      const res = await api.post("/donate/guest", payload);
+
+      const res = await donationService.createDonation(payload);
+
+      // For this lightweight form we don't drive a full Lightning/BTC flow;
+      // we just surface that the intent was created successfully.
+      const receiptId = (res && (res.receiptId || res.donationId)) as string | undefined;
       setMessage(
-        res?.data?.receiptId
-          ? `Donation successful — receipt ${res.data.receiptId}`
-          : "Donation successful"
+        receiptId
+          ? `Donation created — reference ${receiptId}. Complete payment using the main flow to finalize.`
+          : "Donation created. Complete payment using the main donation flow."
       );
       setAmount("");
       setEmail("");
@@ -111,6 +120,6 @@ export default function DonationForm() {
       <Button type="submit" className="mt-4 btn-cta">
         {isSubmitting ? "Processing..." : "Donate"}
       </Button>
-    </form >
+    </form>
   );
 }

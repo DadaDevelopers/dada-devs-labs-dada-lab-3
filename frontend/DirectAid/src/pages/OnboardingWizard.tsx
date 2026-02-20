@@ -289,7 +289,7 @@ const OnboardingWizard: React.FC = () => {
                 </p>
               )}
               <div className="flex justify-end mt-4">
-                <Button variant="secondary" size="sm" onClick={handleBasicNext}>
+                <Button className="btn-cta" size="sm" onClick={handleBasicNext}>
                   Next
                 </Button>
               </div>
@@ -359,12 +359,18 @@ const OnboardingWizard: React.FC = () => {
               )}
 
               <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setStep(1)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStep(1)}
+                  className="border-[var(--color-accent)]/50 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10"
+                >
                   Back
                 </Button>
                 <Button
                   type="button"
-                  variant="secondary"
+                  className="btn-cta"
                   size="sm"
                   disabled={submitting}
                   onClick={selectedRole === "PROVIDER" ? handleStep2Next : handleSubmit}
@@ -546,12 +552,18 @@ const OnboardingWizard: React.FC = () => {
               </Card>
 
               <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStep(2)}
+                  className="border-[var(--color-accent)]/50 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10"
+                >
                   Back
                 </Button>
                 <Button
                   type="button"
-                  variant="secondary"
+                  className="btn-cta"
                   size="sm"
                   disabled={submitting}
                   onClick={handleSubmit}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
@@ -31,21 +31,14 @@ interface BeneficiaryProfileForm {
   country: string;
   city: string;
   displayName: string;
-  shortStory: string;
-  category: string;
-  preferredProvider: string;
   nationalId: string;
   consentContact: boolean;
   consentVersion: string;
 }
 
-const CATEGORIES = [
-  { value: "", label: "Select category (optional)" },
-  { value: "medical", label: "Medical" },
-  { value: "education", label: "Education" },
-  { value: "business", label: "Business" },
-  { value: "emergency", label: "Emergency" },
-  { value: "other", label: "Other" },
+const PROFILE_FORM_KEYS: (keyof BeneficiaryProfileForm)[] = [
+  "firstName", "lastName", "phoneNumber", "country", "city",
+  "displayName", "consentContact", "consentVersion",
 ];
 
 const emptyProfile: BeneficiaryProfileForm = {
@@ -55,9 +48,6 @@ const emptyProfile: BeneficiaryProfileForm = {
   country: "",
   city: "",
   displayName: "",
-  shortStory: "",
-  category: "",
-  preferredProvider: "",
   nationalId: "",
   consentContact: false,
   consentVersion: "v1.1",
@@ -89,6 +79,10 @@ const BeneficiarySettings = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errors, setErrors] = useState<{ general?: string; [key: string]: string | undefined }>({});
+  const [savedProfileSnapshot, setSavedProfileSnapshot] = useState<BeneficiaryProfileForm>(emptyProfile);
+  const [justSavedProfile, setJustSavedProfile] = useState(false);
+  const [savedAddressSnapshot, setSavedAddressSnapshot] = useState({ street: "", city: "", state: "", postalCode: "", country: "" });
+  const [justSavedAddress, setJustSavedAddress] = useState(false);
 
   const [addressData, setAddressData] = useState({
     street: "",
@@ -97,6 +91,20 @@ const BeneficiarySettings = () => {
     postalCode: "",
     country: "",
   });
+
+  const isDirtyProfile = useMemo(
+    () => PROFILE_FORM_KEYS.some((k) => profileData[k] !== savedProfileSnapshot[k]),
+    [profileData, savedProfileSnapshot]
+  );
+  const isDirtyAddress = useMemo(
+    () =>
+      addressData.street !== savedAddressSnapshot.street ||
+      addressData.city !== savedAddressSnapshot.city ||
+      addressData.state !== savedAddressSnapshot.state ||
+      addressData.postalCode !== savedAddressSnapshot.postalCode ||
+      addressData.country !== savedAddressSnapshot.country,
+    [addressData, savedAddressSnapshot]
+  );
 
   const [notifications, setNotifications] = useState({
     campaigns: true,
@@ -122,20 +130,19 @@ const BeneficiarySettings = () => {
         setLoadingProfile(false);
         return;
       }
-      setProfileData({
+      const loadedProfile: BeneficiaryProfileForm = {
         firstName: u.firstName ?? "",
         lastName: u.lastName ?? "",
         phoneNumber: u.phoneNumber ?? "",
         country: u.country ?? "",
         city: u.city ?? "",
         displayName: u.beneficiaryProfile?.displayName ?? "",
-        shortStory: u.beneficiaryProfile?.shortStory ?? "",
-        category: u.beneficiaryProfile?.category ?? "",
-        preferredProvider: u.beneficiaryProfile?.preferredProvider ?? "",
         nationalId: "", // never load plaintext; user re-enters if changing
         consentContact: !!u.beneficiaryProfile?.consentContact?.agreed,
         consentVersion: u.beneficiaryProfile?.consentContact?.version ?? "v1.1",
-      });
+      };
+      setProfileData(loadedProfile);
+      setSavedProfileSnapshot(loadedProfile);
       setProfilePictureId(
         u.beneficiaryProfile?.profilePicture?._id ?? u.beneficiaryProfile?.profilePicture ?? null
       );
@@ -147,13 +154,9 @@ const BeneficiarySettings = () => {
           ? u.beneficiaryProfile.supportingDocs.map((d: any) => d._id ?? d)
           : []
       );
-      if (u.city || u.country) {
-        setAddressData((prev) => ({
-          ...prev,
-          city: u.city ?? prev.city,
-          country: u.country ?? prev.country,
-        }));
-      }
+      const loadedAddress = { street: "", city: u.city ?? "", state: "", postalCode: "", country: u.country ?? "" };
+      setAddressData(loadedAddress);
+      setSavedAddressSnapshot(loadedAddress);
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Failed to load profile";
       const isAuthError = err?.response?.status === 401 || /invalid token|unauthorized/i.test(String(msg));
@@ -238,9 +241,6 @@ const BeneficiarySettings = () => {
         city: profileData.city.trim() || undefined,
         beneficiaryProfile: {
           displayName: profileData.displayName.trim() || undefined,
-          shortStory: profileData.shortStory.trim() || undefined,
-          category: profileData.category || undefined,
-          preferredProvider: profileData.preferredProvider.trim() || undefined,
           nationalId: profileData.nationalId.trim() || undefined,
           consentContact: profileData.consentContact
             ? { agreed: true, version: profileData.consentVersion || "v1.1" }
@@ -258,6 +258,9 @@ const BeneficiarySettings = () => {
         return;
       }
       setSuccessMessage("Profile saved successfully.");
+      setSavedProfileSnapshot({ ...profileData });
+      setJustSavedProfile(true);
+      setTimeout(() => setJustSavedProfile(false), 3000);
       setTimeout(() => setSuccessMessage(""), 4000);
     } catch (err: any) {
       setErrors({
@@ -282,6 +285,9 @@ const BeneficiarySettings = () => {
         return;
       }
       setSuccessMessage("Address saved.");
+      setSavedAddressSnapshot({ ...addressData });
+      setJustSavedAddress(true);
+      setTimeout(() => setJustSavedAddress(false), 3000);
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err: any) {
       setErrors({ general: "An error occurred while saving" });
@@ -431,41 +437,6 @@ const BeneficiarySettings = () => {
                   onChange={handleProfileChange}
                   placeholder="Name shown on your campaigns"
                 />
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-foreground">Category</label>
-                  <select
-                    name="category"
-                    value={profileData.category}
-                    onChange={handleProfileChange}
-                    className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    {CATEGORIES.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-foreground">
-                    Short story (optional)
-                  </label>
-                  <textarea
-                    name="shortStory"
-                    value={profileData.shortStory}
-                    onChange={handleProfileChange}
-                    rows={4}
-                    placeholder="A short description about yourself and how you use DirectAid"
-                    className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  />
-                </div>
-                <FormInput
-                  label="Preferred provider (optional)"
-                  name="preferredProvider"
-                  value={profileData.preferredProvider}
-                  onChange={handleProfileChange}
-                  placeholder="Provider name or ID"
-                />
 
                 <hr className="border-border" />
 
@@ -497,9 +468,9 @@ const BeneficiarySettings = () => {
                           }}
                         />
                         <label htmlFor="national-id-replace" className="cursor-pointer">
-                          <Button type="button" variant="outline" size="sm" className="rounded-lg pointer-events-none">
-                            Replace
-                          </Button>
+                          <span className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium btn-cta">
+                            Choose file
+                          </span>
                         </label>
                         <Button
                           type="button"
@@ -518,7 +489,7 @@ const BeneficiarySettings = () => {
                         type="file"
                         accept=".pdf,image/*"
                         id="national-id-upload"
-                        className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground file:cursor-pointer cursor-pointer"
+                        className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) handleNationalIdUpload(file);
@@ -526,11 +497,17 @@ const BeneficiarySettings = () => {
                         }}
                         disabled={!!nationalIdUploading}
                       />
+                      <label
+                        htmlFor="national-id-upload"
+                        className={`inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium cursor-pointer transition-colors btn-cta ${nationalIdUploading ? "opacity-60 pointer-events-none" : ""}`}
+                      >
+                        {nationalIdUploading ? "Uploading…" : "Choose file"}
+                      </label>
                       {nationalIdUploadError && (
                         <p className="text-xs text-destructive">{nationalIdUploadError}</p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        Upload a clear photo or PDF of your national ID. Backend stores the document for verification.
+                        Upload a clear photo or PDF of your national ID.
                       </p>
                     </div>
                   )}
@@ -551,9 +528,13 @@ const BeneficiarySettings = () => {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <Button onClick={handleSaveProfile} disabled={isSaving} className="btn-cta">
+                  <Button
+                    onClick={handleSaveProfile}
+                    disabled={isSaving || (!isDirtyProfile && !justSavedProfile)}
+                    className="btn-cta"
+                  >
                     <Save className="w-4 h-4 mr-2" />
-                    {isSaving ? "Saving…" : "Save profile"}
+                    {isSaving ? "Saving…" : justSavedProfile ? "Saved" : isDirtyProfile ? "Save profile" : "Saved"}
                   </Button>
                 </div>
               </div>
@@ -599,9 +580,13 @@ const BeneficiarySettings = () => {
                 placeholder="Optional"
               />
             </div>
-            <Button onClick={handleSaveAddress} disabled={isSaving} className="mt-4 btn-cta">
+            <Button
+              onClick={handleSaveAddress}
+              disabled={isSaving || (!isDirtyAddress && !justSavedAddress)}
+              className="mt-4 btn-cta"
+            >
               <Save className="w-4 h-4 mr-2" />
-              {isSaving ? "Saving…" : "Save address"}
+              {isSaving ? "Saving…" : justSavedAddress ? "Saved" : isDirtyAddress ? "Save address" : "Saved"}
             </Button>
           </Card>
         )}

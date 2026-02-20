@@ -23,6 +23,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { campaignService } from "../services/campaignService";
+import { donationService } from "../services/donationService";
 
 // Types
 type Step = "campaign" | "amount" | "payment" | "processing" | "receipt";
@@ -93,6 +94,7 @@ const DonationFlow = () => {
   const [lightningInvoice, setLightningInvoice] = useState("");
   const [btcAddress, setBtcAddress] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Calculate amounts
   const donationAmountUSD = parseFloat(formData.amount) || 0;
@@ -250,16 +252,7 @@ const DonationFlow = () => {
         setCurrentStep("processing");
         setPaymentStatus("waiting"); // Meaning waiting for user to pay
 
-        // 3. Poll for confirmation (Simplified Integration)
-        // Ideally use websocket or check status button
-        const pollInterval = setInterval(async () => {
-          // We can check status if we had a getDonationStatus service
-          // For now, we simulate "confirmed" after user claims they paid or timer
-          // Or we just wait for user to click "I've Paid" - wait, the UI has "I've Paid" button.
-        }, 5000);
-
-        // Cleanup
-        setTimeout(() => clearInterval(pollInterval), 60000);
+        // We now wait for the user to pay and then trigger a real status check via verifyPayment().
       } else {
         setPaymentStatus("failed");
       }
@@ -320,16 +313,58 @@ const DonationFlow = () => {
     }
   };
 
-  // Called when user says "I've Paid"
+  // Called when user says "I've Paid" — now checks real donation status
   const verifyPayment = async () => {
-    // In a real app, this might trigger a checkStatus call
-    // For now, we assume if they clicked it, we show success or keep waiting
-    // Let's just simulate success for the 'happy path' integration demo if backend is silent
-    // But ideally we should check status
-    setPaymentStatus("confirmed");
-    setTimeout(() => {
-      setCurrentStep("receipt");
-    }, 1500);
+    if (!donation?.donationId && !donation?.id) {
+      alert("We couldn't find your donation reference. Please try again or restart the flow.");
+      return;
+    }
+    const donationId = (donation.donationId ?? donation.id) as string;
+
+    try {
+      setStatusMessage("Checking payment status…");
+      const maxAttempts = 6; // e.g. up to ~30s if we use 5s delay
+      let attempts = 0;
+      let lastStatus = "";
+
+      while (attempts < maxAttempts) {
+        const statusRes = await donationService.getDonationStatus(donationId);
+        lastStatus = statusRes.status;
+
+        if (lastStatus === "COMPLETED") {
+          setPaymentStatus("confirmed");
+          setStatusMessage("Payment confirmed on-chain/Lightning. Thank you!");
+          setTimeout(() => {
+            setCurrentStep("receipt");
+          }, 1500);
+          return;
+        }
+
+        if (lastStatus === "FAILED" || lastStatus === "CANCELLED") {
+          setPaymentStatus("failed");
+          setStatusMessage("Payment was not completed. Please try again.");
+          return;
+        }
+
+        // Still pending — wait a bit and retry
+        attempts += 1;
+        setStatusMessage("Awaiting confirmation from payment rails…");
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+
+      // Timed out
+      setPaymentStatus("waiting");
+      setStatusMessage(
+        lastStatus === "PENDING"
+          ? "Still pending. Please wait a bit longer; your payment provider may confirm shortly."
+          : "Could not confirm payment yet. Please check again later."
+      );
+    } catch (err) {
+      console.error("Failed to verify payment", err);
+      setPaymentStatus("failed");
+      setStatusMessage("We could not verify your payment. Please try again or contact support.");
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -1613,6 +1648,11 @@ support@directaid.example.com
                         <p style={{ color: "#e0e0e0", opacity: 0.7 }}>
                           This usually takes just a few seconds
                         </p>
+                        {statusMessage && (
+                          <p className="text-sm mt-2" style={{ color: "#e0e0e0" }}>
+                            {statusMessage}
+                          </p>
+                        )}
                       </div>
                     </>
                   )}

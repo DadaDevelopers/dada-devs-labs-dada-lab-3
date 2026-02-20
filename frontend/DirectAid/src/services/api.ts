@@ -1,7 +1,7 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
-export const API_BASE = "https://directaid-backend.onrender.com/api";
-// export const API_BASE = "http://localhost:5000/api";
+// export const API_BASE = "https://directaid-backend.onrender.com/api";
+export const API_BASE = "http://localhost:5000/api";
 
 import type { AdminMetrics } from "../types";
 
@@ -374,6 +374,12 @@ export async function approveProviderKyc(providerId: string, body: { status: "AP
   return res?.data ?? res;
 }
 
+/** GET /uploads?userId= — admin only; list KYC/docs for a user */
+export async function getUploadsForUser(userId: string) {
+  const res = await api.get(`/uploads?userId=${encodeURIComponent(userId)}`);
+  return (res?.data ?? res) as { uploads: { id: string; name: string; mimeType?: string; purpose?: string; url?: string; status?: string; createdAt?: string }[] };
+}
+
 /** GET /campaigns with optional adminStatus, page, limit */
 export async function getCampaigns(params?: { page?: number; limit?: number; adminStatus?: string }) {
   const sp = new URLSearchParams();
@@ -382,6 +388,16 @@ export async function getCampaigns(params?: { page?: number; limit?: number; adm
   if (params?.adminStatus) sp.set("adminStatus", params.adminStatus);
   const q = sp.toString();
   const res = await api.get(`/campaigns${q ? `?${q}` : ""}`);
+  return (res?.data ?? res) as { page: number; limit: number; total: number; campaigns: unknown[] };
+}
+
+/** GET /campaigns/for-provider — campaigns assigned to or invited (by email) for current provider */
+export async function getCampaignsForProvider(params?: { page?: number; limit?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const q = sp.toString();
+  const res = await api.get(`/campaigns/for-provider${q ? `?${q}` : ""}`);
   return (res?.data ?? res) as { page: number; limit: number; total: number; campaigns: unknown[] };
 }
 
@@ -394,6 +410,12 @@ export async function getCampaignById(id: string) {
 /** PATCH /campaigns/:id/status — body: { status: "approved" | "rejected" | "flagged" | "pending" } */
 export async function updateCampaignStatus(campaignId: string, status: "approved" | "rejected" | "flagged" | "pending") {
   const res = await api.patch(`/campaigns/${campaignId}/status`, { status });
+  return (res?.data ?? res) as { campaign: unknown };
+}
+
+/** POST /campaigns/:id/provider-accept — provider accepts/approves being assigned to the campaign */
+export async function providerAcceptCampaign(campaignId: string, body?: { notes?: string }) {
+  const res = await api.post(`/campaigns/${campaignId}/provider-accept`, body ?? { notes: "Accepted" });
   return (res?.data ?? res) as { campaign: unknown };
 }
 
