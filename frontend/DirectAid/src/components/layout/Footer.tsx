@@ -25,7 +25,7 @@ const Footer: React.FC = () => {
           <div
             className="absolute inset-0 pointer-events-none -z-10 bg-cover bg-center"
             style={{
-              backgroundImage: "url('src/assets/FooterBackgroundImage.png')",
+              backgroundImage: "url('images/FooterBackgroundImage.png')",
               opacity: "0.15",
               filter: "saturate(2) brightness(1.2)",
               maskImage: 'radial-gradient(circle at center, black, transparent 80%)',
