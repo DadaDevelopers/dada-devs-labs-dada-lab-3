@@ -4,7 +4,7 @@ import { getProviderWithdrawals, sendWithdrawalLightning } from "../../../servic
 
 interface WithdrawalRow {
   _id: string;
-  campaignId: { title?: string } | string;
+  campaignId?: { title?: string } | string;
   amount: number;
   currency: string;
   status: string;
@@ -44,7 +44,7 @@ export default function AdminPayoutsPage() {
       await load();
     } catch (e: unknown) {
       const msg = e && typeof e === "object" && "response" in e && (e.response as { data?: { message?: string } })?.data?.message;
-      setError(msg || (e instanceof Error ? e.message : "Failed to send payment."));
+      setError(typeof msg === "string" ? msg : (e instanceof Error ? e.message : "Failed to send payment."));
     } finally {
       setSendingId(null);
     }

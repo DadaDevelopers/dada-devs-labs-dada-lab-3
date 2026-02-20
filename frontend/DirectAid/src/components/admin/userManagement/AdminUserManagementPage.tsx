@@ -259,7 +259,6 @@ export default function AdminUserManagementPage() {
                   const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "—";
                   const provider = u.role === "PROVIDER" ? userIdToProvider[id] : null;
                   const kycStatus = provider?.kycStatus ?? u.kyc?.status ?? "—";
-                  const isPendingKyc = kycStatus === "PENDING";
                   const isBeneficiaryPending = u.role === "BENEFICIARY" && (u.kyc?.status === "PENDING" || !u.beneficiaryProfile?.identityVerified);
 
                   return (

@@ -1,7 +1,7 @@
 // API client with axios-like interface for frontend
 // Point to deployed backend by default; adjust path if needed.
-// export const API_BASE = "https://directaid-backend.onrender.com/api";
-export const API_BASE = "http://localhost:5000/api";
+export const API_BASE = "https://directaid-backend.onrender.com/api";
+// export const API_BASE = "http://localhost:5000/api";
 
 import type { AdminMetrics } from "../types";
 
@@ -381,7 +381,7 @@ export async function getProviderWithdrawals(params?: { status?: string }) {
   if (params?.status) sp.set("status", params.status);
   const q = sp.toString();
   const res = await api.get(`/providers/withdrawals${q ? `?${q}` : ""}`);
-  return (res?.data ?? res) as { withdrawals: { _id: string; campaignId: unknown; providerId: unknown; amount: number; currency: string; status: string; reference?: string; lightningAddress?: string | null; campaignId?: { title?: string } }[] };
+  return (res?.data ?? res) as { withdrawals: { _id: string; campaignId?: { title?: string }; providerId: unknown; amount: number; currency: string; status: string; reference?: string; lightningAddress?: string | null }[] };
 }
 
 /** POST /providers/withdrawals/:id/send-lightning — admin; send payout via Lightning and mark COMPLETED */
