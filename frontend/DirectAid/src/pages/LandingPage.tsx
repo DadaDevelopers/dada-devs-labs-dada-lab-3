@@ -20,7 +20,7 @@ export default function LandingPage() {
       
       {/* The main starlit network image */}
       <img 
-        src="src/assets/DirectAidBackgroundImage.png" 
+        src="images/DirectAidBackgroundImage.png" 
         alt="" 
         className="w-full h-full object-cover opacity-60"
       />

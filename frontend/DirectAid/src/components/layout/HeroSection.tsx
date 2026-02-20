@@ -49,7 +49,7 @@ export default function HeroSection(): React.JSX.Element {
 
             <div className="relative glass-card overflow-hidden border-white/20 p-2 shadow-2xl transform lg:rotate-1 hover:rotate-0 transition-transform duration-700"> 
               <img 
-                src="/src/assets/HeroSectionImage.png" 
+                src="/images/HeroSectionImage.png" 
                 alt="DirectAid Lightning to M-PESA Visual" 
                 className="rounded-xl w-full h-auto max-h-[450px] object-cover shadow-inner"
               />
