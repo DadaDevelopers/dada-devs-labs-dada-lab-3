@@ -76,14 +76,12 @@ const ProviderSettings = () => {
     phone: "",
   });
 
-  type PayoutMethodItem = { method: string; mpesaPhone?: string; bankName?: string; accountName?: string; accountNumberMasked?: string };
+  type PayoutMethodItem = { method: string; lightningAddress?: string; btcAddress?: string };
   const [payoutMethods, setPayoutMethods] = useState<PayoutMethodItem[]>([]);
-  const [payoutForm, setPayoutForm] = useState<{ method: "MPESA" | "BANK"; mpesaPhone: string; bankName: string; accountName: string; accountNumber: string }>({
-    method: "MPESA",
-    mpesaPhone: "",
-    bankName: "",
-    accountName: "",
-    accountNumber: "",
+  const [payoutForm, setPayoutForm] = useState<{ method: "LIGHTNING" | "BITCOIN"; lightningAddress: string; btcAddress: string }>({
+    method: "LIGHTNING",
+    lightningAddress: "",
+    btcAddress: "",
   });
   const [payoutSubmitting, setPayoutSubmitting] = useState(false);
 
@@ -447,12 +445,8 @@ const ProviderSettings = () => {
                             style={{ backgroundColor: "var(--color-primary-bg)" }}
                           >
                             <span className="font-medium">{pm.method}</span>
-                            {pm.method === "MPESA" && pm.mpesaPhone && <span>{pm.mpesaPhone}</span>}
-                            {pm.method === "BANK" && (
-                              <span>
-                                {pm.bankName} {pm.accountName} {pm.accountNumberMasked ?? "****"}
-                              </span>
-                            )}
+                            {pm.method === "LIGHTNING" && pm.lightningAddress && <span>{pm.lightningAddress}</span>}
+                            {pm.method === "BITCOIN" && pm.btcAddress && <span className="font-mono text-sm">{pm.btcAddress}</span>}
                           </li>
                         ))}
                       </ul>
@@ -467,7 +461,7 @@ const ProviderSettings = () => {
                         <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Method</label>
                         <select
                           value={payoutForm.method}
-                          onChange={(e) => setPayoutForm((prev) => ({ ...prev, method: e.target.value as "MPESA" | "BANK" }))}
+                          onChange={(e) => setPayoutForm((prev) => ({ ...prev, method: e.target.value as "LIGHTNING" | "BITCOIN" }))}
                           className="w-full rounded-md border px-3 py-2"
                           style={{
                             backgroundColor: "var(--color-primary-bg)",
@@ -475,62 +469,45 @@ const ProviderSettings = () => {
                             borderColor: "var(--color-accent)",
                           }}
                         >
-                          <option value="MPESA">MPESA</option>
-                          <option value="BANK">Bank</option>
+                          <option value="LIGHTNING">Lightning</option>
+                          <option value="BITCOIN">Bitcoin</option>
                         </select>
                       </div>
-                      {payoutForm.method === "MPESA" ? (
+                      {payoutForm.method === "LIGHTNING" ? (
                         <div>
-                          <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>MPESA phone</label>
+                          <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Lightning address</label>
                           <Input
-                            value={payoutForm.mpesaPhone}
-                            onChange={(e) => setPayoutForm((prev) => ({ ...prev, mpesaPhone: e.target.value }))}
-                            placeholder="e.g. +254712345678"
+                            value={payoutForm.lightningAddress}
+                            onChange={(e) => setPayoutForm((prev) => ({ ...prev, lightningAddress: e.target.value }))}
+                            placeholder="e.g. you@getalby.com"
                             style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
                           />
                         </div>
                       ) : (
-                        <>
-                          <div>
-                            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Bank name</label>
-                            <Input
-                              value={payoutForm.bankName}
-                              onChange={(e) => setPayoutForm((prev) => ({ ...prev, bankName: e.target.value }))}
-                              style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Account name</label>
-                            <Input
-                              value={payoutForm.accountName}
-                              onChange={(e) => setPayoutForm((prev) => ({ ...prev, accountName: e.target.value }))}
-                              style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>Account number</label>
-                            <Input
-                              value={payoutForm.accountNumber}
-                              onChange={(e) => setPayoutForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
-                              style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
-                            />
-                          </div>
-                        </>
+                        <div>
+                          <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-text-light)" }}>BTC address</label>
+                          <Input
+                            value={payoutForm.btcAddress}
+                            onChange={(e) => setPayoutForm((prev) => ({ ...prev, btcAddress: e.target.value }))}
+                            placeholder="e.g. bc1q..."
+                            style={{ backgroundColor: "var(--color-primary-bg)", color: "var(--color-text-light)", borderColor: "var(--color-accent)" }}
+                          />
+                        </div>
                       )}
                       <Button
-                        disabled={payoutSubmitting || (payoutForm.method === "MPESA" ? !payoutForm.mpesaPhone : !payoutForm.bankName || !payoutForm.accountName || !payoutForm.accountNumber)}
+                        disabled={payoutSubmitting || (payoutForm.method === "LIGHTNING" ? !payoutForm.lightningAddress?.trim() : !payoutForm.btcAddress?.trim())}
                         onClick={async () => {
                           setPayoutSubmitting(true);
                           try {
-                            const body = payoutForm.method === "MPESA"
-                              ? { method: "MPESA", mpesaPhone: payoutForm.mpesaPhone }
-                              : { method: "BANK", bankName: payoutForm.bankName, accountName: payoutForm.accountName, accountNumber: payoutForm.accountNumber };
+                            const body = payoutForm.method === "LIGHTNING"
+                              ? { method: "LIGHTNING", lightningAddress: payoutForm.lightningAddress.trim() }
+                              : { method: "BITCOIN", btcAddress: payoutForm.btcAddress.trim() };
                             await api.post("/providers/me/payout-methods", body);
                             const res = await api.get("/providers/me");
                             const p = (res as any).provider;
                             if (p?.payoutMethods) setPayoutMethods(p.payoutMethods);
                             setSuccessMessage("Payout method added.");
-                            setPayoutForm({ method: "MPESA", mpesaPhone: "", bankName: "", accountName: "", accountNumber: "" });
+                            setPayoutForm({ method: "LIGHTNING", lightningAddress: "", btcAddress: "" });
                             setTimeout(() => setSuccessMessage(""), 3000);
                           } catch (e) {
                             setErrors({ general: "Failed to add payout method" });

@@ -1,4 +1,4 @@
-import { X, LayoutDashboard, Users, NotebookText, Settings, LogOut } from "lucide-react";
+import { X, LayoutDashboard, Users, NotebookText, Settings, LogOut, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -36,6 +36,7 @@ const navItems = [
   { icon: <LayoutDashboard />, label: "Dashboard", to: "/admin/overview" },
   { icon: <Users />, label: "User Management", to: "/admin/users" },
   { icon: <NotebookText />, label: "Campaigns", to: "/admin/campaigns" },
+  { icon: <Wallet />, label: "Payouts", to: "/admin/payouts" },
   { icon: <Settings />, label: "Settings", to: "/admin/settings" },
 ];
 

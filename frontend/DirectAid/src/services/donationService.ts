@@ -40,6 +40,13 @@ export const donationService = {
     return d;
   },
 
+  // Lightweight status check (no transformation)
+  getDonationStatus: async (id: string): Promise<{ id: string; status: string; campaignId: string; amountFiat: number; paymentMethod: string }> => {
+    const response = await api.get(`/donations/${id}/status`);
+    const res: any = (response as any)?.data ?? response;
+    return res;
+  },
+
   // Get donor metrics
   getDonorMetrics: async () => {
     const response = await api.get("/donations/me/donor-metrics");

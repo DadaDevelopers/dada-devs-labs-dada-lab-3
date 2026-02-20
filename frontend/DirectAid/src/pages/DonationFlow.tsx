@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Receipt,
@@ -23,6 +23,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { campaignService } from "../services/campaignService";
+import { donationService } from "../services/donationService";
+import { QRCodeSVG } from "qrcode.react";
 
 // Types
 type Step = "campaign" | "amount" | "payment" | "processing" | "receipt";
@@ -42,37 +44,60 @@ const DonationFlow = () => {
   const { selectedCampaign, selectCampaign, createDonation, updateCampaign } = useApp();
 
   const [currentStep, setCurrentStep] = useState<Step>("campaign");
+  const [campaignLoadError, setCampaignLoadError] = useState<string | null>(null);
+  const campaignLoadAttempted = useRef<string | null>(null);
   const currentUser = user;
   const donor = currentUser || { name: "Guest", email: "" }; // Fallback for guest
 
-  // Simpler approach:
-  // If campaign.location is missing, fetch it.
-
+  // Load campaign from URL ?campaignId= — only try once per id to avoid loop on 404
   useEffect(() => {
     const campaignIdFromUrl = searchParams.get("campaignId");
-    if (campaignIdFromUrl && !selectedCampaign) {
-      selectCampaign(campaignIdFromUrl as string);
-    } else if (selectedCampaign && !selectedCampaign.location) {
-      // If location is missing (stale data), force refresh
-
-      campaignService.getCampaignById(selectedCampaign.id ?? "").then(fresh => {
-        // We need a way to update `selectedCampaign` in context with this fresh data
-        // AppContext has `updateCampaign`.
-        updateCampaign(selectedCampaign.id ?? "", fresh);
-      }).catch(err => console.error("Refresh failed", err));
+    if (!campaignIdFromUrl) {
+      setCampaignLoadError(null);
+      campaignLoadAttempted.current = null;
+      return;
     }
-  }, [searchParams, selectedCampaign, selectCampaign, updateCampaign]);
+    if (campaignLoadAttempted.current === campaignIdFromUrl) {
+      return; // already tried (success or fail)
+    }
+    if (selectedCampaign && (String((selectedCampaign as any).id ?? (selectedCampaign as any)._id) === campaignIdFromUrl)) {
+      setCampaignLoadError(null);
+      return;
+    }
+    setCampaignLoadError(null);
+    campaignLoadAttempted.current = campaignIdFromUrl;
+    setCampaignLoadError(null);
+    selectCampaign(campaignIdFromUrl)
+      .catch(() => setCampaignLoadError("Campaign not found or unavailable."));
+  }, [searchParams, selectedCampaign, selectCampaign]);
 
-  // Use selected campaign or valid fallback if null (to prevent crash during dev/reload)
-  const campaign = selectedCampaign || {
-    id: "camp_fallback",
-    title: "Loading Campaign...",
-    description: "...",
-    targetAmount: 0,
-    amountRaised: 0,
-    location: "...",
-    category: "other",
-  };
+  // If we have a selected campaign but missing location, refresh it (no ref guard needed)
+  useEffect(() => {
+    const sid = (selectedCampaign as any)?.id ?? (selectedCampaign as any)?._id;
+    if (!selectedCampaign || !sid || selectedCampaign.location) return;
+    campaignService.getCampaignById(sid)
+      .then((fresh: any) => {
+        const normalized = fresh?.campaign ?? fresh;
+        if (normalized && (normalized._id || normalized.id)) {
+          updateCampaign(sid, normalized);
+        }
+      })
+      .catch(() => {});
+  }, [selectedCampaign, updateCampaign]);
+
+  // Normalize so campaign always has .id (backend may return _id only)
+  const rawCampaign = selectedCampaign;
+  const campaign = rawCampaign
+    ? { ...rawCampaign, id: (rawCampaign as any).id ?? (rawCampaign as any)._id ?? "camp_fallback" }
+    : {
+        id: "camp_fallback",
+        title: campaignLoadError ? "Campaign unavailable" : "Loading Campaign...",
+        description: campaignLoadError || "...",
+        targetAmount: 0,
+        amountRaised: 0,
+        location: "...",
+        category: "other",
+      };
 
 
 
@@ -91,8 +116,47 @@ const DonationFlow = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle");
   const [invoiceCopied, setInvoiceCopied] = useState(false);
   const [lightningInvoice, setLightningInvoice] = useState("");
+  const [isDemoInvoice, setIsDemoInvoice] = useState(false);
   const [btcAddress, setBtcAddress] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // Auto-poll donation status when waiting for payment (so success page shows after LNBits webhook or manual check)
+  useEffect(() => {
+    if (currentStep !== "processing" || paymentStatus !== "waiting" || !donation) return;
+    const donationId = (donation.donationId ?? donation.id) as string | undefined;
+    if (!donationId) return;
+
+    const poll = async () => {
+      try {
+        const statusRes = await donationService.getDonationStatus(donationId);
+        const status = String(statusRes?.status ?? "").toUpperCase();
+        if (status === "COMPLETED") {
+          setPaymentStatus("confirmed");
+          setStatusMessage("Payment confirmed. Thank you!");
+          setTimeout(() => setCurrentStep("receipt"), 800);
+          return true;
+        }
+        if (status === "FAILED" || status === "CANCELLED") {
+          setPaymentStatus("failed");
+          setStatusMessage("Payment was not completed. Please try again.");
+          return true;
+        }
+      } catch {
+        // ignore network errors; will retry next interval
+      }
+      return false;
+    };
+
+    // Run first check immediately, then every 3s
+    const intervalId = setInterval(async () => {
+      const done = await poll();
+      if (done) clearInterval(intervalId);
+    }, 3000);
+    poll(); // run once immediately
+
+    return () => clearInterval(intervalId);
+  }, [currentStep, paymentStatus, donation?.id, donation?.donationId]);
 
   // Calculate amounts
   const donationAmountUSD = parseFloat(formData.amount) || 0;
@@ -205,7 +269,7 @@ const DonationFlow = () => {
 
   const handleLightningPayment = async () => {
     if (!requireValidCampaign()) return;
-    // 1. Create Donation Intent on Backend
+    setStatusMessage(null);
     setPaymentStatus("sending");
 
     // Prepare payload
@@ -244,28 +308,23 @@ const DonationFlow = () => {
         };
 
         setDonation(completeDonationState);
-        setLightningInvoice(res.invoice); // Store real invoice
+        setLightningInvoice(res.invoice);
+        setIsDemoInvoice(Boolean(res.demoInvoice));
 
         // 2. Advance to Processing/Waiting
         setCurrentStep("processing");
         setPaymentStatus("waiting"); // Meaning waiting for user to pay
 
-        // 3. Poll for confirmation (Simplified Integration)
-        // Ideally use websocket or check status button
-        const pollInterval = setInterval(async () => {
-          // We can check status if we had a getDonationStatus service
-          // For now, we simulate "confirmed" after user claims they paid or timer
-          // Or we just wait for user to click "I've Paid" - wait, the UI has "I've Paid" button.
-        }, 5000);
-
-        // Cleanup
-        setTimeout(() => clearInterval(pollInterval), 60000);
+        // We now wait for the user to pay and then trigger a real status check via verifyPayment().
       } else {
         setPaymentStatus("failed");
+        setStatusMessage(null);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Payment Error", error);
       setPaymentStatus("failed");
+      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setStatusMessage(msg || "Payment request failed. Please try again.");
     }
   };
 
@@ -320,16 +379,58 @@ const DonationFlow = () => {
     }
   };
 
-  // Called when user says "I've Paid"
+  // Called when user says "I've Paid" — now checks real donation status
   const verifyPayment = async () => {
-    // In a real app, this might trigger a checkStatus call
-    // For now, we assume if they clicked it, we show success or keep waiting
-    // Let's just simulate success for the 'happy path' integration demo if backend is silent
-    // But ideally we should check status
-    setPaymentStatus("confirmed");
-    setTimeout(() => {
-      setCurrentStep("receipt");
-    }, 1500);
+    if (!donation?.donationId && !donation?.id) {
+      alert("We couldn't find your donation reference. Please try again or restart the flow.");
+      return;
+    }
+    const donationId = (donation.donationId ?? donation.id) as string;
+
+    try {
+      setStatusMessage("Checking payment status…");
+      const maxAttempts = 6; // e.g. up to ~30s if we use 5s delay
+      let attempts = 0;
+      let lastStatus = "";
+
+      while (attempts < maxAttempts) {
+        const statusRes = await donationService.getDonationStatus(donationId);
+        lastStatus = statusRes.status;
+
+        if (lastStatus === "COMPLETED") {
+          setPaymentStatus("confirmed");
+          setStatusMessage("Payment confirmed on-chain/Lightning. Thank you!");
+          setTimeout(() => {
+            setCurrentStep("receipt");
+          }, 1500);
+          return;
+        }
+
+        if (lastStatus === "FAILED" || lastStatus === "CANCELLED") {
+          setPaymentStatus("failed");
+          setStatusMessage("Payment was not completed. Please try again.");
+          return;
+        }
+
+        // Still pending — wait a bit and retry
+        attempts += 1;
+        setStatusMessage("Awaiting confirmation from payment rails…");
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+
+      // Timed out
+      setPaymentStatus("waiting");
+      setStatusMessage(
+        lastStatus === "PENDING"
+          ? "Still pending. Please wait a bit longer; your payment provider may confirm shortly."
+          : "Could not confirm payment yet. Please check again later."
+      );
+    } catch (err) {
+      console.error("Failed to verify payment", err);
+      setPaymentStatus("failed");
+      setStatusMessage("We could not verify your payment. Please try again or contact support.");
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -462,6 +563,23 @@ support@directaid.example.com
         className="min-h-screen p-4 sm:p-6"
         style={{ backgroundColor: "#0a0e1a" }}
       >
+        {/* Campaign load error — show message and back link so page is never blank */}
+        {campaignLoadError ? (
+          <div className="max-w-3xl mx-auto py-12 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4" style={{ color: "#ffa500" }} />
+            <h2 className="text-xl font-bold mb-2" style={{ color: "#e0e0e0" }}>Campaign not found</h2>
+            <p className="mb-6" style={{ color: "#e0e0e0", opacity: 0.8 }}>{campaignLoadError}</p>
+            <button
+              type="button"
+              onClick={() => navigate(campaignsRedirect)}
+              className="px-6 py-3 rounded-xl font-semibold"
+              style={{ backgroundColor: "#00ffff", color: "#0a0e1a" }}
+            >
+              Browse campaigns
+            </button>
+          </div>
+        ) : (
+        <>
         {/* Header */}
         <div className="max-w-3xl mx-auto mb-8">
           <button
@@ -1035,6 +1153,11 @@ support@directaid.example.com
                                   ? "Generating Invoice..."
                                   : "Generate Invoice"}
                               </Button>
+                              {paymentStatus === "failed" && statusMessage && (
+                                <p className="mt-4 text-sm max-w-md mx-auto px-2" style={{ color: "#ff8888" }}>
+                                  {statusMessage}
+                                </p>
+                              )}
                             </div>
                           ) : (
                             <div className="text-center py-6">
@@ -1052,21 +1175,15 @@ support@directaid.example.com
                                   >
                                     Lightning Invoice QR
                                   </p>
-                                  {/* In a real app, use a QR code library here */}
-                                  <div className="grid grid-cols-8 gap-1 w-full max-w-[160px] mx-auto">
-                                    {Array.from({ length: 64 }).map((_, i) => (
-                                      <div
-                                        key={i}
-                                        className="aspect-square"
-                                        style={{
-                                          backgroundColor:
-                                            Math.random() > 0.5
-                                              ? "#0a0e1a"
-                                              : "#ffffff",
-                                        }}
-                                      />
-                                    ))}
-                                  </div>
+                                  {lightningInvoice && (
+                                    <QRCodeSVG
+                                      value={lightningInvoice}
+                                      size={160}
+                                      bgColor="#ffffff"
+                                      fgColor="#0a0e1a"
+                                      className="mx-auto"
+                                    />
+                                  )}
                                 </div>
                               </div>
 
@@ -1076,6 +1193,11 @@ support@directaid.example.com
                               >
                                 Scan with your Lightning wallet
                               </p>
+                              {isDemoInvoice && (
+                                <p className="text-xs mb-3 px-4" style={{ color: "#ffa500" }}>
+                                  Demo invoice — QR will not work in real wallets. Set LNBits in the backend for real payments.
+                                </p>
+                              )}
 
                               <div className="max-w-md mx-auto px-4">
                                 <label
@@ -1206,20 +1328,15 @@ support@directaid.example.com
                                   >
                                     Bitcoin Address QR
                                   </p>
-                                  <div className="grid grid-cols-8 gap-1 w-full max-w-[160px] mx-auto">
-                                    {Array.from({ length: 64 }).map((_, i) => (
-                                      <div
-                                        key={i}
-                                        className="aspect-square"
-                                        style={{
-                                          backgroundColor:
-                                            Math.random() > 0.6
-                                              ? "#0a0e1a"
-                                              : "#ffffff",
-                                        }}
-                                      />
-                                    ))}
-                                  </div>
+                                  {btcAddress && (
+                                    <QRCodeSVG
+                                      value={btcAddress}
+                                      size={160}
+                                      bgColor="#ffffff"
+                                      fgColor="#0a0e1a"
+                                      className="mx-auto"
+                                    />
+                                  )}
                                 </div>
                               </div>
 
@@ -1561,22 +1678,29 @@ support@directaid.example.com
                           <p className="text-sm mb-3 px-4" style={{ color: "#e0e0e0", opacity: 0.8 }}>
                             Scan with your Lightning wallet
                           </p>
+                          {isDemoInvoice && (
+                            <p className="text-xs mb-3 px-4" style={{ color: "#ffa500" }}>
+                              Demo invoice — for testing only
+                            </p>
+                          )}
 
-                          {/* QR Placeholder */}
-                          <div
-                            className="w-full max-w-[200px] aspect-square mx-auto mb-4 rounded-lg flex items-center justify-center border-2 overflow-hidden"
-                            style={{
-                              backgroundColor: "#ffffff",
-                              borderColor: "#00ffff",
-                            }}
-                          >
-                            {/* Just a simple placeholder visual for now */}
-                            <div className="grid grid-cols-8 gap-1 w-full max-w-[120px] mx-auto opacity-50">
-                              {Array.from({ length: 64 }).map((_, i) => (
-                                <div key={i} className="aspect-square bg-gray-900" />
-                              ))}
+                          {lightningInvoice && (
+                            <div
+                              className="w-full max-w-[200px] aspect-square mx-auto mb-4 rounded-lg flex items-center justify-center border-2 overflow-hidden p-2"
+                              style={{
+                                backgroundColor: "#ffffff",
+                                borderColor: "#00ffff",
+                              }}
+                            >
+                              <QRCodeSVG
+                                value={lightningInvoice}
+                                size={180}
+                                bgColor="#ffffff"
+                                fgColor="#0a0e1a"
+                                className="w-full h-full"
+                              />
                             </div>
-                          </div>
+                          )}
 
                           <div className="max-w-md mx-auto px-4">
                             <label className="block text-xs mb-2" style={{ color: "#e0e0e0", opacity: 0.7 }}>
@@ -1613,6 +1737,11 @@ support@directaid.example.com
                         <p style={{ color: "#e0e0e0", opacity: 0.7 }}>
                           This usually takes just a few seconds
                         </p>
+                        {statusMessage && (
+                          <p className="text-sm mt-2" style={{ color: "#e0e0e0" }}>
+                            {statusMessage}
+                          </p>
+                        )}
                       </div>
                     </>
                   )}
@@ -1643,20 +1772,23 @@ support@directaid.example.com
                             Send exactly {donationAmountBTC} BTC
                           </p>
 
-                          {/* QR Placeholder */}
-                          <div
-                            className="w-full max-w-[200px] aspect-square mx-auto mb-4 rounded-lg flex items-center justify-center border-2 overflow-hidden"
-                            style={{
-                              backgroundColor: "#ffffff",
-                              borderColor: "#00ffff",
-                            }}
-                          >
-                            <div className="grid grid-cols-8 gap-1 w-full max-w-[120px] mx-auto opacity-50">
-                              {Array.from({ length: 64 }).map((_, i) => (
-                                <div key={i} className="aspect-square bg-gray-900" />
-                              ))}
+                          {btcAddress && (
+                            <div
+                              className="w-full max-w-[200px] aspect-square mx-auto mb-4 rounded-lg flex items-center justify-center border-2 overflow-hidden p-2"
+                              style={{
+                                backgroundColor: "#ffffff",
+                                borderColor: "#00ffff",
+                              }}
+                            >
+                              <QRCodeSVG
+                                value={btcAddress}
+                                size={180}
+                                bgColor="#ffffff"
+                                fgColor="#0a0e1a"
+                                className="w-full h-full"
+                              />
                             </div>
-                          </div>
+                          )}
 
                           <div className="max-w-md mx-auto px-4">
                             <label className="block text-xs mb-2" style={{ color: "#e0e0e0", opacity: 0.7 }}>
@@ -1742,7 +1874,7 @@ support@directaid.example.com
                         Payment Failed
                       </h2>
                       <p style={{ color: "#e0e0e0", opacity: 0.7 }}>
-                        The payment request timed out or was cancelled
+                        {statusMessage || "The payment request timed out or was cancelled"}
                       </p>
                     </div>
                     <Button
@@ -1928,6 +2060,8 @@ support@directaid.example.com
             </Card>
           )}
         </div>
+        </>
+        )}
       </div>
     </DashboardLayout>
   );

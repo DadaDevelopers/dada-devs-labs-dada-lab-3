@@ -119,13 +119,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     const campaign = campaigns.find(c => c.id === campaignId || (c as any)._id === campaignId);
     if (campaign) {
       setSelectedCampaign(campaign);
+      return;
+    }
+    const fetchedCampaign = await campaignService.getCampaignById(campaignId);
+    const toSet = (fetchedCampaign as any)?.campaign ?? fetchedCampaign;
+    if (toSet && ((toSet as any)._id || (toSet as any).id)) {
+      setSelectedCampaign({ ...toSet, id: (toSet as any).id ?? (toSet as any)._id } as Campaign);
     } else {
-      try {
-        const fetchedCampaign = await campaignService.getCampaignById(campaignId);
-        setSelectedCampaign(fetchedCampaign);
-      } catch (err) {
-        console.error("Failed to fetch selected campaign", err);
-      }
+      setSelectedCampaign(fetchedCampaign as Campaign);
     }
   };
 

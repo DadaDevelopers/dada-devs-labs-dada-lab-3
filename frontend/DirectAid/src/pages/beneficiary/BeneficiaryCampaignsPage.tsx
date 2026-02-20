@@ -6,6 +6,7 @@ import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/card";
 import { getCampaignDeadlineDisplay } from "../../lib/utils";
+import { getCampaignStatusLabel, normalizeStatusForList } from "../../utils/campaignStatus";
 import {
   LayoutDashboard,
   DollarSign,
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 import type { BeneficiaryCampaign } from "../../hooks/useBeneficiaryApi";
 
-type FilterType = "all" | "pending" | "active";
+type FilterType = "all" | "pending" | "active" | "completed";
 
 export default function BeneficiaryCampaignsPage() {
   const navigate = useNavigate();
@@ -45,14 +46,20 @@ export default function BeneficiaryCampaignsPage() {
 
   const filteredCampaigns = campaigns.filter((c: BeneficiaryCampaign) => {
     if (filter === "all") return true;
-    const adminStatus = (c as any).adminStatus;
-    if (filter === "pending") return adminStatus === "pending";
-    if (filter === "active") return adminStatus !== "pending";
+    const status = normalizeStatusForList((c as any).status);
+    if (filter === "pending") return status === "pending";
+    if (filter === "active") return status === "active";
+    if (filter === "completed") return status === "completed";
     return true;
   });
 
-  const displayStatus = (c: BeneficiaryCampaign) =>
-    (c as any).adminStatus === "pending" ? "Pending" : (c as any).status ?? "Active";
+  const displayStatus = (c: BeneficiaryCampaign) => getCampaignStatusLabel(c as any);
+  const statusChipClass = (label: string) => {
+    if (label === "Completed" || label === "Ready") return "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400";
+    if (label === "Rejected" || label === "Cancelled") return "bg-rose-500/20 text-rose-600 dark:text-rose-400";
+    if (label === "Pending approval") return "bg-amber-500/20 text-amber-600 dark:text-amber-400";
+    return "bg-sky-500/20 text-sky-600 dark:text-sky-400";
+  };
 
   const userName = user?.firstName || user?.name || user?.email || "User";
 
@@ -79,9 +86,9 @@ export default function BeneficiaryCampaignsPage() {
           </Button>
         </div>
 
-        {/* Filters */}
+        {/* Filters — aligned with utils/campaignStatus */}
         <div className="flex flex-wrap gap-2">
-          {(["all", "pending", "active"] as FilterType[]).map((f) => (
+          {(["all", "pending", "active", "completed"] as FilterType[]).map((f) => (
             <button
               key={f}
               type="button"
@@ -92,7 +99,7 @@ export default function BeneficiaryCampaignsPage() {
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {f === "all" ? "All" : f === "pending" ? "Pending" : "Active"}
+              {f === "all" ? "All" : f === "pending" ? "Pending" : f === "active" ? "Active" : "Completed"}
             </button>
           ))}
         </div>
@@ -128,11 +135,7 @@ export default function BeneficiaryCampaignsPage() {
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <h3 className="font-semibold line-clamp-2">{campaign.title}</h3>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-                        (campaign as any).adminStatus === "pending"
-                          ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                          : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                      }`}
+                      className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${statusChipClass(displayStatus(campaign))}`}
                     >
                       {displayStatus(campaign)}
                     </span>

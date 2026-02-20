@@ -5,11 +5,13 @@ import {
   confirmBeneficiary,
   getAllCampaigns,
   getMyCampaigns,
+  getCampaignsForProvider,
   getCampaignById,
   getCampaignWithdrawals,
   getCampaignTransactions,
   updateCampaign,
   adminUpdateCampaignStatus,
+  adminUpdateCampaignVisibility,
   deleteCampaign,
   linkProviderToCampaign,
   providerAcceptCampaign,
@@ -40,6 +42,9 @@ router.get("/", getAllCampaigns);
 // My campaigns — authenticated BENEFICIARY only (must be before /:id)
 router.get("/me", protect, authorize("BENEFICIARY"), getMyCampaigns);
 
+// Campaigns for current provider (assigned + invited by manual email)
+router.get("/for-provider", protect, authorize("PROVIDER"), getCampaignsForProvider);
+
 // Provider linking and acceptance
 router.post("/:id/link-provider", protect, linkProviderToCampaign);
 router.post("/:id/provider-accept", protect, authorize("PROVIDER"), providerAcceptCampaign);
@@ -47,6 +52,7 @@ router.post("/:id/submit", protect, submitCampaignForReview);
 
 // Admin campaign endpoints (keep before dynamic /:id if needed)
 router.patch("/:id/status", protect, authorize("ADMIN"), adminUpdateCampaignStatus);
+router.patch("/:id/visibility", protect, authorize("ADMIN"), adminUpdateCampaignVisibility);
 
 // Get single campaign by id — public
 router.get("/:id", getCampaignById);

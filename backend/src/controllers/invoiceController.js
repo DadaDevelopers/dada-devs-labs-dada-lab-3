@@ -4,7 +4,7 @@ import Invoice from "../models/Invoice.js";
 // Create an invoice (MVP: campaignId, providerId, amount, currency, paymentMethod required; donationId/donorId optional)
 export const createInvoice = async (req, res, next) => {
   try {
-    const { donorId, donationId, campaignId, providerId, amount, currency, paymentMethod, transactionHash, invoiceFileUrl } = req.body;
+    const { donorId, donationId, campaignId, providerId, amount, currency, paymentMethod, transactionHash, invoiceFileUrl, lightningAddress, btcAddress } = req.body;
 
     if (!campaignId || !providerId || !amount || !currency || !paymentMethod) {
       return res.status(400).json({ message: "Missing required fields: campaignId, providerId, amount, currency, paymentMethod" });
@@ -23,6 +23,8 @@ export const createInvoice = async (req, res, next) => {
       currency,
       netAmount,
       paymentMethod,
+      lightningAddress: paymentMethod === "LIGHTNING" ? (lightningAddress || null) : null,
+      btcAddress: paymentMethod === "BITCOIN" ? (btcAddress || null) : null,
       transactionHash,
       invoiceFileUrl: invoiceFileUrl || null
     });

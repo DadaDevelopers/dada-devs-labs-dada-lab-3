@@ -30,7 +30,23 @@ const CampaignSchema = new Schema(
     currency: { type: String, required: true, default: "USD" },
 
     // lifecycle vs admin moderation
-    status: { type: String, enum: ["ACTIVE", "COMPLETED", "CANCELLED"], default: "ACTIVE", index: true },
+    // status:
+    // - PENDING: created but not yet fully approved/confirmed
+    // - ACTIVE: admin-approved and provider-confirmed (eligible for donations)
+    // - COMPLETED / CANCELLED: lifecycle end states
+    status: {
+      type: String,
+      enum: ["PENDING", "ACTIVE", "COMPLETED", "CANCELLED"],
+      default: "PENDING",
+      index: true
+    },
+
+    // explicit visibility toggle for admin hide/unhide
+    isHidden: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
 
     // admin moderation status (what admin sees/sets)
     adminStatus: {

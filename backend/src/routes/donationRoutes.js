@@ -1,6 +1,6 @@
 // src/routes/donationRoutes.js
 import express from "express";
-import { createDonation, mpesaWebhook, confirmBitcoinDonation, lightningWebhook, getDonation, getDonationsByCampaign, getDonationsByUser, getDonationReceipt, listDonations } from "../controllers/donationController.js";
+import { createDonation, mpesaWebhook, confirmBitcoinDonation, lightningWebhook, getDonation, getDonationsByCampaign, getDonationsByUser, getDonationReceipt, listDonations, getDonationStatus } from "../controllers/donationController.js";
 //import { mpesaCallbackController } from "../controllers/mpesaCallbackController.js";
 //import { stripeWebhookController } from "../controllers/stripeWebhookController.js";
 import { getDonorMetrics, getReceiptPDF, emailReceipt } from "../controllers/donorMetricsController.js";
@@ -13,11 +13,11 @@ const router = express.Router();
 // normal JSON body routes
 router.post("/", optionalAuth, createDonation); // create donation (guest or logged-in donor)
 
-/*Provider webhooks : no auth*/
+/*Provider webhooks : no auth - callers are external (LNBits, Daraja, etc.)*/
 // MPESA webhook (Daraja will POST JSON)
 router.post("/webhooks/mpesa", protect, mpesaWebhook);
-//router.post("/webhooks/mpesa", express.json(), mpesaCallbackController);
-router.post("/webhooks/lightning", protect, lightningWebhook);
+// Lightning: LNBits POSTs here when an invoice is paid (no JWT; optional: verify webhook secret)
+router.post("/webhooks/lightning", lightningWebhook);
 
 // ---- Crypto confirmation ----
 router.post("/bitcoin/confirm", protect, confirmBitcoinDonation);
@@ -26,6 +26,7 @@ router.post("/bitcoin/confirm", protect, confirmBitcoinDonation);
 router.get("/me", protect, getDonationsByUser);
 router.get("/:id", protect, getDonation);
 router.get("/campaign/:campaignId", protect, getDonationsByCampaign);
+router.get("/:id/status", optionalAuth, getDonationStatus);
 
 // Admin list
 router.get("/", protect, authorize("ADMIN"), listDonations);

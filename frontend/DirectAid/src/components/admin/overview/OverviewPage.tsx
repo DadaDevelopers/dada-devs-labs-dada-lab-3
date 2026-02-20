@@ -144,13 +144,15 @@ export default function OverviewPage() {
           subValue={`${metrics.users.newUsersToday} new (7d)`}
           icon={<Users className="text-cyan-400 w-5 h-5" />}
         />
-        <StatCard
-          title="KYC pending"
-          value={String(metrics.compliance.kycPending)}
-          subValue={`${metrics.compliance.kycRejected} rejected`}
-          icon={<ShieldAlert className="text-rose-400 w-5 h-5" />}
-          trend={metrics.compliance.kycPending > 0 ? "high" : "neutral"}
-        />
+        <Link to="/admin/users?filter=PROVIDER">
+          <StatCard
+            title="KYC pending"
+            value={String(metrics.compliance.kycPending)}
+            subValue={`${metrics.compliance.kycRejected} rejected`}
+            icon={<ShieldAlert className="text-rose-400 w-5 h-5" />}
+            trend={metrics.compliance.kycPending > 0 ? "high" : "neutral"}
+          />
+        </Link>
       </section>
 
       {/* 3. ACTION CENTER (QUEUES) */}
@@ -179,12 +181,17 @@ export default function OverviewPage() {
             <QueueBox
               title="Provider KYC"
               viewAllTo="/admin/users?filter=PROVIDER"
-              items={pendingProviders.map((p) => ({
-                id: (p as { _id?: string })._id ?? p.id ?? "",
-                label: p.businessName ?? "Provider",
-                sub: `KYC ${p.kycStatus ?? "PENDING"}`,
-                badge: "PENDING",
-              }))}
+              items={pendingProviders.map((p) => {
+                const providerId = (p as { _id?: string })._id ?? p.id ?? "";
+                const userId = (p as { userId?: string }).userId ?? "";
+                return {
+                  id: providerId,
+                  label: p.businessName ?? "Provider",
+                  sub: `KYC ${p.kycStatus ?? "PENDING"}`,
+                  badge: "PENDING",
+                  to: userId ? `/admin/users?filter=PROVIDER&highlightUserId=${encodeURIComponent(userId)}` : undefined,
+                };
+              })}
             />
           </div>
 
@@ -281,7 +288,7 @@ function QueueBox({
   viewAllTo,
 }: {
   title: string;
-  items: { id: string; label: string; sub: string; badge: string }[];
+  items: { id: string; label: string; sub: string; badge: string; to?: string }[];
   viewAllTo?: string;
 }) {
   return (
@@ -293,22 +300,32 @@ function QueueBox({
         <span className="text-[9px] font-bold text-amber-400">{items.length}</span>
       </div>
       <div className="divide-y divide-white/5">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="px-6 py-4 hover:bg-white/5 transition-colors cursor-pointer group"
-          >
-            <div className="flex justify-between items-start gap-2 mb-1">
-              <div className="text-xs font-bold text-slate-200 group-hover:text-amber-400 truncate min-w-0">
-                {item.label}
+        {items.map((item) => {
+          const content = (
+            <>
+              <div className="flex justify-between items-start gap-2 mb-1">
+                <div className="text-xs font-bold text-slate-200 group-hover:text-amber-400 truncate min-w-0">
+                  {item.label}
+                </div>
+                <span className="text-[8px] px-1.5 py-0.5 rounded border border-white/10 font-black uppercase tracking-tighter text-slate-500 flex-shrink-0">
+                  {item.badge}
+                </span>
               </div>
-              <span className="text-[8px] px-1.5 py-0.5 rounded border border-white/10 font-black uppercase tracking-tighter text-slate-500 flex-shrink-0">
-                {item.badge}
-              </span>
+              <div className="text-[10px] text-slate-500 font-medium">{item.sub}</div>
+            </>
+          );
+          return (
+            <div key={item.id} className="px-6 py-4 hover:bg-white/5 transition-colors cursor-pointer group">
+              {item.to ? (
+                <Link to={item.to} className="block">
+                  {content}
+                </Link>
+              ) : (
+                content
+              )}
             </div>
-            <div className="text-[10px] text-slate-500 font-medium">{item.sub}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {viewAllTo && (
         <Link

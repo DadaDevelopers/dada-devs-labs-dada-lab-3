@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 
 const UploadSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-  purpose: { type: String, enum: ["provider_license","beneficiary_doc","other"], default: "other", index: true },
+  purpose: { type: String, enum: ["provider_license","beneficiary_doc","national_id","other"], default: "other", index: true },
   name: String,
   mimeType: String,
   url: String,

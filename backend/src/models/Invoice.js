@@ -23,6 +23,8 @@ const InvoiceSchema = new Schema({
     required: true, 
     enum: ["MPESA","BANK","STRIPE","CARD","BITCOIN","LIGHTNING","CASH","OTHER"] 
   },
+  lightningAddress: { type: String }, // when paymentMethod is LIGHTNING (from payouts or invoice form)
+  btcAddress: { type: String },       // when paymentMethod is BITCOIN (from payouts or invoice form)
   paymentReference: { type: String }, // provider reference
   paymentDate: { type: Date, default: Date.now },
 

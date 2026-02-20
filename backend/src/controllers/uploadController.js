@@ -1,9 +1,9 @@
 // backend/src/controllers/uploadController.js
 import Upload from "../models/Upload.js";
-//import s3 from "../utils/s3.js";
-import generateUploadUrl from "../utils/s3.js";
-
 import config from "../config/config.js";
+// eslint-disable-next-line no-unused-vars
+import generateUploadUrl from "../utils/s3.js";
+const s3 = null; // Replace with actual S3 client when configured
 
 export async function presignUpload(req, res, next) {
   try {
@@ -65,4 +65,16 @@ export async function createUploadFromMetadata(req, res, next) {
     });
     res.status(201).json({ id: upload._id, url: upload.url, name: upload.name, mimeType: upload.mimeType });
   } catch (err) { next(err); }
+}
+
+/** List uploads for a user (admin only) — for KYC document review */
+export async function listUploadsForUser(req, res, next) {
+  try {
+    const userId = req.query.userId;
+    if (!userId) return res.status(400).json({ message: "userId query required" });
+    const uploads = await Upload.find({ userId }).sort({ createdAt: -1 }).lean();
+    res.json({ uploads: uploads.map((u) => ({ id: u._id, name: u.name, mimeType: u.mimeType, purpose: u.purpose, url: u.url, status: u.status, createdAt: u.createdAt })) });
+  } catch (err) {
+    next(err);
+  }
 }

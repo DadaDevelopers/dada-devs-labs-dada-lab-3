@@ -16,6 +16,12 @@ interface CampaignSummaryCardProps {
   imageUrl?: string;
   onClick?: () => void;
   onDonate?: (e: React.MouseEvent) => void;
+  /** When set (e.g. provider "To approve" tab), show Approve/Decline instead of Donate as primary actions */
+  providerActions?: {
+    onApprove: (e: React.MouseEvent) => void;
+    onDecline?: (e: React.MouseEvent) => void;
+    approving?: boolean;
+  };
 }
 
 export const CampaignSummaryCard = ({
@@ -32,6 +38,7 @@ export const CampaignSummaryCard = ({
   imageUrl,
   onClick,
   onDonate,
+  providerActions,
 }: CampaignSummaryCardProps) => {
   const progressPercentage = Math.min((amountRaised / targetAmount) * 100, 100);
 
@@ -137,7 +144,7 @@ export const CampaignSummaryCard = ({
             <span>{donorCount} Donors</span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -146,13 +153,36 @@ export const CampaignSummaryCard = ({
             >
               Details
             </Button>
-            <Button
-              className="rounded-full px-5 btn-cta h-9 flex items-center gap-1.5 group/btn"
-              onClick={onDonate}
-            >
-              <span>Donate</span>
-              <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-1" />
-            </Button>
+            {providerActions ? (
+              <>
+                <Button
+                  size="sm"
+                  className="rounded-full px-5 btn-cta h-9 flex items-center gap-1.5"
+                  onClick={providerActions.onApprove}
+                  disabled={providerActions.approving}
+                >
+                  {providerActions.approving ? "Accepting…" : "Approve"}
+                </Button>
+                {providerActions.onDecline && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full px-4 h-9 border-white/20 text-muted-foreground hover:text-white"
+                    onClick={providerActions.onDecline}
+                  >
+                    Decline
+                  </Button>
+                )}
+              </>
+            ) : onDonate ? (
+              <Button
+                className="rounded-full px-5 btn-cta h-9 flex items-center gap-1.5 group/btn"
+                onClick={onDonate}
+              >
+                <span>Donate</span>
+                <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-1" />
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

@@ -11,6 +11,7 @@ import AdminUserManagementPage from "../../components/admin/userManagement/Admin
 import AdminSettingsPage from "../../components/admin/AdminSettingsPage";
 import IncidentLogPage from "../../components/admin/overview/IncidentLogPage";
 import AdminCampaignDetailPage from "../../components/admin/campaignManagement/AdminCampaignDetailPage";
+import AdminPayoutsPage from "../../components/admin/payouts/AdminPayoutsPage";
 
 const AdminDashboardPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -36,6 +37,7 @@ const AdminDashboardPage = () => {
             <Route path="campaigns" element={<AdminCampaignPage />} />
             <Route path="campaigns/:id" element={<AdminCampaignDetailPage />} />
             <Route path="users" element={<AdminUserManagementPage />} />
+            <Route path="payouts" element={<AdminPayoutsPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
             <Route path="incident-log" element={<IncidentLogPage />} />
           </Routes>

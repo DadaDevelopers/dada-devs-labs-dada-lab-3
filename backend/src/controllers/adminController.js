@@ -1,5 +1,6 @@
 // adminController.js
 import { User } from "../models/User.js";
+import Provider from "../models/Provider.js";
 import Campaign from "../models/Campaign.js";
 import Donation from "../models/Donation.js";
 import ActivityLog from "../models/ActivityLog.js";
@@ -46,9 +47,8 @@ export const getAdminStats = async (req, res, next) => {
         { $group: { _id: "$role", count: { $sum: 1 } } }
       ]),
 
-      // 5. KYC by status (for providers)
-      User.aggregate([
-        { $match: { role: "PROVIDER" } },
+      // 5. KYC by status (from Provider collection — matches All Users / User Management list)
+      Provider.aggregate([
         { $group: { _id: "$kycStatus", count: { $sum: 1 } } }
       ]),
 
@@ -57,8 +57,8 @@ export const getAdminStats = async (req, res, next) => {
         { $group: { _id: "$adminStatus", count: { $sum: 1 } } }
       ]),
 
-      // 7. pending KYC (quick count)
-      User.countDocuments({ role: "PROVIDER", kycStatus: "PENDING", isDeleted: false }),
+      // 7. pending KYC (from Provider collection so summary card matches All Users page)
+      Provider.countDocuments({ kycStatus: "PENDING" }),
 
       // 8. total donations sum (Donation model uses amountFiat)
       Donation.aggregate([

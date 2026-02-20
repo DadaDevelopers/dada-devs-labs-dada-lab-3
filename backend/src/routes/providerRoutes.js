@@ -9,7 +9,9 @@ import {
   approveKYC,
   addPayoutMethod,
   requestPayout,
-  deleteProvider
+  deleteProvider,
+  listWithdrawals,
+  sendWithdrawalLightning,
 } from "../controllers/providerController.js";
 
 import { protect, authorize } from "../middlewares/auth.js";
@@ -30,6 +32,8 @@ router.post("/me/withdraw", protect, authorize("PROVIDER"), requestPayout); // a
 
 // Admin
 router.get("/", protect, authorize("ADMIN"), listProviders);
+router.get("/withdrawals", protect, authorize("ADMIN"), listWithdrawals);
+router.post("/withdrawals/:id/send-lightning", protect, authorize("ADMIN"), sendWithdrawalLightning);
 router.get("/:id", protect, authorize("ADMIN"), getProviderById);
 router.put("/:id/kyc", protect, authorize("ADMIN"), approveKYC);
 router.delete("/:id", protect, authorize("ADMIN"), deleteProvider);

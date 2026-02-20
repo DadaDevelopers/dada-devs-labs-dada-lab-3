@@ -87,6 +87,7 @@ const CampaignCreationWizard = () => {
 
   const [newCampaign, setNewCampaign] = useState<any>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [stepValidationErrors, setStepValidationErrors] = useState<string[] | null>(null);
 
   // Fetch providers on mount (colleague's addition – kept, feeds your matching)
   useEffect(() => {
@@ -129,6 +130,48 @@ const CampaignCreationWizard = () => {
     const hasSupportingDocs = supportingDocs.length > 0;
 
     return hasBasicInfo && hasProvider && hasSupportingDocs;
+  };
+
+  const getMissingDetailsFields = (): string[] => {
+    const missing: string[] = [];
+    if (!formData.title.trim()) missing.push("Campaign title");
+    if (!formData.description.trim()) missing.push("Description");
+    if (!formData.targetAmount) missing.push("Target amount");
+    if (!formData.fundraisingDeadline) missing.push("Fundraising deadline");
+    if (!formData.location.trim()) missing.push("Location");
+    const hasProvider =
+      providerSelection === "platform"
+        ? selectedProviderId !== ""
+        : manualProvider.name.trim() && (manualProvider.phone.trim() || manualProvider.email.trim());
+    if (!hasProvider) missing.push("Provider (select or enter name and contact)");
+    if (supportingDocs.length === 0) missing.push("At least one supporting document");
+    return missing;
+  };
+
+  const getMissingInvoiceFields = (): string[] => {
+    const missing: string[] = [];
+    if (!invoiceData.invoiceFile) missing.push("Invoice/Receipt file");
+    if (!invoiceData.invoiceAmount) missing.push("Invoice amount");
+    if (!invoiceData.invoiceDate) missing.push("Invoice date");
+    return missing;
+  };
+
+  const handleNextToDocuments = () => {
+    if (canProceedToInvoice()) {
+      setStepValidationErrors(null);
+      setCurrentStep("invoice");
+    } else {
+      setStepValidationErrors(getMissingDetailsFields());
+    }
+  };
+
+  const handleNextToReview = () => {
+    if (canProceedToReview()) {
+      setStepValidationErrors(null);
+      setCurrentStep("review");
+    } else {
+      setStepValidationErrors(getMissingInvoiceFields());
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -602,10 +645,15 @@ const CampaignCreationWizard = () => {
                   )}
                 </div>
 
+                {stepValidationErrors && currentStep === "info" && (
+                  <div className="p-4 rounded-lg border border-destructive/50 bg-destructive/10 text-destructive text-sm" role="alert">
+                    <p className="font-medium mb-1">Please complete the following:</p>
+                    <ul className="list-disc list-inside">{stepValidationErrors.map((f, i) => <li key={i}>{f}</li>)}</ul>
+                  </div>
+                )}
                 <div className="pt-4">
                   <Button
-                    onClick={() => setCurrentStep("invoice")}
-                    disabled={!canProceedToInvoice()}
+                    onClick={handleNextToDocuments}
                     className="w-full rounded-2xl btn-cta font-semibold py-3"
                   >
                     Next: Upload documents
@@ -704,17 +752,22 @@ const CampaignCreationWizard = () => {
                   </div>
                 </div>
 
+                {stepValidationErrors && currentStep === "invoice" && (
+                  <div className="p-4 rounded-lg border border-destructive/50 bg-destructive/10 text-destructive text-sm" role="alert">
+                    <p className="font-medium mb-1">Please complete the following:</p>
+                    <ul className="list-disc list-inside">{stepValidationErrors.map((f, i) => <li key={i}>{f}</li>)}</ul>
+                  </div>
+                )}
                 <div className="flex gap-3 pt-4">
                   <Button
-                    onClick={() => setCurrentStep("info")}
+                    onClick={() => { setStepValidationErrors(null); setCurrentStep("info"); }}
                     variant="outline"
                     className="flex-1 rounded-2xl border-[var(--color-accent)]/50 text-[var(--color-text-light)] hover:bg-[var(--color-accent)]/10 font-medium py-3"
                   >
                     Back
                   </Button>
                   <Button
-                    onClick={() => setCurrentStep("review")}
-                    disabled={!canProceedToReview()}
+                    onClick={handleNextToReview}
                     className="flex-1 rounded-2xl btn-cta font-semibold py-3"
                   >
                     Review campaign
@@ -851,7 +904,7 @@ const CampaignCreationWizard = () => {
                 )}
                 <div className="flex gap-3 pt-4">
                   <Button
-                    onClick={() => setCurrentStep("invoice")}
+                    onClick={() => { setStepValidationErrors(null); setCurrentStep("invoice"); }}
                     variant="outline"
                     className="flex-1 rounded-2xl border-[var(--color-accent)]/50 text-[var(--color-text-light)] hover:bg-[var(--color-accent)]/10 font-medium py-3"
                   >
@@ -902,8 +955,15 @@ const CampaignCreationWizard = () => {
 
               <div className="space-y-3">
                 <Button
-                  onClick={handleBackToDashboard}
+                  onClick={() => navigate("/beneficiary/campaigns")}
                   className="w-full rounded-2xl btn-cta font-semibold py-3"
+                >
+                  View my campaigns
+                </Button>
+                <Button
+                  onClick={handleBackToDashboard}
+                  variant="outline"
+                  className="w-full rounded-2xl border-[var(--color-accent)]/50 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 font-medium py-3"
                 >
                   Back to Dashboard
                 </Button>

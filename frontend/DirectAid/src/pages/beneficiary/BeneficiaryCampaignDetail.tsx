@@ -20,6 +20,7 @@ import {
   X,
   Check,
 } from "lucide-react";
+import { canEditCampaign } from "../../utils/campaignStatus";
 
 interface CampaignData {
   _id?: string;
@@ -30,8 +31,11 @@ interface CampaignData {
   currency?: string;
   category?: string;
   status?: string;
+  adminStatus?: string;
   amountRaised?: number;
   confirmationStatus?: string;
+  providerId?: string | null;
+  metadata?: { manualProvider?: { name?: string; phone?: string; email?: string } };
 }
 
 const BeneficiaryCampaignDetail = () => {
@@ -44,11 +48,22 @@ const BeneficiaryCampaignDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<{ title: string; description: string; targetAmount: string; category: string }>({
+  const [form, setForm] = useState<{
+    title: string;
+    description: string;
+    targetAmount: string;
+    category: string;
+    manualProviderName: string;
+    manualProviderPhone: string;
+    manualProviderEmail: string;
+  }>({
     title: "",
     description: "",
     targetAmount: "",
     category: "",
+    manualProviderName: "",
+    manualProviderPhone: "",
+    manualProviderEmail: "",
   });
 
   const beneficiaryName = user?.firstName || user?.name || user?.email || "User";
@@ -82,11 +97,15 @@ const BeneficiaryCampaignDetail = () => {
       }
       setCampaign(c);
       const target = c.targetAmount != null ? (typeof c.targetAmount === "number" ? c.targetAmount : parseFloat(String(c.targetAmount))) : 0;
+      const mp = (c as CampaignData).metadata?.manualProvider;
       setForm({
         title: c.title ?? "",
         description: c.description ?? "",
         targetAmount: target ? String(target) : "",
         category: c.category ?? "",
+        manualProviderName: mp?.name ?? "",
+        manualProviderPhone: mp?.phone ?? "",
+        manualProviderEmail: mp?.email ?? "",
       });
     };
     api
@@ -112,23 +131,38 @@ const BeneficiaryCampaignDetail = () => {
     if (!id || !campaign) return;
     setSaving(true);
     const targetNum = form.targetAmount ? parseFloat(form.targetAmount) : undefined;
+    const payload: Record<string, unknown> = {
+      title: form.title,
+      description: form.description,
+      targetAmount: targetNum,
+      category: form.category || undefined,
+    };
+    if (form.manualProviderName || form.manualProviderPhone || form.manualProviderEmail) {
+      payload.metadata = {
+        ...(campaign.metadata || {}),
+        manualProvider: {
+          name: form.manualProviderName.trim() || undefined,
+          phone: form.manualProviderPhone.trim() || undefined,
+          email: form.manualProviderEmail.trim() || undefined,
+        },
+      };
+    }
     api
-      .put(`/campaigns/${id}`, {
-        title: form.title,
-        description: form.description,
-        targetAmount: targetNum,
-        category: form.category || undefined,
-      })
+      .put(`/campaigns/${id}`, payload)
       .then((res) => {
         const c = (res.data as { campaign?: CampaignData }).campaign;
         if (c) {
           setCampaign(c);
           const target = c.targetAmount != null ? (typeof c.targetAmount === "number" ? c.targetAmount : parseFloat(String(c.targetAmount))) : 0;
+          const mp = c.metadata?.manualProvider;
           setForm({
             title: c.title ?? "",
             description: c.description ?? "",
             targetAmount: target ? String(target) : "",
             category: c.category ?? "",
+            manualProviderName: mp?.name ?? "",
+            manualProviderPhone: mp?.phone ?? "",
+            manualProviderEmail: mp?.email ?? "",
           });
         }
         setEditing(false);
@@ -225,6 +259,30 @@ const BeneficiaryCampaignDetail = () => {
                   className="rounded-lg px-4 py-2.5"
                 />
               </div>
+              <div className="border-t border-border pt-4 mt-4">
+                <p className="text-sm font-medium mb-2 text-foreground">Provider (if not in platform)</p>
+                <div className="space-y-3">
+                  <Input
+                    value={form.manualProviderName}
+                    onChange={(e) => setForm((f) => ({ ...f, manualProviderName: e.target.value }))}
+                    placeholder="Provider name"
+                    className="rounded-lg px-4 py-2.5"
+                  />
+                  <Input
+                    value={form.manualProviderPhone}
+                    onChange={(e) => setForm((f) => ({ ...f, manualProviderPhone: e.target.value }))}
+                    placeholder="Phone (optional)"
+                    className="rounded-lg px-4 py-2.5"
+                  />
+                  <Input
+                    type="email"
+                    value={form.manualProviderEmail}
+                    onChange={(e) => setForm((f) => ({ ...f, manualProviderEmail: e.target.value }))}
+                    placeholder="Email (so they can see and approve the campaign)"
+                    className="rounded-lg px-4 py-2.5"
+                  />
+                </div>
+              </div>
               <div className="flex gap-3 pt-2">
                 <Button onClick={handleSave} disabled={saving} className="gap-2 rounded-lg px-5 py-2.5">
                   <Check className="w-4 h-4" />
@@ -256,14 +314,16 @@ const BeneficiaryCampaignDetail = () => {
                     </span>
                   )}
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setEditing(true)}
-                  className="gap-2 rounded-lg shrink-0"
-                >
-                  <Pencil className="w-4 h-4" />
-                  Edit
-                </Button>
+                {canEditCampaign(campaign) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditing(true)}
+                    className="gap-2 rounded-lg shrink-0"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Edit
+                  </Button>
+                )}
               </div>
               {campaign.description && (
                 <p className="text-muted-foreground mt-5 text-base leading-relaxed whitespace-pre-wrap">

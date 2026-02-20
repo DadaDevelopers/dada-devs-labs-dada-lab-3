@@ -11,6 +11,8 @@ export interface BeneficiaryCampaign {
   amountRaised?: number;
   currency?: string;
   status?: string;
+  adminStatus?: string;
+  submittedForReview?: boolean;
   confirmationStatus?: "pending" | "provider_confirmed" | "both_confirmed" | "disputed";
   providerConfirmedAt?: string | null;
   beneficiaryConfirmedAt?: string | null;

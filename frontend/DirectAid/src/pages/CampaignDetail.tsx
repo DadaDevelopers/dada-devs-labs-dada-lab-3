@@ -621,7 +621,9 @@ export default function CampaignDetail() {
 
               {/* Transactions (donations + withdrawals) */}
               <div className="mt-6">
-                <CampaignTransactionsSection campaignId={id ?? String(campaign.id)} />
+                {(id || campaign?.id) && (
+                  <CampaignTransactionsSection campaignId={String(id ?? campaign?.id)} />
+                )}
               </div>
             </div>
           </div>
@@ -637,7 +639,7 @@ export default function CampaignDetail() {
                   <div className="space-y-2">
                     <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Progress to Goal</p>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-5xl font-extrabold text-white">${campaign.amountRaised.toLocaleString()}</span>
+                      <span className="text-5xl font-extrabold text-white">${Number(campaign?.amountRaised ?? 0).toLocaleString()}</span>
                       <span className="text-lg text-primary font-bold">Raised</span>
                     </div>
                   </div>
@@ -657,15 +659,7 @@ export default function CampaignDetail() {
                     </div>
                   </div>
 
-                  {userRole === "DONOR" || userRole === "Guest" ? (
-                    <Button
-                      onClick={() => navigate(`/donate?campaignId=${campaign.id}`)}
-                      className="w-full h-16 text-lg rounded-3xl btn-cta flex items-center justify-center gap-3"
-                    >
-                      <Heart className="w-6 h-6" />
-                      <span>Support this Mission</span>
-                    </Button>
-                  ) : isOwner && campaign.confirmationStatus === "provider_confirmed" ? (
+                  {isOwner && campaign.confirmationStatus === "provider_confirmed" ? (
                     <Button
                       onClick={() => navigate("/beneficiary/confirm")}
                       className="w-full h-16 text-lg rounded-3xl bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all"
@@ -673,6 +667,10 @@ export default function CampaignDetail() {
                       <ShieldCheck className="w-6 h-6" />
                       <span>Confirm Service Receipt</span>
                     </Button>
+                  ) : isOwner ? (
+                    <div className="p-4 text-center rounded-2xl bg-white/5 border border-white/10 text-xs text-muted-foreground italic">
+                      Awaiting provider confirmation to unlock receipt.
+                    </div>
                   ) : isAssignedProvider && campaign.confirmationStatus === "pending" ? (
                     <Button
                       onClick={() => navigate("/provider/confirm")}
@@ -682,9 +680,20 @@ export default function CampaignDetail() {
                       <span>Confirm Service Delivery</span>
                     </Button>
                   ) : (
-                    <div className="p-4 text-center rounded-2xl bg-white/5 border border-white/10 text-xs text-muted-foreground italic">
-                      {isOwner ? "Awaiting provider confirmation to unlock receipt." : "You are viewing this campaign as a " + userRole}
-                    </div>
+                    <>
+                      <Button
+                        onClick={() => navigate(`/donate?campaignId=${campaign.id}`)}
+                        className="w-full h-16 text-lg rounded-3xl btn-cta flex items-center justify-center gap-3"
+                      >
+                        <Heart className="w-6 h-6" />
+                        <span>Support this Mission</span>
+                      </Button>
+                      {userRole !== "DONOR" && userRole !== "Guest" && (
+                        <p className="text-xs text-muted-foreground mt-2 text-center">
+                          Anyone can support; you can donate as a guest or sign in as a donor.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </Card>
