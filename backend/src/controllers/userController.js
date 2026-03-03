@@ -52,14 +52,31 @@ export const getBeneficiaryMetrics = async (req, res, next) => {
     }
     const beneficiaryId = req.user.userId;
 
-    const campaigns = await Campaign.find({ beneficiaryId }).select("amountRaised status");
+    const campaigns = await Campaign.find({ beneficiaryId }).select("amountRaised status adminStatus");
+
     let totalAidReceived = 0;
     campaigns.forEach((c) => {
-      if (c.amountRaised) totalAidReceived += parseFloat(c.amountRaised.toString());
+      // Only count amountRaised if campaign is approved (safety check)
+      if (c.amountRaised && c.adminStatus === "approved") {
+        totalAidReceived += parseFloat(c.amountRaised.toString());
+      }
     });
-    const campaignsSupportingYou = campaigns.filter((c) => c.status === "ACTIVE").length;
-    // totalDisbursements: stub until Disbursement/Payment flow is implemented
-    const totalDisbursements = 0;
+
+    // Campaigns supporting you: Approved by admin AND Active in lifecycle
+    const campaignsSupportingYou = campaigns.filter(
+      (c) => c.status === "ACTIVE" && c.adminStatus === "approved"
+    ).length;
+
+    // Calculate total disbursements from Disbursement model
+    const disbursements = await Disbursement.find({
+      beneficiaryId,
+      status: "completed"
+    }).select("amount");
+
+    const totalDisbursements = disbursements.reduce(
+      (sum, d) => sum + (Number(d.amount) || 0),
+      0
+    );
 
     res.json({
       metrics: {
